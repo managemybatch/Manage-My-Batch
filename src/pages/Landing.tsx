@@ -20,43 +20,43 @@ import { cn } from '../lib/utils';
 
 const features = [
   {
-    title: 'ছাত্র ব্যবস্থাপনা',
-    description: 'ছাত্রদের ভর্তি, প্রোফাইল এবং তথ্য সহজে পরিচালনা করুন।',
+    title: 'শিক্ষা প্রতিষ্ঠান ব্যবস্থাপনা',
+    description: 'স্কুল, মাদ্রাসা বা কোচিং সেন্টারের ছাত্রদের ভর্তি, প্রোফাইল এবং তথ্য সহজে পরিচালনা করুন।',
     icon: Users,
     color: 'text-blue-600',
     bgColor: 'bg-blue-100'
   },
   {
-    title: 'ফি কালেকশন',
-    description: 'মাসিক ফি, বকেয়া এবং পেমেন্ট হিস্ট্রি ট্র্যাক করুন অটোমেটিক্যালি।',
+    title: 'অটোমেটেড ফি কালেকশন',
+    description: 'মাসিক বেতন, ভর্তি ফি এবং পেমেন্ট হিস্ট্রি ট্র্যাক করুন ডিজিটাল পদ্ধতিতে।',
     icon: CreditCard,
     color: 'text-green-600',
     bgColor: 'bg-green-100'
   },
   {
-    title: 'উপস্থিতি ট্র্যাকিং',
-    description: 'ডিজিটাল পদ্ধতিতে ছাত্রদের উপস্থিতি গ্রহণ এবং রিপোর্ট তৈরি করুন।',
+    title: 'ডিজিটাল উপস্থিতি',
+    description: 'ছাত্রদের স্মার্ট উপস্থিতি গ্রহণ এবং অটোমেটেড রিপোর্ট তৈরি করার আধুনিক সিস্টেম।',
     icon: ClipboardCheck,
     color: 'text-purple-600',
     bgColor: 'bg-purple-100'
   },
   {
-    title: 'পরীক্ষার ফলাফল',
-    description: 'পরীক্ষার মার্কস এন্ট্রি এবং প্রগতি রিপোর্ট কার্ড তৈরি করুন নিমিষেই।',
+    title: 'পরীক্ষার ফলাফল ও মার্কশিট',
+    description: 'পরীক্ষার মার্কস এন্ট্রি এবং প্রগতি রিপোর্ট কার্ড বা মার্কশিট তৈরি করুন নিমিষেই।',
     icon: BarChart3,
     color: 'text-orange-600',
     bgColor: 'bg-orange-100'
   },
   {
-    title: 'SMS নোটিফিকেশন',
-    description: 'ফি, উপস্থিতি এবং জরুরি নোটিশ অভিভাবকদের পাঠান SMS-এর মাধ্যমে।',
+    title: 'SMS ও নোটিফিকেশন',
+    description: 'ফি, উপস্থিতি এবং জরুরি নোটিশ অভিভাবকদের পাঠান অটোমেটেড SMS-এর মাধ্যমে।',
     icon: MessageSquare,
     color: 'text-pink-600',
     bgColor: 'bg-pink-100'
   },
   {
-    title: 'ব্যাচ ও রুটিন',
-    description: 'একাধিক ব্যাচ এবং ক্লাসের সময়সূচী সুশৃঙ্খলভাবে সাজান।',
+    title: 'ক্লাস রুটিন ও ব্যাচ',
+    description: 'স্কুল বা মাদ্রাসার ক্লাস রুটিন এবং কোচিংয়ের ব্যাচ ম্যানেজমেন্ট করুন সুশৃঙ্খলভাবে।',
     icon: Calendar,
     color: 'text-indigo-600',
     bgColor: 'bg-indigo-100'
@@ -65,22 +65,22 @@ const features = [
 
 const reviews = [
   {
-    name: 'আব্দুর রহমান',
-    role: 'পরিচালক, রহমান কোচিং সেন্টার',
-    content: 'এই সফটওয়্যারটি ব্যবহার করার পর আমাদের ফি কালেকশন অনেক সহজ হয়ে গেছে। এখন আর বকেয়া নিয়ে চিন্তা করতে হয় না।',
+    name: 'মাওলানা আব্দুল্লাহ',
+    role: 'মুহতামিম, আল-হেরা মাদ্রাসা',
+    content: 'এই সফটওয়্যারটি আমাদের মাদ্রাসার ফি কালেকশন এবং ছাত্রদের তথ্য সংরক্ষণে বৈপ্লবিক পরিবর্তন এনেছে। খুবই সহজ এবং কার্যকর।',
     rating: 5
   },
   {
     name: 'ফারহানা আক্তার',
-    role: 'অধ্যক্ষ, আইডিয়াল একাডেমি',
-    content: 'ছাত্রদের উপস্থিতি এবং পরীক্ষার রেজাল্ট অভিভাবকদের জানানো এখন মাত্র এক ক্লিকের ব্যাপার। অসাধারণ সার্ভিস!',
+    role: 'প্রধান শিক্ষক, আইডিয়াল একাডেমি',
+    content: 'ছাত্রদের উপস্থিতি এবং পরীক্ষার রেজাল্ট অভিভাবকদের জানানো এখন মাত্র এক ক্লিকের ব্যাপার। স্কুলের জন্য এটি সেরা ম্যানেজমেন্ট সিস্টেম।',
     rating: 5
   },
   {
     name: 'কামরুল হাসান',
-    role: 'ম্যানেজার, সাকসেস পয়েন্ট',
-    content: 'খুবই সহজ ইন্টারফেস। আমাদের স্টাফরা খুব দ্রুত এটি ব্যবহার করা শিখে গেছে। কোচিং ম্যানেজমেন্টের জন্য সেরা সমাধান।',
-    rating: 4
+    role: 'পরিচালক, সাকসেস কোচিং',
+    content: 'খুবই সহজ ইন্টারফেস। আমাদের স্টাফরা খুব দ্রুত এটি ব্যবহার করা শিখে গেছে। কোচিং ম্যানেজমেন্টের জন্য সেরা ডিজিটাল সমাধান।',
+    rating: 5
   }
 ];
 
@@ -165,15 +165,15 @@ export function Landing() {
         <div className="max-w-7xl mx-auto text-center relative z-10">
           <div className="inline-flex items-center gap-2 bg-blue-100 text-blue-700 px-4 py-2 rounded-full text-sm font-bold mb-8">
             <ShieldCheck className="w-4 h-4" />
-            কোচিং ম্যানেজমেন্টের আধুনিক সমাধান
+            স্কুল, মাদ্রাসা ও কোচিং ম্যানেজমেন্টের আধুনিক সমাধান
           </div>
           <h1 className="text-4xl md:text-6xl font-black text-gray-900 mb-6 leading-tight">
-            আপনার কোচিং সেন্টার পরিচালনা করুন <br />
+            আপনার শিক্ষা প্রতিষ্ঠান পরিচালনা করুন <br />
             <span className="text-blue-600">সহজ এবং ডিজিটাল পদ্ধতিতে</span>
           </h1>
           <p className="text-lg md:text-xl text-gray-600 mb-10 max-w-3xl mx-auto leading-relaxed">
-            ছাত্র ভর্তি, ফি কালেকশন, উপস্থিতি এবং পরীক্ষার ফলাফল - সবকিছু এখন এক প্ল্যাটফর্মে। 
-            আপনার প্রতিষ্ঠানের কাজের গতি বাড়ান এবং সময় বাঁচান।
+            স্কুল ম্যানেজমেন্ট সিস্টেম, মাদ্রাসা সফটওয়্যার এবং কোচিং সেন্টার ম্যানেজমেন্ট - সবকিছু এখন এক প্ল্যাটফর্মে। 
+            ভর্তি, ফি, উপস্থিতি এবং রেজাল্ট ম্যানেজমেন্ট করুন স্মার্টলি।
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 relative z-20">
             <Link 
@@ -223,8 +223,8 @@ export function Landing() {
       <section id="features" className="py-24 px-4 bg-gray-50">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-black text-gray-900 mb-4">আমাদের শক্তিশালী বৈশিষ্ট্যসমূহ</h2>
-            <p className="text-gray-600 max-w-2xl mx-auto">কোচিং সেন্টারের দৈনন্দিন কাজগুলোকে সহজ করতে আমরা নিয়ে এসেছি সব আধুনিক ফিচার।</p>
+            <h2 className="text-3xl md:text-4xl font-black text-gray-900 mb-4">সেরা শিক্ষা প্রতিষ্ঠান ম্যানেজমেন্ট ফিচার</h2>
+            <p className="text-gray-600 max-w-2xl mx-auto">স্কুল, মাদ্রাসা বা কোচিং সেন্টারের দৈনন্দিন কাজগুলোকে সহজ করতে আমরা নিয়ে এসেছি সব আধুনিক ডিজিটাল ফিচার।</p>
           </div>
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -247,8 +247,8 @@ export function Landing() {
           <div className="flex flex-col lg:flex-row items-center gap-16">
             <div className="flex-1">
               <h2 className="text-3xl md:text-4xl font-black text-gray-900 mb-8 leading-tight">
-                কেন আপনার কোচিং সেন্টারের জন্য <br />
-                <span className="text-blue-600">আমাদের সফটওয়্যার প্রয়োজন?</span>
+                কেন আপনার শিক্ষা প্রতিষ্ঠানের জন্য <br />
+                <span className="text-blue-600">আমাদের ম্যানেজমেন্ট সফটওয়্যার প্রয়োজন?</span>
               </h2>
               <div className="space-y-6">
                 <div className="flex gap-4">
@@ -305,7 +305,7 @@ export function Landing() {
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-black text-white mb-4">আমাদের গ্রাহকরা যা বলছেন</h2>
-            <p className="text-blue-100 max-w-2xl mx-auto">সারা দেশের শত শত কোচিং সেন্টার আমাদের ওপর আস্থা রেখেছে।</p>
+            <p className="text-blue-100 max-w-2xl mx-auto">সারা দেশের শত শত স্কুল, মাদ্রাসা এবং কোচিং সেন্টার আমাদের ওপর আস্থা রেখেছে।</p>
           </div>
 
           <div className="grid md:grid-cols-3 gap-8">
@@ -340,12 +340,11 @@ export function Landing() {
           <div className="absolute bottom-0 left-0 w-64 h-64 bg-blue-600/20 rounded-full blur-3xl -ml-32 -mb-32"></div>
           
           <h2 className="text-3xl md:text-5xl font-black text-white mb-6 relative z-10">
-            আজই আপনার কোচিং সেন্টারকে <br />
+            আজই আপনার শিক্ষা প্রতিষ্ঠানকে <br />
             <span className="text-blue-500">ডিজিটাল করুন</span>
           </h2>
           <p className="text-gray-400 text-lg mb-10 max-w-2xl mx-auto relative z-10">
-            কোনো ক্রেডিট কার্ড ছাড়াই রেজিস্ট্রেশন করুন এবং আমাদের সব ফিচার ব্যবহার করে দেখুন। 
-            আপনার প্রতিষ্ঠানের উন্নতি এখন আপনার হাতে।
+            কোনো ক্রেডিট কার্ড ছাড়াই রেজিস্ট্রেশন করুন এবং স্কুল, মাদ্রাসা বা কোচিং ম্যানেজমেন্টের সব ফিচার ব্যবহার করে দেখুন। 
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 relative z-10">
             <Link 
@@ -370,8 +369,8 @@ export function Landing() {
                 <span className="text-xl font-black text-gray-900 tracking-tight">Manage My Batch</span>
               </div>
               <p className="text-gray-500 max-w-sm leading-relaxed">
-                আমরা কোচিং সেন্টার এবং শিক্ষা প্রতিষ্ঠানের জন্য আধুনিক এবং সহজ ম্যানেজমেন্ট সফটওয়্যার প্রদান করি। 
-                আমাদের লক্ষ্য শিক্ষা ব্যবস্থাকে আরও গতিশীল এবং ডিজিটাল করা।
+                আমরা স্কুল, মাদ্রাসা এবং কোচিং সেন্টারের জন্য আধুনিক এবং সহজ শিক্ষা প্রতিষ্ঠান ম্যানেজমেন্ট সফটওয়্যার প্রদান করি। 
+                আমাদের লক্ষ্য বাংলাদেশের শিক্ষা ব্যবস্থাকে আরও গতিশীল এবং ডিজিটাল করা।
               </p>
             </div>
             <div>
