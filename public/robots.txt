@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://managemybatch.com/sitemap.xml

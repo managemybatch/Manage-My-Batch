@@ -1,0 +1,458 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Fields:
+    //   - uid: string (required)
+    //   - email: string (required)
+    //   - displayName: string (optional)
+    //   - photoURL: string (optional)
+    //   - role: string (required, 'admin' | 'teacher')
+    //   - institution: string (optional)
+    //
+    // Collection: students
+    // Fields:
+    //   - name: string (required)
+    //   - rollNo: string (required)
+    //   - guardianPhone: string (required)
+    //   - batchId: string (required)
+    //   - joinDate: string (required)
+    //   - monthlyFee: number (required)
+    //   - status: string (required, 'active' | 'inactive')
+    //   - createdBy: string (required)
+    //   - createdAt: string (required)
+    //   - email: string (optional)
+    //   - phone: string (optional)
+    //   - guardianName: string (optional)
+    //   - fatherName: string (optional)
+    //   - motherName: string (optional)
+    //   - dateOfBirth: string (optional)
+    //   - birthCertificateNo: string (optional)
+    //   - nidNumber: string (optional)
+    //   - address: string (optional)
+    //   - photoUrl: string (optional)
+    //   - grade: string (optional)
+    //   - section: string (optional)
+    //   - batchName: string (optional)
+    //   - subjectGroup: string (optional)
+    //   - feeType: string (optional)
+    //
+    // Collection: fees
+    // Fields:
+    //   - studentId: string (required)
+    //   - studentName: string (optional)
+    //   - amount: number (required)
+    //   - date: string (required)
+    //   - month: string (required)
+    //   - year: int (required)
+    //   - status: string (required, 'paid' | 'pending')
+    //   - type: string (required)
+    //   - createdBy: string (required)
+    //
+    // Collection: attendance
+    // Fields:
+    //   - studentId: string (required)
+    //   - date: string (required)
+    //   - status: string (required, 'present' | 'absent' | 'late')
+    //   - grade: string (required)
+    //   - section: string (required)
+    //   - markedBy: string (required)
+    //
+    // Collection: batches
+    // Fields:
+    //   - name: string (required)
+    //   - grade: string (required)
+    //   - section: string (optional)
+    //   - createdBy: string (required)
+    //   - createdAt: timestamp (required)
+    //
+    // Collection: offline_exams
+    // Fields:
+    //   - title: string (required)
+    //   - batchId: string (required)
+    //   - date: string (required)
+    //   - totalMarks: number (required)
+    //   - status: string (required, 'pending' | 'completed')
+    //   - createdBy: string (required)
+    //   - createdAt: timestamp (required)
+    //
+    // Collection: institutions
+    // Fields:
+    //   - name: string (required)
+    //   - established: string (optional)
+    //   - address: string (optional)
+    //   - phone: string (optional)
+    //   - email: string (optional)
+    //   - description: string (optional)
+    //   - vision: string (optional)
+    //   - admissionForm: map (required)
+    //
+    // Collection: applications
+    // Fields:
+    //   - institutionId: string (required)
+    //   - studentName: string (required)
+    //   - guardianPhone: string (required)
+    //   - email: string (optional)
+    //   - grade: string (optional)
+    //   - status: string (required)
+    //   - createdAt: timestamp (required)
+    //
+    // Collection: teachers
+    // Fields:
+    //   - name: string (required)
+    //   - email: string (required)
+    //   - phone: string (required)
+    //   - subject: string (required)
+    //   - salary: number (required)
+    //   - paymentStatus: string (required)
+    //   - joinDate: string (required)
+    //   - institutionId: string (required)
+    //
+    // Collection: schedules
+    // Fields:
+    //   - teacherId: string (required)
+    //   - teacherName: string (required)
+    //   - batchId: string (required)
+    //   - batchName: string (required)
+    //   - day: string (required)
+    //   - time: string (required)
+    //   - subject: string (required)
+    //
+    // Collection: circulars
+    // Fields:
+    //   - title: string (required)
+    //   - description: string (required)
+    //   - requirements: list (required)
+    //   - salaryRange: string (required)
+    //   - deadline: string (required)
+    //   - active: bool (required)
+    //   - institutionId: string (required)
+    //
+    // Collection: job_applications
+    // Fields:
+    //   - circularId: string (required)
+    //   - institutionId: string (required)
+    //   - applicantName: string (required)
+    //   - phone: string (required)
+    //   - email: string (required)
+    //   - resumeUrl: string (required)
+    //   - status: string (required)
+    //   - createdAt: timestamp (required)
+    //
+    // Collection: super_notifications
+    // Fields:
+    //   - title: string (required)
+    //   - message: string (required)
+    //   - type: string (required, 'info' | 'warning' | 'success' | 'error')
+    //   - createdAt: string (required)
+    //   - createdBy: string (required)
+    //   - createdByName: string (optional)
+    //
+    // Collection: support_messages
+    // Fields:
+    //   - chatId: string (required)
+    //   - senderId: string (required)
+    //   - receiverId: string (required)
+    //   - content: string (required)
+    //   - createdAt: string (required)
+    //   - isRead: bool (required)
+    //
+    // Collection: system_faqs
+    // Fields:
+    //   - question: string (required)
+    //   - answer: string (required)
+    //   - order: number (required)
+    //   - category: string (optional)
+    //
+    // Collection: exam_results
+    // Fields:
+    //   - examId: string (required)
+    //   - studentId: string (required)
+    //   - marks: map (required)
+    //   - totalObtained: number (required)
+    //   - percentage: number (required)
+    //   - createdAt: timestamp (required)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && (
+        request.auth.token.email.lower() in ["managemybatch@gmail.com", "pallistoreinfo@gmail.com", "admin@managemybatch.com"] ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'super_admin')) ||
+        (request.auth.token.email == "managemybatch@gmail.com" && request.auth.token.email_verified == true)
+      );
+    }
+
+    function isInstitutionAdmin() {
+      return isAuthenticated() && (
+        isAdmin() ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
+      );
+    }
+
+    function getInstitutionId() {
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid)) 
+        ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.institutionId 
+        : null;
+    }
+
+    function isTeacher() {
+      return isAuthenticated() && (
+        isInstitutionAdmin() ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'teacher' || 
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'staff'))
+      );
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidUrl(url) {
+      return url is string && (url == "" || url.matches("^https://.*") || url.matches("^http://.*"));
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidUser(data) {
+      return hasRequiredFields(['uid', 'email', 'role']) &&
+        data.role in ['admin', 'teacher', 'staff', 'super_admin', 'support', 'moderator'] &&
+        (data.displayName == null || (data.displayName is string && data.displayName.size() < 100)) &&
+        (data.photoURL == null || isValidUrl(data.photoURL));
+    }
+
+    function isValidStudent(data) {
+      return hasRequiredFields(['name', 'rollNo', 'guardianPhone', 'batchId', 'joinDate', 'monthlyFee', 'status', 'createdBy']) &&
+        data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+        data.rollNo is string &&
+        data.guardianPhone is string &&
+        data.batchId is string &&
+        data.joinDate is string &&
+        data.monthlyFee is number && data.monthlyFee >= 0 &&
+        data.status in ['active', 'inactive'] &&
+        (data.createdBy == request.auth.uid || isAdmin()) &&
+        (data.email == null || isValidEmail(data.email)) &&
+        (data.phone == null || data.phone is string) &&
+        (data.guardianName == null || data.guardianName is string) &&
+        (data.fatherName == null || data.fatherName is string) &&
+        (data.motherName == null || data.motherName is string) &&
+        (data.dateOfBirth == null || data.dateOfBirth is string) &&
+        (data.birthCertificateNo == null || data.birthCertificateNo is string) &&
+        (data.nidNumber == null || data.nidNumber is string) &&
+        (data.address == null || data.address is string) &&
+        (data.photoUrl == null || isValidUrl(data.photoUrl)) &&
+        (data.grade == null || data.grade is string) &&
+        (data.section == null || data.section is string) &&
+        (data.batchName == null || data.batchName is string) &&
+        (data.subjectGroup == null || data.subjectGroup is string) &&
+        (data.feeType == null || data.feeType is string);
+    }
+
+    function isValidFee(data) {
+      return hasRequiredFields(['studentId', 'amount', 'date', 'month', 'year', 'status', 'type', 'institutionId', 'createdBy']) &&
+        data.studentId is string &&
+        data.amount is number && data.amount >= 0 &&
+        data.status in ['paid', 'pending'] &&
+        data.institutionId is string &&
+        (data.institutionId == request.auth.uid || data.institutionId == getInstitutionId()) &&
+        data.createdBy == request.auth.uid;
+    }
+
+    function isValidAttendance(data) {
+      return hasRequiredFields(['studentId', 'date', 'status', 'grade', 'section', 'markedBy']) &&
+        data.studentId is string &&
+        data.status in ['present', 'absent', 'late'] &&
+        data.markedBy == request.auth.uid;
+    }
+
+    function isValidBatch(data) {
+      return hasRequiredFields(['name', 'grade', 'createdBy', 'createdAt']) &&
+        data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+        data.grade is string &&
+        (!('admissionFee' in data) || (data.admissionFee is number && data.admissionFee >= 0)) &&
+        (!('monthlyFee' in data) || (data.monthlyFee is number && data.monthlyFee >= 0)) &&
+        (data.description == null || data.description is string) &&
+        (data.color == null || data.color is string) &&
+        (data.batchTime == null || data.batchTime is string) &&
+        (data.duration == null || data.duration is string) &&
+        (data.subjects == null || data.subjects is list) &&
+        (data.weeklyDays == null || data.weeklyDays is list) &&
+        (data.createdBy == request.auth.uid || isAdmin() || (isTeacher() && data.institutionId == getInstitutionId()));
+    }
+
+    function isValidOfflineExam(data) {
+      return hasRequiredFields(['title', 'batchId', 'date', 'totalMarks', 'status', 'createdBy', 'createdAt']) &&
+        data.title is string && data.title.size() > 0 && data.title.size() < 200 &&
+        data.batchId is string &&
+        data.totalMarks is number && data.totalMarks > 0 &&
+        data.status in ['pending', 'completed'] &&
+        data.createdBy == request.auth.uid;
+    }
+
+    function isValidMessage(data) {
+      return hasRequiredFields(['senderId', 'recipientType', 'content', 'status', 'creditsUsed', 'createdAt', 'institutionId']) &&
+        data.senderId == request.auth.uid &&
+        data.institutionId == (getInstitutionId() != null ? getInstitutionId() : request.auth.uid) &&
+        data.recipientType in ['batch', 'group', 'individual', 'teacher', 'applicant'] &&
+        data.content is string && data.content.size() > 0 && data.content.size() < 1000 &&
+        data.status in ['delivered', 'failed'] &&
+        data.creditsUsed is number && data.creditsUsed >= 0;
+    }
+
+    function isValidCreditBalance(data) {
+      return hasRequiredFields(['userId', 'balance', 'totalSent', 'lastUpdated']) &&
+        data.userId is string &&
+        data.balance is number &&
+        data.totalSent is number;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if isOwner(userId) && isValidUser(request.resource.data) && 
+                      (request.resource.data.role == 'admin' || isAdmin());
+      allow update: if isAdmin() || (isOwner(userId) && isValidUser(request.resource.data) && 
+                      (request.resource.data.role == resource.data.role || isAdmin()));
+      allow delete: if isAdmin();
+    }
+
+    match /students/{studentId} {
+      allow read: if true; // Publicly readable for attendance and results
+      allow write: if isTeacher();
+    }
+
+    match /fees/{feeId} {
+      allow read, write: if isTeacher();
+    }
+
+    match /attendance/{attendanceId} {
+      allow read, write: if isTeacher();
+    }
+
+    match /batches/{batchId} {
+      allow read: if true; // Publicly readable for attendance
+      allow write: if isTeacher();
+    }
+
+    match /offline_exams/{examId} {
+      allow read: if true; // Publicly readable for results
+      allow create: if isTeacher() && isValidOfflineExam(request.resource.data);
+      allow update: if isTeacher() && isValidOfflineExam(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /attendance_submissions/{submissionId} {
+      allow read: if isTeacher();
+      allow create: if true; // Publicly submittable
+      allow update: if isTeacher() && (resource.data.institutionId == request.auth.uid || resource.data.institutionId == getInstitutionId() || isAdmin());
+      allow delete: if isTeacher();
+    }
+
+    match /institutions/{instId} {
+      allow read: if true; // Publicly readable for profiles and forms
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+    }
+
+    match /applications/{appId} {
+      allow read: if isTeacher() && (resource.data.institutionId == request.auth.uid || resource.data.institutionId == getInstitutionId() || isAdmin());
+      allow create: if true; // Publicly submittable
+      allow update, delete: if isTeacher() && (resource.data.institutionId == request.auth.uid || resource.data.institutionId == getInstitutionId() || isAdmin());
+    }
+
+    match /teachers/{teacherId} {
+      allow read: if isTeacher();
+      allow create, update, delete: if isTeacher();
+    }
+
+    match /schedules/{scheduleId} {
+      allow read: if isTeacher();
+      allow create, update, delete: if isTeacher();
+    }
+
+    match /circulars/{circularId} {
+      allow read: if true; // Publicly readable
+      allow create, update, delete: if isTeacher();
+    }
+
+    match /job_applications/{appId} {
+      allow read: if isTeacher() && (resource.data.institutionId == request.auth.uid || resource.data.institutionId == getInstitutionId() || isAdmin());
+      allow create: if true; // Publicly submittable
+      allow update, delete: if isTeacher() && (resource.data.institutionId == request.auth.uid || resource.data.institutionId == getInstitutionId() || isAdmin());
+    }
+
+    match /exam_results/{resultId} {
+      allow read: if isTeacher();
+      allow create, update, delete: if isTeacher();
+    }
+
+    match /messages/{messageId} {
+      allow read: if isTeacher() && (resource.data.institutionId == request.auth.uid || resource.data.institutionId == getInstitutionId() || isAdmin());
+      allow create: if isTeacher() && isValidMessage(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /super_notifications/{notificationId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /system_faqs/{faqId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /support_messages/{messageId} {
+      allow read: if isAuthenticated() && (resource.data.chatId == request.auth.uid || resource.data.chatId == getInstitutionId() || isAdmin());
+      allow create: if isAuthenticated() && (request.resource.data.chatId == request.auth.uid || request.resource.data.chatId == getInstitutionId() || isAdmin());
+      allow update: if isAuthenticated() && (resource.data.chatId == request.auth.uid || resource.data.chatId == getInstitutionId() || isAdmin());
+      allow delete: if isAdmin();
+    }
+
+    match /exam_results/{resultId} {
+      allow read: if isTeacher();
+      allow create, update, delete: if isTeacher();
+    }
+
+    match /credits/{userId} {
+      allow read: if isOwner(userId) || isAdmin() || getInstitutionId() == userId;
+      allow create: if isOwner(userId) && isValidCreditBalance(request.resource.data) && request.resource.data.balance == 100;
+      allow update: if (isAdmin() || isOwner(userId) || getInstitutionId() == userId) && isValidCreditBalance(request.resource.data) && (isAdmin() || request.resource.data.balance <= resource.data.balance);
+    }
+
+    match /{path=**} {
+      allow read, write: if false;
+    }
+  }
+}
