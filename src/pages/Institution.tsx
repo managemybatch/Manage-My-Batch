@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Building, Share2, Download, Users, Briefcase, Layers, MapPin, Phone, Mail, Globe, Info, CheckCircle, ExternalLink, Loader2, Plus, Trash2, UserPlus, MessageSquare } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import { useTranslation } from 'react-i18next';
@@ -9,6 +9,7 @@ import { collection, doc, getDoc, setDoc, updateDoc, query, where, getDocs, onSn
 import { motion, AnimatePresence } from 'motion/react';
 import { Modal } from '../components/Modal';
 import { ConfirmModal } from '../components/ConfirmModal';
+import html2canvas from 'html2canvas';
 
 interface InstitutionData {
   name: string;
@@ -51,8 +52,10 @@ export function Institution() {
   const [activeTab, setActiveTab] = useState<'profile' | 'admissionForm' | 'applications'>('profile');
   const [newFieldName, setNewFieldName] = useState('');
   const [loading, setLoading] = useState(true);
+  const [downloading, setDownloading] = useState(false);
   const [institution, setInstitution] = useState<InstitutionData | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const bioRef = useRef<HTMLDivElement>(null);
   const [applications, setApplications] = useState<Application[]>([]);
   const [stats, setStats] = useState({ students: 0, teachers: 0, batches: 0 });
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
@@ -328,60 +331,36 @@ export function Institution() {
   };
 
   const downloadBio = async () => {
-    if (!institution) return;
-    const { jsPDF } = await import('jspdf');
-    const doc = new jsPDF();
-    const instName = institution.name || 'Institution';
+    if (!institution || !bioRef.current || downloading) return;
     
-    // Header
-    doc.setFontSize(22);
-    doc.setTextColor(79, 70, 229); // Indigo
-    doc.text(instName, 105, 20, { align: 'center' });
-    
-    doc.setFontSize(10);
-    doc.setTextColor(100);
-    doc.text(`Established: ${institution.established || 'N/A'}`, 105, 28, { align: 'center' });
-    
-    // Line
-    doc.setDrawColor(200);
-    doc.line(20, 35, 190, 35);
-    
-    // Content
-    doc.setFontSize(12);
-    doc.setTextColor(0);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Contact Details', 20, 45);
-    doc.setFont('helvetica', 'normal');
-    doc.text(`Phone: ${institution.phone || 'N/A'}`, 25, 52);
-    doc.text(`Email: ${institution.email || 'N/A'}`, 25, 59);
-    doc.text(`Address: ${institution.address || 'N/A'}`, 25, 66);
-    
-    doc.setFont('helvetica', 'bold');
-    doc.text('About Institution', 20, 80);
-    doc.setFont('helvetica', 'normal');
-    const descLines = doc.splitTextToSize(institution.description || 'No description provided.', 160);
-    doc.text(descLines, 25, 87);
-    
-    let y = 87 + (descLines.length * 7);
-    
-    if (institution.vision) {
-      doc.setFont('helvetica', 'bold');
-      doc.text('Vision', 20, y + 10);
-      doc.setFont('helvetica', 'normal');
-      const visionLines = doc.splitTextToSize(institution.vision, 160);
-      doc.text(visionLines, 25, y + 17);
-      y = y + 17 + (visionLines.length * 7);
+    setDownloading(true);
+    try {
+      const { jsPDF } = await import('jspdf');
+      const canvas = await html2canvas(bioRef.current, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff'
+      });
+      
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+      const imgWidth = canvas.width;
+      const imgHeight = canvas.height;
+      const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
+      const imgX = (pdfWidth - imgWidth * ratio) / 2;
+      const imgY = 10;
+      
+      pdf.addImage(imgData, 'PNG', imgX, imgY, imgWidth * ratio, imgHeight * ratio);
+      pdf.save(`${institution.name.replace(/\s+/g, '_')}_Bio.pdf`);
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      setToast({ message: 'Failed to generate PDF. Please try again.', type: 'error' });
+    } finally {
+      setDownloading(false);
     }
-    
-    if (institution.principalName) {
-      doc.setFont('helvetica', 'bold');
-      doc.text('Principal Information', 20, y + 10);
-      doc.setFont('helvetica', 'normal');
-      doc.text(`Name: ${institution.principalName}`, 25, y + 17);
-      doc.text(`Title: ${institution.principalTitle || 'Principal'}`, 25, y + 24);
-    }
-    
-    doc.save(`${instName.replace(/\s+/g, '_')}_Profile.pdf`);
   };
 
   if (loading) {
@@ -408,9 +387,11 @@ export function Institution() {
           </button>
           <button 
             onClick={downloadBio}
-            className="flex items-center gap-2 px-4 py-2.5 bg-gray-900 text-white font-bold rounded-xl hover:bg-gray-800 transition-all shadow-lg shadow-gray-200"
+            disabled={downloading}
+            className="flex items-center gap-2 px-4 py-2.5 bg-gray-900 text-white font-bold rounded-xl hover:bg-gray-800 disabled:opacity-50 transition-all shadow-lg shadow-gray-200"
           >
-            <Download className="w-4 h-4" /> {t('institution.profile.downloadBio')}
+            {downloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+            {downloading ? 'Generating...' : t('institution.profile.downloadBio')}
           </button>
         </div>
       </div>
@@ -882,6 +863,133 @@ export function Institution() {
           </motion.div>
         )}
       </AnimatePresence>
+      <HiddenBioTemplate institution={institution} stats={stats} bioRef={bioRef} />
+    </div>
+  );
+}
+
+function HiddenBioTemplate({ institution, stats, bioRef }: { institution: any, stats: any, bioRef: React.RefObject<HTMLDivElement> }) {
+  if (!institution) return null;
+  return (
+    <div className="absolute -left-[9999px] top-0 shadow-none">
+      <div 
+        ref={bioRef}
+        className="w-[800px] p-12 bg-white space-y-12 text-gray-900 border"
+        style={{ fontFamily: '"Inter", sans-serif' }}
+      >
+        <div className="flex items-center gap-8 border-b-4 border-indigo-600 pb-8">
+          <div className="w-32 h-32 bg-indigo-50 rounded-3xl flex items-center justify-center text-4xl font-black text-indigo-600 shrink-0 overflow-hidden">
+            {institution.logoURL ? (
+              <img src={institution.logoURL} alt="Logo" className="w-full h-full object-contain p-4" referrerPolicy="no-referrer" />
+            ) : (
+              institution.name.charAt(0)
+            )}
+          </div>
+          <div className="space-y-2">
+            <h1 className="text-4xl font-black tracking-tight text-gray-900">{institution.name}</h1>
+            <p className="text-gray-500 font-bold flex items-center gap-2">
+              <MapPin className="w-4 h-4" /> {institution.address || 'Address not provided'}
+            </p>
+            <p className="text-indigo-600 font-bold uppercase tracking-widest text-xs">Established: {institution.established || 'N/A'}</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-3 gap-6">
+          {[
+            { label: 'Students', value: stats.students, color: 'text-blue-600' },
+            { label: 'Teachers', value: stats.teachers, color: 'text-emerald-600' },
+            { label: 'Batches', value: stats.batches, color: 'text-amber-600' },
+          ].map((stat, idx) => (
+            <div key={idx} className="bg-gray-50 p-6 rounded-2xl text-center border border-gray-100">
+              <p className="text-[10px] font-black text-gray-400 border uppercase tracking-widest mb-1">{stat.label}</p>
+              <h3 className={cn("text-2xl font-black", stat.color)}>{stat.value}</h3>
+            </div>
+          ))}
+        </div>
+
+        <div className="space-y-8">
+          <section className="space-y-4">
+            <h2 className="text-2xl font-black text-indigo-600 border-l-4 border-indigo-600 pl-4 uppercase tracking-tight">About Institution</h2>
+            <p className="text-gray-600 leading-relaxed text-lg whitespace-pre-wrap">
+              {institution.description || 'No description provided.'}
+            </p>
+          </section>
+
+          {(institution.vision || institution.goal || institution.target) && (
+            <section className="space-y-6 bg-indigo-50/50 p-8 rounded-3xl border border-indigo-100">
+              {institution.vision && (
+                <div className="space-y-2">
+                  <h3 className="text-lg font-black text-gray-900">Vision & Mission</h3>
+                  <p className="text-gray-600 leading-relaxed whitespace-pre-wrap">{institution.vision}</p>
+                </div>
+              )}
+              {institution.goal && (
+                <div className="space-y-2">
+                  <h3 className="text-lg font-black text-gray-900">Our Goal</h3>
+                  <p className="text-gray-600 leading-relaxed whitespace-pre-wrap">{institution.goal}</p>
+                </div>
+              )}
+              {institution.target && (
+                <div className="space-y-2">
+                  <h3 className="text-lg font-black text-gray-900">Our Target</h3>
+                  <p className="text-gray-600 leading-relaxed whitespace-pre-wrap">{institution.target}</p>
+                </div>
+              )}
+            </section>
+          )}
+
+          {institution.principalName && (
+            <section className="space-y-6">
+              <h2 className="text-2xl font-black text-indigo-600 border-l-4 border-indigo-600 pl-4 uppercase tracking-tight">Message from Principal</h2>
+              <div className="flex gap-8 items-start">
+                {institution.principalPhotoURL && (
+                  <div className="w-32 h-32 rounded-2xl overflow-hidden shrink-0 shadow-lg border-4 border-white ring-1 ring-gray-100">
+                    <img src={institution.principalPhotoURL} alt="Principal" className="w-full h-full object-cover" />
+                  </div>
+                )}
+                <div className="space-y-2">
+                  <p className="text-xl font-bold text-gray-900">{institution.principalName}</p>
+                  <p className="text-indigo-600 font-bold text-xs uppercase tracking-widest">{institution.principalTitle || 'Principal'}</p>
+                  <p className="text-gray-600 italic leading-relaxed text-lg">
+                    "Welcome to our institution. We are committed to providing the highest quality education and fostering a nurturing environment for all our students."
+                  </p>
+                </div>
+              </div>
+            </section>
+          )}
+
+          <div className="pt-8 border-t border-gray-100">
+            <h3 className="text-lg font-black text-gray-900 mb-4">Contact Information</h3>
+            <div className="grid grid-cols-2 gap-8">
+              <div className="space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-gray-50 rounded-xl flex items-center justify-center text-gray-400">
+                    <Phone className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Phone</p>
+                    <p className="font-bold text-gray-900">{institution.phone || 'N/A'}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-gray-50 rounded-xl flex items-center justify-center text-gray-400">
+                    <Mail className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Email</p>
+                    <p className="font-bold text-gray-900">{institution.email || 'N/A'}</p>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-gray-50 p-6 rounded-2xl border border-gray-100">
+                <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">Generated by</p>
+                <p className="font-black text-indigo-600 text-xl tracking-tight">Manage My Batch</p>
+                <p className="text-xs text-gray-400">Your education partner</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
