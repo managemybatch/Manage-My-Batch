@@ -56,28 +56,51 @@ export function InstitutionProfile() {
     setDownloading(true);
     try {
       const { jsPDF } = await import('jspdf');
+      
+      // Wait a bit for images and styles to settle
+      await new Promise(r => setTimeout(r, 500));
+
       const canvas = await html2canvas(bioRef.current, {
-        scale: 2,
+        scale: 1.5,
         useCORS: true,
-        logging: false,
-        backgroundColor: '#ffffff'
+        logging: true,
+        backgroundColor: '#ffffff',
+        width: 800,
+        height: bioRef.current.scrollHeight
       });
       
-      const imgData = canvas.toDataURL('image/png');
+      if (!canvas || canvas.width === 0) {
+        throw new Error('Canvas generation failed');
+      }
+
+      const imgData = canvas.toDataURL('image/jpeg', 0.8);
       const pdf = new jsPDF('p', 'mm', 'a4');
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = pdf.internal.pageSize.getHeight();
-      const imgWidth = canvas.width;
-      const imgHeight = canvas.height;
-      const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
-      const imgX = (pdfWidth - imgWidth * ratio) / 2;
-      const imgY = 10;
       
-      pdf.addImage(imgData, 'PNG', imgX, imgY, imgWidth * ratio, imgHeight * ratio);
-      pdf.save(`${institution.name.replace(/\s+/g, '_')}_Bio.pdf`);
-    } catch (error) {
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      
+      const margin = 10;
+      const imgWidth = pageWidth - (margin * 2);
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      
+      let heightLeft = imgHeight;
+      let position = margin;
+
+      pdf.addImage(imgData, 'JPEG', margin, position, imgWidth, imgHeight);
+      heightLeft -= (pageHeight - margin * 2);
+
+      while (heightLeft >= 0) {
+        pdf.addPage();
+        position = heightLeft - imgHeight + margin;
+        pdf.addImage(imgData, 'JPEG', margin, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
+
+      const safeName = institution.name ? institution.name.substring(0, 30).split(' ').join('_') : 'Institution';
+      pdf.save(`${safeName}_Bio.pdf`);
+    } catch (error: any) {
       console.error('Error generating PDF:', error);
-      alert('Failed to generate PDF. Please try again.');
+      alert(`Failed to generate PDF: ${error.message || 'Check connection'}`);
     } finally {
       setDownloading(false);
     }
@@ -308,16 +331,16 @@ export function InstitutionProfile() {
 
 function HiddenBioTemplate({ institution, stats, bioRef }: { institution: any, stats: any, bioRef: React.RefObject<HTMLDivElement> }) {
   return (
-    <div className="absolute -left-[9999px] top-0">
+    <div className="fixed top-0 left-0 -z-[100] opacity-0 pointer-events-none overflow-hidden" style={{ width: '800px' }}>
       <div 
         ref={bioRef}
         className="w-[800px] p-12 bg-white space-y-12 text-gray-900 border"
-        style={{ fontFamily: '"Inter", sans-serif' }}
+        style={{ fontFamily: '"Inter", sans-serif', minHeight: '1000px' }}
       >
         <div className="flex items-center gap-8 border-b-4 border-indigo-600 pb-8">
           <div className="w-32 h-32 bg-indigo-50 rounded-3xl flex items-center justify-center text-4xl font-black text-indigo-600 shrink-0 overflow-hidden">
             {institution.logoURL ? (
-              <img src={institution.logoURL} alt="Logo" className="w-full h-full object-contain p-4" referrerPolicy="no-referrer" />
+              <img src={institution.logoURL} alt="Logo" className="w-full h-full object-contain p-4" crossOrigin="anonymous" referrerPolicy="no-referrer" />
             ) : (
               institution.name.charAt(0)
             )}
@@ -381,7 +404,7 @@ function HiddenBioTemplate({ institution, stats, bioRef }: { institution: any, s
               <div className="flex gap-8 items-start">
                 {institution.principalPhotoURL && (
                   <div className="w-32 h-32 rounded-2xl overflow-hidden shrink-0 shadow-lg border-4 border-white ring-1 ring-gray-100">
-                    <img src={institution.principalPhotoURL} alt="Principal" className="w-full h-full object-cover" />
+                    <img src={institution.principalPhotoURL} alt="Principal" className="w-full h-full object-cover" crossOrigin="anonymous" />
                   </div>
                 )}
                 <div className="space-y-2">
