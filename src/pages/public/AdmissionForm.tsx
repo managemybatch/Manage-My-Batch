@@ -63,12 +63,16 @@ export function AdmissionForm() {
     });
 
     try {
+      const selectedBatch = batches.find(b => b.id === data['batch']);
       await addDoc(collection(db, 'applications'), {
         institutionId: id,
         studentName: data['studentName'] || 'N/A',
         guardianPhone: data['guardianPhone'] || 'N/A',
-        grade: batches.find(b => b.id === data['batch'])?.grade || batches.find(b => b.id === data['batch'])?.name || 'N/A',
+        grade: selectedBatch?.grade || selectedBatch?.name || 'N/A',
         batchId: data['batch'],
+        batchName: selectedBatch?.name || '',
+        monthlyFee: selectedBatch?.monthlyFee || 0,
+        admissionFee: selectedBatch?.admissionFee || 0,
         status: 'pending',
         photoUrl: photoPreview,
         formData: {

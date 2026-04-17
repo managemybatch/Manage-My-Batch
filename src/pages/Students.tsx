@@ -110,7 +110,7 @@ export function Students() {
 
         if (!name || !batchNameStr) continue;
 
-        firestoreBatch.set(studentRef, {
+        const studentData = {
           name: name.trim(),
           guardianPhone: phone?.trim() || '',
           batchId: b?.id || '',
@@ -125,7 +125,50 @@ export function Students() {
           institutionId: instId,
           createdBy: user.uid,
           createdAt: serverTimestamp(),
-        });
+        };
+
+        firestoreBatch.set(studentRef, studentData);
+        
+        // Create Paid Fee Records for Import
+        const admissionFee = b?.admissionFee || 0;
+        const monthlyFee = b?.monthlyFee || 0;
+        const now = new Date();
+        const currentMonth = MONTHS[now.getMonth()];
+        const currentYear = now.getFullYear();
+
+        if (admissionFee > 0) {
+          const feeRef = doc(collection(db, 'fees'));
+          firestoreBatch.set(feeRef, {
+            studentId: studentRef.id,
+            studentName: studentData.name,
+            amount: admissionFee,
+            date: now.toISOString(),
+            month: currentMonth,
+            year: currentYear,
+            status: 'paid',
+            type: 'Admission Fee',
+            institutionId: instId,
+            createdBy: user.uid,
+            createdAt: serverTimestamp(),
+          });
+        }
+
+        if (monthlyFee > 0) {
+          const feeRef = doc(collection(db, 'fees'));
+          firestoreBatch.set(feeRef, {
+            studentId: studentRef.id,
+            studentName: studentData.name,
+            amount: monthlyFee,
+            date: now.toISOString(),
+            month: currentMonth,
+            year: currentYear,
+            status: 'paid',
+            type: 'Monthly Fee',
+            institutionId: instId,
+            createdBy: user.uid,
+            createdAt: serverTimestamp(),
+          });
+        }
         
         if (b?.id) {
           const batchRef = doc(db, 'batches', b.id);
@@ -173,6 +216,7 @@ export function Students() {
     isAdmissionFeePaid: true,
     isMonthlyFeePaid: true,
     status: 'active' as const,
+    applicationId: null as string | null,
   });
 
   useEffect(() => {
@@ -365,6 +409,15 @@ export function Students() {
       console.log('Committing batch...');
       await firestoreBatch.commit();
       console.log('Batch committed successfully');
+
+      // Delete Application if exists
+      if (newStudent.applicationId) {
+        try {
+          await deleteDoc(doc(db, 'applications', newStudent.applicationId));
+        } catch (err) {
+          console.error('Error deleting application:', err);
+        }
+      }
       
       // Send Admission Message
       const message = t('students.addModal.successMsg', {
@@ -459,23 +512,26 @@ export function Students() {
 
   const handleApproveApplication = (app: any) => {
     const prefillData = {
-      name: app.formData?.fullName || app.studentName || '',
+      name: app.formData?.studentName || app.studentName || '',
       fatherName: app.formData?.fatherName || '',
       motherName: app.formData?.motherName || '',
-      guardianPhone: app.phone || '',
+      guardianPhone: app.formData?.guardianPhone || app.guardianPhone || '',
       address: app.formData?.address || '',
       photoUrl: app.photoUrl || '',
       batchId: app.batchId || '',
       rollNo: '',
       monthlyFee: app.monthlyFee || 0,
       admissionFee: app.admissionFee || 0,
+      dateOfBirth: app.formData?.dob || '',
+      birthCertificateNo: app.formData?.birthReg || '',
+      nidNumber: app.formData?.nid || '',
+      joinDate: app.formData?.admissionDate || new Date().toISOString().split('T')[0],
+      subjectGroup: app.formData?.subjectGroup || 'Science',
+      applicationId: app.id
     };
     
     setNewStudent(prev => ({ ...prev, ...prefillData }));
     setIsAddModalOpen(true);
-    // Remove the application once approved/added (the user will save it manually in the modal)
-    // Actually, we should probably delete it after successful save in handleAddStudent
-    // For now, let's keep it until they save.
   };
 
   const handleDeleteApplication = async (appId: string) => {
@@ -883,7 +939,7 @@ export function Students() {
                 </div>
               </TableCell>
               <TableCell>
-                <p className="text-sm font-bold text-gray-900">{app.phone}</p>
+                <p className="text-sm font-bold text-gray-900">{app.formData?.guardianPhone || app.guardianPhone}</p>
               </TableCell>
               <TableCell>
                 <div className="flex flex-col">
@@ -1396,8 +1452,30 @@ export function Students() {
               </select>
             </div>
 
-            <div className="space-y-2 md:col-span-2">
-              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">{t('students.addModal.feeType')}</label>
+            <div className="space-y-4 md:col-span-2 bg-indigo-50/50 p-6 rounded-2xl border border-indigo-100">
+              <label className="text-xs font-bold text-gray-500 uppercase tracking-widest">{t('students.addModal.feeType')}</label>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <label className="flex items-center gap-3 p-3 bg-white border border-gray-200 rounded-xl cursor-pointer hover:border-indigo-500 transition-all">
+                  <input
+                    type="checkbox"
+                    checked={newStudent.isAdmissionFeePaid}
+                    onChange={e => setNewStudent({...newStudent, isAdmissionFeePaid: e.target.checked})}
+                    className="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500"
+                  />
+                  <span className="text-sm font-medium text-gray-700">{t('students.addModal.skipAdmissionFee')}</span>
+                </label>
+                <label className="flex items-center gap-3 p-3 bg-white border border-gray-200 rounded-xl cursor-pointer hover:border-indigo-500 transition-all">
+                  <input
+                    type="checkbox"
+                    checked={newStudent.isMonthlyFeePaid}
+                    onChange={e => setNewStudent({...newStudent, isMonthlyFeePaid: e.target.checked})}
+                    className="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500"
+                  />
+                  <span className="text-sm font-medium text-gray-700">{t('students.addModal.skipMonthlyFee')}</span>
+                </label>
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
                 {['Full Fee', 'Half Fee', 'Scholarship', 'Custom'].map((type) => (
                   <button
@@ -1418,7 +1496,7 @@ export function Students() {
 
                       setNewStudent({
                         ...newStudent, 
-                        feeType: type,
+                        feeType: type as any,
                         monthlyFee: mFee,
                         admissionFee: aFee
                       });

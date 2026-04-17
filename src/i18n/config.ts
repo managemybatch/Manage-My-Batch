@@ -81,6 +81,8 @@ const resources = {
           feeType: "Default Fee Type",
           address: "Detailed Address",
           addressPlaceholder: "Enter full address...",
+          skipAdmissionFee: "Mark admission fee as already paid",
+          skipMonthlyFee: "Mark current month fee as already paid",
           successMsg: "Congratulations! {{name}}'s admission is successful.\nAdmission Fee: ৳{{aFee}}\nMonthly Fee: ৳{{mFee}}\nTotal Received: ৳{{total}}\nThank you, Manage My Batch."
         }
       },
@@ -666,6 +668,8 @@ bn: {
           feeType: "ডিফল্ট ফি টাইপ",
           address: "বিস্তারিত ঠিকানা",
           addressPlaceholder: "সম্পূর্ণ ঠিকানা লিখুন...",
+          skipAdmissionFee: "ভর্তি ফি পরিশোধ করা হয়েছে",
+          skipMonthlyFee: "চলতি মাসের ফি পরিশোধ করা হয়েছে",
           successMsg: "অভিনন্দন! {{name}} এর ভর্তি সফল হয়েছে।\nভর্তি ফি: ৳{{aFee}}\nমাসিক ফি: ৳{{mFee}}\nমোট গ্রহণ করা হয়েছে: ৳{{total}}\nধন্যবাদ, Manage My Batch।"
         }
       },
