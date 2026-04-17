@@ -41,6 +41,7 @@ export function Dashboard() {
   const { t } = useTranslation();
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
   const [systemNotifications, setSystemNotifications] = useState<any[]>([]);
+  const [expiryNotification, setExpiryNotification] = useState<any | null>(null);
   const [smsBalance, setSmsBalance] = useState(0);
 
   useEffect(() => {
@@ -77,6 +78,49 @@ export function Dashboard() {
       unsubscribe();
       unsubCredits();
     };
+  }, [user]);
+
+  // Handle Plan Expiry Auto-Notifications
+  useEffect(() => {
+    if (!user || user.subscriptionPlan === 'free' || !user.subscriptionExpiry) {
+      setExpiryNotification(null);
+      return;
+    }
+
+    const expiryDate = new Date(user.subscriptionExpiry);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    expiryDate.setHours(0, 0, 0, 0);
+
+    const diffDays = Math.ceil((expiryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+    if (diffDays === 3) {
+      setExpiryNotification({
+        id: 'auto-expiry-3',
+        type: 'warning',
+        title: 'Plan Ending Soon',
+        message: 'Your plan will end in 3 days. Please renew to avoid service interruption.',
+        createdAt: new Date().toISOString()
+      });
+    } else if (diffDays === 0) {
+      setExpiryNotification({
+        id: 'auto-expiry-0',
+        type: 'error',
+        title: 'Plan Ends Today',
+        message: 'Your subscription ends today. Please make a payment to continue using all features.',
+        createdAt: new Date().toISOString()
+      });
+    } else if (diffDays < 0 && diffDays >= -5) {
+      setExpiryNotification({
+        id: `auto-expiry-past-${Math.abs(diffDays)}`,
+        type: 'error',
+        title: 'Plan Expired (Grace Period)',
+        message: `Your plan expired ${Math.abs(diffDays)} days ago. You are in a 5-day grace period. Access will be restricted soon.`,
+        createdAt: new Date().toISOString()
+      });
+    } else {
+      setExpiryNotification(null);
+    }
   }, [user]);
 
   const dismissNotification = async (id: string) => {
@@ -291,12 +335,34 @@ export function Dashboard() {
 
       {/* System Notifications */}
       <AnimatePresence>
-        {systemNotifications.length > 0 && (
+        {(systemNotifications.length > 0 || expiryNotification) && (
           <div className="space-y-4">
             <h3 className="text-sm font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2 px-2">
               <Bell className="w-4 h-4" /> {t('common.notifications')}
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {expiryNotification && (
+                <motion.div 
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="bg-rose-600 p-4 rounded-2xl border border-rose-500 shadow-lg shadow-rose-200 text-white flex gap-3 relative overflow-hidden md:col-span-1"
+                >
+                  <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full blur-2xl -mr-12 -mt-12" />
+                  <div className="p-2 rounded-xl bg-white/20 h-fit">
+                    <AlertTriangle className="w-5 h-5 text-white" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h4 className="text-sm font-black text-white truncate">{expiryNotification.title}</h4>
+                    <p className="text-xs text-rose-50 opacity-90 line-clamp-2 mt-1">{expiryNotification.message}</p>
+                    <button 
+                      onClick={() => setIsUpgradeModalOpen(true)}
+                      className="mt-2 text-[10px] font-black uppercase tracking-widest bg-white text-rose-600 px-3 py-1 rounded-lg hover:bg-rose-50 transition-colors"
+                    >
+                      Renew Now
+                    </button>
+                  </div>
+                </motion.div>
+              )}
               {systemNotifications.map((notif) => (
                 <motion.div 
                   key={notif.id}

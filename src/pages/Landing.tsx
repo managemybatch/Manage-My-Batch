@@ -14,9 +14,12 @@ import {
   Menu,
   X,
   Star,
-  Quote
+  Quote,
+  Clock,
+  AlertTriangle
 } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { SUBSCRIPTION_PLANS } from '../constants';
 
 const features = [
   {
@@ -294,6 +297,97 @@ export function Landing() {
                 className="relative rounded-2xl shadow-2xl z-10"
                 referrerPolicy="no-referrer"
               />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Pricing Section */}
+      <section id="pricing" className="py-24 px-4 bg-gray-50">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl md:text-5xl font-black text-gray-900 mb-4 tracking-tight">সহজ এবং স্বচ্ছ প্রাইসিং</h2>
+            <p className="text-gray-500 max-w-2xl mx-auto font-medium">আপনার প্রতিষ্ঠানের প্রয়োজন অনুযায়ী সেরা প্ল্যানটি বেছে নিন। কোনো লুকানো চার্জ নেই।</p>
+          </div>
+
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8 mb-16">
+            {SUBSCRIPTION_PLANS.map((plan) => (
+              <div 
+                key={plan.id} 
+                className={cn(
+                  "bg-white p-8 rounded-[2rem] border relative transition-all duration-300 hover:shadow-2xl hover:-translate-y-2",
+                  plan.id === 'standard' ? "border-blue-500 shadow-xl shadow-blue-100" : "border-gray-100 shadow-sm"
+                )}
+              >
+                {plan.id === 'standard' && (
+                  <div className="absolute top-0 right-10 -translate-y-1/2 bg-blue-600 text-white px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg">
+                    Popular
+                  </div>
+                )}
+                <div className="mb-8">
+                  <h3 className="text-xl font-black text-gray-900 uppercase tracking-tight mb-2">{plan.name}</h3>
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-4xl font-black text-gray-900">{plan.price}</span>
+                    <span className="text-gray-500 font-bold">/মাস</span>
+                  </div>
+                </div>
+
+                <ul className="space-y-4 mb-10">
+                  <li className="flex items-center gap-3 text-sm font-medium text-gray-600">
+                    <CheckCircle2 className="w-5 h-5 text-blue-600 flex-shrink-0" />
+                    <span>সর্বোচ্চ {plan.studentLimit} জন ছাত্র</span>
+                  </li>
+                  <li className="flex items-center gap-3 text-sm font-medium text-gray-600">
+                    <CheckCircle2 className="w-5 h-5 text-blue-600 flex-shrink-0" />
+                    <span>সর্বোচ্চ {plan.batchLimit} টি ব্যাচ</span>
+                  </li>
+                  <li className="flex items-center gap-3 text-sm font-medium text-gray-600">
+                    <CheckCircle2 className="w-5 h-5 text-blue-600 flex-shrink-0" />
+                    <span>আনলিমিটেড এটেনডেন্স ও রেজাল্ট</span>
+                  </li>
+                  <li className="flex items-center gap-3 text-sm font-medium text-gray-600">
+                    <CheckCircle2 className="w-5 h-5 text-blue-600 flex-shrink-0" />
+                    <span>প্রিমিয়াম সাপোর্ট ও এসএমএস টোকেন সুবিধা</span>
+                  </li>
+                </ul>
+
+                <Link 
+                  to="/signup"
+                  className={cn(
+                    "w-full py-4 rounded-2xl font-black text-sm transition-all text-center block",
+                    plan.id === 'standard' 
+                      ? "bg-blue-600 text-white hover:bg-blue-700 shadow-lg shadow-blue-200" 
+                      : "bg-gray-50 text-gray-900 hover:bg-gray-100 border border-gray-200"
+                  )}
+                >
+                  শুরু করুন
+                </Link>
+              </div>
+            ))}
+          </div>
+
+          {/* Benefits Grid */}
+          <div className="grid md:grid-cols-3 gap-6">
+            <div className="bg-white p-6 rounded-2xl border border-blue-50 border-t-4 border-t-blue-500 shadow-sm">
+              <div className="w-10 h-10 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center mb-4">
+                <CheckCircle2 className="w-6 h-6" />
+              </div>
+              <h4 className="font-black text-gray-900 mb-2">কোনো অগ্রিম চার্জ নেই</h4>
+              <p className="text-sm text-gray-500 leading-relaxed">আমাদের সেবায় কোনো ইন্সটলমেন্ট ফি বা হিডেন চার্জ নেই। আপনি শুধুমাত্র মাসের সাবস্ক্রিপশন ফি দিয়েই সেবাটি ব্যবহার করতে পারবেন।</p>
+            </div>
+            <div className="bg-white p-6 rounded-2xl border border-amber-50 border-t-4 border-t-amber-500 shadow-sm">
+              <div className="w-10 h-10 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center mb-4">
+                <Clock className="w-6 h-6" />
+              </div>
+              <h4 className="font-black text-gray-900 mb-2">৫ দিনের গ্রেস পিরিয়ড</h4>
+              <p className="text-sm text-gray-500 leading-relaxed">প্ল্যান শেষ হওয়ার পর আপনার কোনো জরুরি কাজ যাতে না থামে, সেজন্য আমরা ৫ দিন অতিরিক্ত ব্যবহারের সুবিধা দেই।</p>
+            </div>
+            <div className="bg-white p-6 rounded-2xl border border-rose-50 border-t-4 border-t-rose-500 shadow-sm">
+              <div className="w-10 h-10 bg-rose-50 text-rose-600 rounded-xl flex items-center justify-center mb-4">
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+              <h4 className="font-black text-gray-900 mb-2">ডাটা ডিলিট পলিসি</h4>
+              <p className="text-sm text-gray-500 leading-relaxed">যদি কোনো প্রতিষ্ঠান টানা ৩০ দিন সফটওয়্যারটি ব্যবহার না করে (অ্যাকাউন্ট নিষ্ক্রিয় থাকে), তবে নিরাপত্তার খাতিরে ডাটা স্থায়ীভাবে মুছে ফেলা হবে।</p>
             </div>
           </div>
         </div>

@@ -68,11 +68,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 return;
               }
 
-              // Check for subscription expiry
+              // Check for subscription expiry with 5-day grace period
               if (userData.role === 'admin' && userData.subscriptionPlan !== 'free' && userData.subscriptionExpiry) {
                 const expiryDate = new Date(userData.subscriptionExpiry);
-                if (expiryDate < new Date()) {
-                  // Revert to free
+                const gracePeriodExpiry = new Date(expiryDate);
+                gracePeriodExpiry.setDate(gracePeriodExpiry.getDate() + 5);
+                
+                if (gracePeriodExpiry < new Date()) {
+                  // Revert to free after grace period ends
                   await updateDoc(doc(db, 'users', firebaseUser.uid), { subscriptionPlan: 'free' });
                   return;
                 }
