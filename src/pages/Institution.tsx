@@ -3,7 +3,7 @@ import { Building, Share2, Download, Users, Briefcase, Layers, MapPin, Phone, Ma
 import { useAuth } from '../lib/auth';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import { cn } from '../lib/utils';
+import { cn, compressImage } from '../lib/utils';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { collection, doc, getDoc, setDoc, updateDoc, query, where, getDocs, onSnapshot, orderBy, limit } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
@@ -52,6 +52,7 @@ export function Institution() {
   const [newFieldName, setNewFieldName] = useState('');
   const [loading, setLoading] = useState(true);
   const [institution, setInstitution] = useState<InstitutionData | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
   const [applications, setApplications] = useState<Application[]>([]);
   const [stats, setStats] = useState({ students: 0, teachers: 0, batches: 0 });
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
@@ -180,7 +181,9 @@ export function Institution() {
 
   const handleSaveProfile = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!user?.uid || !institution) return;
+    if (!user?.uid || !institution || isSaving) return;
+    
+    setIsSaving(true);
     const instId = user.institutionId || user.uid;
     const formData = new FormData(e.currentTarget);
     const updatedData: any = {
@@ -205,51 +208,47 @@ export function Institution() {
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, 'institutions');
       setToast({ message: 'Failed to update profile.', type: 'error' });
+    } finally {
+      setIsSaving(false);
     }
   };
 
-  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleLogoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 200000) {
-        alert('Image size too large. Please choose an image under 200KB.');
-        return;
+      try {
+        const compressed = await compressImage(file, 400, 0.7); // Smaller for logo
+        setInstitution(prev => prev ? { ...prev, logoURL: compressed } : null);
+      } catch (error) {
+        console.error("Error compressing logo:", error);
+        alert('Failed to process image.');
       }
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setInstitution(prev => prev ? { ...prev, logoURL: reader.result as string } : null);
-      };
-      reader.readAsDataURL(file);
     }
   };
 
-  const handlePrincipalPhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePrincipalPhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 500000) {
-        alert('Image size too large. Please choose an image under 500KB.');
-        return;
+      try {
+        const compressed = await compressImage(file, 600, 0.7);
+        setInstitution(prev => prev ? { ...prev, principalPhotoURL: compressed } : null);
+      } catch (error) {
+        console.error("Error compressing photo:", error);
+        alert('Failed to process image.');
       }
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setInstitution(prev => prev ? { ...prev, principalPhotoURL: reader.result as string } : null);
-      };
-      reader.readAsDataURL(file);
     }
   };
 
-  const handleInstitutionPhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleInstitutionPhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 800000) {
-        alert('Image size too large. Please choose an image under 800KB.');
-        return;
+      try {
+        const compressed = await compressImage(file, 1000, 0.7);
+        setInstitution(prev => prev ? { ...prev, photoURL: compressed } : null);
+      } catch (error) {
+        console.error("Error compressing photo:", error);
+        alert('Failed to process image.');
       }
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setInstitution(prev => prev ? { ...prev, photoURL: reader.result as string } : null);
-      };
-      reader.readAsDataURL(file);
     }
   };
 
@@ -537,8 +536,19 @@ export function Institution() {
                   <textarea name="vision" defaultValue={institution?.vision} rows={3} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all resize-none" />
                 </div>
                 <div className="flex justify-end">
-                  <button type="submit" className="px-8 py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200">
-                    {t('common.save')}
+                  <button 
+                    type="submit" 
+                    disabled={isSaving}
+                    className="px-8 py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-indigo-200 flex items-center gap-2"
+                  >
+                    {isSaving ? (
+                      <>
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                        {t('common.saving')}...
+                      </>
+                    ) : (
+                      t('common.save')
+                    )}
                   </button>
                 </div>
               </form>

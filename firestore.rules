@@ -82,6 +82,7 @@ service cloud.firestore {
     //
     // Collection: institutions
     // Fields:
+    //   - id: string (required)
     //   - name: string (required)
     //   - established: string (optional)
     //   - address: string (optional)
@@ -89,7 +90,15 @@ service cloud.firestore {
     //   - email: string (optional)
     //   - description: string (optional)
     //   - vision: string (optional)
+    //   - goal: string (optional)
+    //   - target: string (optional)
+    //   - logoURL: string (optional)
+    //   - photoURL: string (optional)
+    //   - principalName: string (optional)
+    //   - principalTitle: string (optional)
+    //   - principalPhotoURL: string (optional)
     //   - admissionForm: map (required)
+    //   - createdAt: string (required)
     //
     // Collection: applications
     // Fields:
@@ -235,7 +244,7 @@ service cloud.firestore {
     }
 
     function isValidUrl(url) {
-      return url is string && (url == "" || url.matches("^https://.*") || url.matches("^http://.*"));
+      return url is string && (url == "" || url.matches("^https://.*") || url.matches("^http://.*") || url.matches("^data:image/.*"));
     }
 
     // ===============================================================
@@ -334,6 +343,25 @@ service cloud.firestore {
         data.totalSent is number;
     }
 
+    function isValidInstitution(data) {
+      return hasRequiredFields(['name', 'admissionForm']) &&
+        data.name is string && data.name.size() > 0 && data.name.size() < 200 &&
+        (data.established == null || data.established is string && data.established.size() < 50) &&
+        (data.address == null || data.address is string && data.address.size() < 1000) &&
+        (data.phone == null || data.phone is string && data.phone.size() < 50) &&
+        (data.email == null || isValidEmail(data.email)) &&
+        (data.description == null || data.description is string && data.description.size() < 5000) &&
+        (data.vision == null || data.vision is string && data.vision.size() < 2000) &&
+        (data.goal == null || data.goal is string && data.goal.size() < 1000) &&
+        (data.target == null || data.target is string && data.target.size() < 1000) &&
+        (data.logoURL == null || (data.logoURL is string && data.logoURL.size() < 1000000 && isValidUrl(data.logoURL))) &&
+        (data.photoURL == null || (data.photoURL is string && data.photoURL.size() < 1000000 && isValidUrl(data.photoURL))) &&
+        (data.principalName == null || data.principalName is string && data.principalName.size() < 100) &&
+        (data.principalTitle == null || data.principalTitle is string && data.principalTitle.size() < 100) &&
+        (data.principalPhotoURL == null || (data.principalPhotoURL is string && data.principalPhotoURL.size() < 1000000 && isValidUrl(data.principalPhotoURL))) &&
+        data.admissionForm is map;
+    }
+
     // ===============================================================
     // Rules
     // ===============================================================
@@ -381,8 +409,8 @@ service cloud.firestore {
 
     match /institutions/{instId} {
       allow read: if true; // Publicly readable for profiles and forms
-      allow create: if isAdmin();
-      allow update: if isAdmin();
+      allow create: if isAdmin() || (isInstitutionAdmin() && instId == request.auth.uid);
+      allow update: if (isAdmin() || (isInstitutionAdmin() && (instId == request.auth.uid || instId == getInstitutionId()))) && isValidInstitution(request.resource.data);
     }
 
     match /applications/{appId} {
