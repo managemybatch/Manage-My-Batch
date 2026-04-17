@@ -29,7 +29,11 @@ import { db, handleFirestoreError, OperationType } from '../firebase';
 import { useAuth } from '../lib/auth';
 import { useTranslation, Trans } from 'react-i18next';
 import { SubscriptionModal } from '../components/SubscriptionModal';
-import { SUBSCRIPTION_PLANS } from '../constants';
+import { 
+  GRADES, 
+  SUBSCRIPTION_PLANS, 
+  MONTHS 
+} from '../constants';
 import { AnimatePresence } from 'motion/react';
 
 export function Dashboard() {
@@ -192,15 +196,24 @@ export function Dashboard() {
   useEffect(() => {
     const currentYear = new Date().getFullYear();
     const currentMonthIndex = new Date().getMonth();
-    const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
     const withDues = students.filter((student: any) => {
       if (student.status !== 'active') return false;
+      
+      // Get join month and year
+      const joinDate = new Date(student.joinDate || Date.now());
+      const joinYear = joinDate.getFullYear();
+      const joinMonthIndex = joinDate.getMonth();
+
+      // Academic year starts in January, but we only count from join month if it's the same year
+      // If they joined in a previous year, we count from January of the current year
+      const startMonthIndex = joinYear < currentYear ? 0 : joinMonthIndex;
+
       const paidMonths = fees
         .filter((f: any) => f.studentId === student.id && f.year === currentYear && f.type === 'Monthly Fee' && f.status === 'paid')
         .map((f: any) => f.month);
 
-      for (let i = 0; i <= currentMonthIndex; i++) {
+      for (let i = startMonthIndex; i <= currentMonthIndex; i++) {
         if (!paidMonths.includes(MONTHS[i])) return true;
       }
       return false;
@@ -268,7 +281,7 @@ export function Dashboard() {
             </div>
           </div>
           <Link 
-            to="/fees"
+            to="/fees?tab=dues"
             className="px-8 py-3 bg-rose-600 text-white rounded-xl font-black hover:bg-rose-700 transition-all shadow-lg shadow-rose-200 flex items-center gap-2"
           >
             {t('dashboard.viewDueList')} <ChevronRight className="w-4 h-4" />
@@ -384,7 +397,7 @@ export function Dashboard() {
         <StatItem label={t('dashboard.stats.pendingResults')} value={stats.pendingResults} icon={AlertCircle} color="rose" to="/offline-exams" />
         <StatItem label={t('dashboard.stats.attendanceRate')} value={`${stats.attendanceRate}%`} icon={ClipboardCheck} color="indigo" to="/attendance" />
         <StatItem label={t('dashboard.stats.totalCollected')} value={formatCurrency(stats.totalCollected)} icon={CreditCard} color="emerald" to="/fees" />
-        <StatItem label={t('dashboard.stats.studentsWithDues')} value={studentsWithDues.length} icon={AlertCircle} color="rose" to="/fees" />
+        <StatItem label={t('dashboard.stats.studentsWithDues')} value={studentsWithDues.length} icon={AlertCircle} color="rose" to="/fees?tab=dues" />
       </div>
 
       {/* Plan Usage Section */}

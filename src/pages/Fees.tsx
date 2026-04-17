@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { CreditCard, Plus, Search, Filter, Download, CheckCircle2, Clock, Loader2, User, Phone, Calendar, AlertCircle, Send, Wallet, Banknote, Users } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 import { Table, TableRow, TableCell } from '../components/Table';
 import { cn, formatCurrency, formatDate, formatWhatsAppPhone } from '../lib/utils';
 import { collection, onSnapshot, query, addDoc, serverTimestamp, orderBy, writeBatch, doc, where } from 'firebase/firestore';
@@ -45,6 +46,7 @@ interface FeeRecord {
 export function Fees() {
   const { t } = useTranslation();
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
   const [fees, setFees] = useState<FeeRecord[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [batches, setBatches] = useState<Batch[]>([]);
@@ -53,7 +55,7 @@ export function Fees() {
   const [selectedBatch, setSelectedBatch] = useState('All Batches');
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
-  const [activeTab, setActiveTab] = useState<'all' | 'dues'>('all');
+  const [activeTab, setActiveTab] = useState<'all' | 'dues'>((searchParams.get('tab') as any) === 'dues' ? 'dues' : 'all');
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [reportDates, setReportDates] = useState({ start: '', end: '' });
   const [isSaving, setIsSaving] = useState(false);
