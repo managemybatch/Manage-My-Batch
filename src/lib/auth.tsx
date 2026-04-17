@@ -23,6 +23,7 @@ interface UserProfile {
   institutionId?: string;
   subscriptionPlan?: 'free' | 'basic' | 'standard' | 'advanced';
   subscriptionExpiry?: string;
+  lastLogin?: string;
   dismissedNotifications?: string[];
 }
 
@@ -66,6 +67,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 await updateDoc(doc(db, 'users', firebaseUser.uid), { isSuperAdmin: true, role: 'super_admin' });
                 // The next snapshot will have the updated data
                 return;
+              }
+
+              // Update last login (once per 24 hours to avoid excessive writes)
+              const today = new Date().toISOString().split('T')[0];
+              if (userData.lastLogin !== today) {
+                await updateDoc(doc(db, 'users', firebaseUser.uid), { lastLogin: today });
               }
 
               // Check for subscription expiry with 5-day grace period

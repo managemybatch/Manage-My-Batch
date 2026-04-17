@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Filter, MoreVertical, Mail, Phone, Download, Loader2, Layers, User, MessageSquare, Contact } from 'lucide-react';
+import { Plus, Search, Filter, MoreVertical, Mail, Phone, Download, Loader2, Layers, User, MessageSquare, Contact, FileText, CheckCircle2, XCircle, Users } from 'lucide-react';
 import { Table, TableRow, TableCell } from '../components/Table';
 import { motion } from 'motion/react';
-import { cn, formatWhatsAppPhone } from '../lib/utils';
+import { cn, formatWhatsAppPhone, formatDate } from '../lib/utils';
 import { collection, onSnapshot, query, addDoc, serverTimestamp, deleteDoc, doc, getDoc, writeBatch, where, orderBy, increment } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { useAuth } from '../lib/auth';
 import { Modal } from '../components/Modal';
 import { ConfirmModal } from '../components/ConfirmModal';
-import { GRADES, SECTIONS, SUBSCRIPTION_PLANS } from '../constants';
+import { GRADES, SECTIONS, SUBSCRIPTION_PLANS, MONTHS } from '../constants';
 import { useTranslation } from 'react-i18next';
 import { SubscriptionModal } from '../components/SubscriptionModal';
 
@@ -56,6 +56,8 @@ export function Students() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [students, setStudents] = useState<Student[]>([]);
+  const [applications, setApplications] = useState<any[]>([]);
+  const [activeTab, setActiveTab] = useState<'students' | 'applications'>('students');
   const [batches, setBatches] = useState<Batch[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -72,6 +74,79 @@ export function Students() {
   const [isSaving, setIsSaving] = useState(false);
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const importInputRef = React.useRef<HTMLInputElement>(null);
+
+  const handleImportCSV = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const text = event.target?.result as string;
+      const rows = text.split('\n').map(row => row.split(','));
+      // Assume Header: Name, Phone, Batch, RollNo, GuardianName, FatherName, MotherName, Address
+      // Basic validation
+      if (rows.length < 2) {
+        alert('Empty or invalid CSV file');
+        return;
+      }
+
+      const headers = rows[0].map(h => h.trim().toLowerCase());
+      const studentRows = rows.slice(1).filter(r => r.length > 1);
+
+      setIsSaving(true);
+      const firestoreBatch = writeBatch(db);
+      const instId = user.institutionId || user.uid;
+      let count = 0;
+
+      for (const row of studentRows) {
+        const studentRef = doc(collection(db, 'students'));
+        const name = row[headers.indexOf('name')] || row[0];
+        const phone = row[headers.indexOf('phone')] || row[1];
+        const batchNameStr = row[headers.indexOf('batch')] || row[2];
+        const rollNo = row[headers.indexOf('rollno')] || row[3] || '';
+        
+        const b = batches.find(batch => batch.name.toLowerCase() === batchNameStr?.trim().toLowerCase());
+
+        if (!name || !batchNameStr) continue;
+
+        firestoreBatch.set(studentRef, {
+          name: name.trim(),
+          guardianPhone: phone?.trim() || '',
+          batchId: b?.id || '',
+          batchName: b?.name || batchNameStr.trim(),
+          grade: b?.grade || '',
+          rollNo: rollNo.trim(),
+          status: 'active',
+          joinDate: new Date().toISOString().split('T')[0],
+          monthlyFee: b?.monthlyFee || 0,
+          admissionFee: b?.admissionFee || 0,
+          feeType: 'Full Fee',
+          institutionId: instId,
+          createdBy: user.uid,
+          createdAt: serverTimestamp(),
+        });
+        
+        if (b?.id) {
+          const batchRef = doc(db, 'batches', b.id);
+          firestoreBatch.update(batchRef, { studentCount: increment(1) });
+        }
+        count++;
+      }
+
+      try {
+        await firestoreBatch.commit();
+        alert(`Successfully imported ${count} students`);
+      } catch (err) {
+        console.error('Import failed', err);
+        alert('Failed to import students');
+      } finally {
+        setIsSaving(false);
+        if (importInputRef.current) importInputRef.current.value = '';
+      }
+    };
+    reader.readAsText(file);
+  };
   
   const [newStudent, setNewStudent] = useState({
     name: '',
@@ -95,6 +170,8 @@ export function Students() {
     admissionFee: 0,
     subjectGroup: 'Science',
     feeType: 'Full Fee',
+    isAdmissionFeePaid: true,
+    isMonthlyFeePaid: true,
     status: 'active' as const,
   });
 
@@ -157,9 +234,27 @@ export function Students() {
       handleFirestoreError(error, OperationType.LIST, 'students');
     });
 
+    // Fetch Applications
+    const qApps = query(
+      collection(db, 'applications'),
+      where('institutionId', '==', instId)
+    );
+    const unsubApps = onSnapshot(qApps, (snapshot) => {
+      const appData = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setApplications(appData.sort((a: any, b: any) => {
+        const dateA = a.createdAt ? (typeof a.createdAt === 'string' ? new Date(a.createdAt).getTime() : a.createdAt.seconds * 1000) : 0;
+        const dateB = b.createdAt ? (typeof b.createdAt === 'string' ? new Date(b.createdAt).getTime() : b.createdAt.seconds * 1000) : 0;
+        return dateB - dateA;
+      }));
+    });
+
     return () => {
       unsubBatches();
       unsubStudents();
+      unsubApps();
     };
   }, [user, searchParams]);
 
@@ -230,15 +325,16 @@ export function Students() {
       }
 
       // Create Admission Fee Record
-      if (admissionFee > 0) {
+      if (admissionFee > 0 && (newStudent as any).isAdmissionFeePaid) {
         const admissionFeeRef = doc(collection(db, 'fees'));
+        const jDate = new Date(newStudent.joinDate);
         firestoreBatch.set(admissionFeeRef, {
           studentId: studentRef.id,
           studentName: newStudent.name,
           amount: admissionFee,
           date: new Date().toISOString(),
-          month: new Date().toLocaleString('default', { month: 'long' }),
-          year: new Date().getFullYear(),
+          month: MONTHS[jDate.getMonth()],
+          year: jDate.getFullYear(),
           status: 'paid', // Collected at admission
           type: 'Admission Fee',
           institutionId: user.institutionId || user.uid,
@@ -248,15 +344,16 @@ export function Students() {
       }
 
       // Create First Monthly Fee Record
-      if (monthlyFee > 0) {
+      if (monthlyFee > 0 && (newStudent as any).isMonthlyFeePaid) {
         const monthlyFeeRef = doc(collection(db, 'fees'));
+        const jDate = new Date(newStudent.joinDate);
         firestoreBatch.set(monthlyFeeRef, {
           studentId: studentRef.id,
           studentName: newStudent.name,
           amount: monthlyFee,
           date: new Date().toISOString(),
-          month: new Date().toLocaleString('default', { month: 'long' }),
-          year: new Date().getFullYear(),
+          month: MONTHS[jDate.getMonth()],
+          year: jDate.getFullYear(),
           status: 'paid', // Collected at admission
           type: 'Monthly Fee',
           institutionId: user.institutionId || user.uid,
@@ -360,6 +457,35 @@ export function Students() {
     }
   };
 
+  const handleApproveApplication = (app: any) => {
+    const prefillData = {
+      name: app.formData?.fullName || app.studentName || '',
+      fatherName: app.formData?.fatherName || '',
+      motherName: app.formData?.motherName || '',
+      guardianPhone: app.phone || '',
+      address: app.formData?.address || '',
+      photoUrl: app.photoUrl || '',
+      batchId: app.batchId || '',
+      rollNo: '',
+      monthlyFee: app.monthlyFee || 0,
+      admissionFee: app.admissionFee || 0,
+    };
+    
+    setNewStudent(prev => ({ ...prev, ...prefillData }));
+    setIsAddModalOpen(true);
+    // Remove the application once approved/added (the user will save it manually in the modal)
+    // Actually, we should probably delete it after successful save in handleAddStudent
+    // For now, let's keep it until they save.
+  };
+
+  const handleDeleteApplication = async (appId: string) => {
+    try {
+      await deleteDoc(doc(db, 'applications', appId));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `applications/${appId}`);
+    }
+  };
+
   const filteredStudents = students.filter(s => {
     const matchesSearch = s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       s.rollNo.includes(searchTerm);
@@ -368,6 +494,12 @@ export function Students() {
     const matchesBatch = batchId ? s.batchId === batchId : true;
     
     return matchesSearch && matchesBatch;
+  });
+
+  const filteredApplications = applications.filter(app => {
+    const name = app.formData?.fullName || app.studentName || '';
+    return name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+           app.phone?.includes(searchTerm);
   });
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, isEdit = false) => {
@@ -491,6 +623,21 @@ export function Students() {
           <p className="text-gray-500 mt-1">{t('students.subtitle')}</p>
         </div>
         <div className="flex items-center gap-3">
+          <input
+            type="file"
+            ref={importInputRef}
+            onChange={handleImportCSV}
+            accept=".csv"
+            className="hidden"
+          />
+          <button
+            onClick={() => importInputRef.current?.click()}
+            disabled={isSaving}
+            className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-all shadow-sm"
+            title="CSV Format: Name, Phone, Batch, RollNo"
+          >
+            <Download className="w-4 h-4 rotate-180" /> {t('common.import', { defaultValue: 'Import' })}
+          </button>
           <button 
             onClick={downloadBatchIDCards}
             className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-all shadow-sm"
@@ -507,6 +654,35 @@ export function Students() {
             <Plus className="w-4 h-4" /> {t('students.addStudent')}
           </button>
         </div>
+      </div>
+
+      <div className="flex items-center gap-2 bg-white p-1.5 rounded-2xl border border-gray-100 shadow-sm w-fit">
+        <button
+          onClick={() => setActiveTab('students')}
+          className={cn(
+            "px-6 py-2.5 text-sm font-bold rounded-xl transition-all flex items-center gap-2",
+            activeTab === 'students' ? "bg-indigo-600 text-white shadow-lg shadow-indigo-100" : "text-gray-500 hover:bg-gray-50"
+          )}
+        >
+          <Users className="w-4 h-4" /> {t('students.allStudents')}
+        </button>
+        <button
+          onClick={() => setActiveTab('applications')}
+          className={cn(
+            "px-6 py-2.5 text-sm font-bold rounded-xl transition-all flex items-center gap-2",
+            activeTab === 'applications' ? "bg-amber-600 text-white shadow-lg shadow-amber-100" : "text-gray-500 hover:bg-gray-50"
+          )}
+        >
+          <FileText className="w-4 h-4" /> {t('students.applications', { defaultValue: 'Applications' })}
+          {applications.length > 0 && (
+            <span className={cn(
+              "px-2 py-0.5 rounded-full text-[10px] font-black",
+              activeTab === 'applications' ? "bg-white text-amber-600" : "bg-amber-100 text-amber-600"
+            )}>
+              {applications.length}
+            </span>
+          )}
+        </button>
       </div>
 
       <div className="flex flex-col md:flex-row gap-4 items-center justify-between bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
@@ -535,7 +711,7 @@ export function Students() {
         <div className="flex items-center justify-center py-20">
           <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
         </div>
-      ) : (
+      ) : activeTab === 'students' ? (
         <Table headers={[
           t('students.table.student'),
           t('students.table.whatsapp'),
@@ -676,6 +852,68 @@ export function Students() {
                       </>
                     )}
                   </div>
+                </div>
+              </TableCell>
+            </TableRow>
+          ))}
+        </Table>
+      ) : (
+        <Table headers={[
+          t('students.table.student'),
+          t('students.table.contact'),
+          t('students.table.batchGrade'),
+          t('students.table.date'),
+          t('students.table.actions')
+        ]}>
+          {filteredApplications.map((app) => (
+            <TableRow key={app.id}>
+              <TableCell>
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center">
+                    {app.photoUrl ? (
+                      <img src={app.photoUrl} alt="App" className="w-full h-full rounded-full object-cover" />
+                    ) : (
+                      <User className="w-5 h-5 text-amber-600" />
+                    )}
+                  </div>
+                  <div>
+                    <p className="font-bold text-gray-900">{app.formData?.fullName || app.studentName}</p>
+                    <p className="text-xs text-gray-500">Father: {app.formData?.fatherName || '—'}</p>
+                  </div>
+                </div>
+              </TableCell>
+              <TableCell>
+                <p className="text-sm font-bold text-gray-900">{app.phone}</p>
+              </TableCell>
+              <TableCell>
+                <div className="flex flex-col">
+                  <span className="font-medium text-gray-900">{app.batchName || 'No Batch'}</span>
+                  <span className="text-xs text-gray-500">{app.grade || '—'}</span>
+                </div>
+              </TableCell>
+              <TableCell>
+                <p className="text-xs text-gray-500">
+                  {app.createdAt ? (typeof app.createdAt === 'string' ? formatDate(app.createdAt) : formatDate(new Date(app.createdAt.seconds * 1000).toISOString())) : '—'}
+                </p>
+              </TableCell>
+              <TableCell>
+                <div className="flex items-center gap-2">
+                  <button 
+                    onClick={() => handleApproveApplication(app)}
+                    className="px-3 py-1.5 bg-emerald-600 text-white text-xs font-bold rounded-lg hover:bg-emerald-700 transition-all flex items-center gap-1"
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5" /> {t('common.approve', { defaultValue: 'Approve' })}
+                  </button>
+                  <button 
+                    onClick={() => {
+                      if (confirm('Are you sure you want to discard this application?')) {
+                        handleDeleteApplication(app.id);
+                      }
+                    }}
+                    className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
+                  >
+                    <XCircle className="w-4 h-4" />
+                  </button>
                 </div>
               </TableCell>
             </TableRow>
@@ -1199,6 +1437,36 @@ export function Students() {
                     {type}
                   </button>
                 ))}
+              </div>
+            </div>
+
+            <div className="space-y-4 md:col-span-2">
+              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">{t('students.addModal.feeStatus', { defaultValue: 'Fee Payment Status' })}</label>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <label className="flex items-center gap-3 p-4 bg-emerald-50 border border-emerald-100 rounded-2xl cursor-pointer hover:bg-emerald-100 transition-all">
+                  <input
+                    type="checkbox"
+                    checked={newStudent.isAdmissionFeePaid}
+                    onChange={e => setNewStudent({...newStudent, isAdmissionFeePaid: e.target.checked})}
+                    className="w-5 h-5 rounded border-emerald-300 text-emerald-600 focus:ring-emerald-500"
+                  />
+                  <div className="flex flex-col">
+                    <span className="text-sm font-bold text-emerald-900">{t('students.addModal.admissionPaid', { defaultValue: 'Admission Fee Paid' })}</span>
+                    <span className="text-[10px] text-emerald-600 font-medium">Auto-records as paid fee</span>
+                  </div>
+                </label>
+                <label className="flex items-center gap-3 p-4 bg-indigo-50 border border-indigo-100 rounded-2xl cursor-pointer hover:bg-indigo-100 transition-all">
+                  <input
+                    type="checkbox"
+                    checked={newStudent.isMonthlyFeePaid}
+                    onChange={e => setNewStudent({...newStudent, isMonthlyFeePaid: e.target.checked})}
+                    className="w-5 h-5 rounded border-indigo-300 text-indigo-600 focus:ring-indigo-500"
+                  />
+                  <div className="flex flex-col">
+                    <span className="text-sm font-bold text-indigo-900">{t('students.addModal.monthlyPaid', { defaultValue: 'Monthly Fee Paid' })}</span>
+                    <span className="text-[10px] text-indigo-600 font-medium">For joining month ({MONTHS[new Date(newStudent.joinDate || new Date()).getMonth()]})</span>
+                  </div>
+                </label>
               </div>
             </div>
 

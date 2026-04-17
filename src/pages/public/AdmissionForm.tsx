@@ -10,8 +10,10 @@ export function AdmissionForm() {
   const { id } = useParams();
   const [loading, setLoading] = useState(true);
   const [institution, setInstitution] = useState<any>(null);
+  const [batches, setBatches] = useState<any[]>([]);
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchData() {
@@ -21,6 +23,11 @@ export function AdmissionForm() {
         if (instDoc.exists()) {
           setInstitution({ id: instDoc.id, ...instDoc.data() });
         }
+
+        // Fetch batches for this institution
+        const { getDocs, query, where, collection } = await import('firebase/firestore');
+        const batchesSnap = await getDocs(query(collection(db, 'batches'), where('institutionId', '==', id)));
+        setBatches(batchesSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       } catch (err) {
         handleFirestoreError(err, OperationType.GET, 'institutions');
       } finally {
@@ -29,6 +36,21 @@ export function AdmissionForm() {
     }
     fetchData();
   }, [id]);
+
+  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 1024 * 1024) { // 1MB limit for base64
+        alert('Photo size should be less than 1MB');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPhotoPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -45,9 +67,14 @@ export function AdmissionForm() {
         institutionId: id,
         studentName: data['studentName'] || 'N/A',
         guardianPhone: data['guardianPhone'] || 'N/A',
-        grade: data['batch'] || 'N/A',
+        grade: batches.find(b => b.id === data['batch'])?.grade || batches.find(b => b.id === data['batch'])?.name || 'N/A',
+        batchId: data['batch'],
         status: 'pending',
-        formData: data,
+        photoUrl: photoPreview,
+        formData: {
+          ...data,
+          photoUrl: photoPreview
+        },
         createdAt: new Date().toISOString()
       });
       
@@ -153,6 +180,30 @@ export function AdmissionForm() {
         </div>
 
         <form onSubmit={handleSubmit} className="bg-white p-8 md:p-12 rounded-3xl border border-gray-100 shadow-xl shadow-indigo-100/50 space-y-8">
+          {/* Photo Upload Section */}
+          <div className="flex flex-col items-center gap-4 pb-4 border-b border-gray-100">
+            <label className="text-xs font-bold text-gray-500 uppercase tracking-widest">ছাত্রের ছবি (ঐচ্ছিক)</label>
+            <div className="relative group">
+              <div className="w-32 h-32 bg-gray-50 border-2 border-dashed border-gray-200 rounded-3xl flex flex-col items-center justify-center text-gray-400 group-hover:border-indigo-500 group-hover:text-indigo-500 transition-all cursor-pointer overflow-hidden">
+                {photoPreview ? (
+                  <img src={photoPreview} alt="Preview" className="w-full h-full object-cover" />
+                ) : (
+                  <>
+                    <User className="w-8 h-8 mb-1" />
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-center px-2">ছবি আপলোড করুন</span>
+                  </>
+                )}
+              </div>
+              <input 
+                type="file" 
+                accept="image/*"
+                onChange={handlePhotoChange}
+                className="absolute inset-0 opacity-0 cursor-pointer"
+              />
+            </div>
+            <p className="text-[10px] text-gray-400">সর্বোচ্চ ১ মেগাবাইট</p>
+          </div>
+
           <div className="grid grid-cols-1 gap-6">
             {ADMISSION_FIELDS.map((field) => {
               const isVisible = institution.admissionForm.fields?.[field.key] !== false;
@@ -171,6 +222,17 @@ export function AdmissionForm() {
                         rows={3}
                         className="w-full px-4 py-4 bg-gray-50 border border-gray-200 rounded-2xl text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all resize-none"
                       />
+                    ) : field.key === 'batch' ? (
+                      <select
+                        name="batch"
+                        required={field.required}
+                        className="w-full pl-12 pr-4 py-4 bg-gray-50 border border-gray-200 rounded-2xl text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all appearance-none"
+                      >
+                        <option value="">ব্যাচ নির্বাচন করুন...</option>
+                        {batches.map(b => (
+                          <option key={b.id} value={b.id}>{b.name} ({b.grade})</option>
+                        ))}
+                      </select>
                     ) : (
                       <input
                         name={field.key}

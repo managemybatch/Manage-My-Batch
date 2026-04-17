@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { auth, db, handleFirestoreError, OperationType } from '../../firebase';
 import { sendPasswordResetEmail } from 'firebase/auth';
-import { collection, query, where, getDocs, updateDoc, doc, setDoc, getDoc, limit, count } from 'firebase/firestore';
+import { collection, query, where, getDocs, updateDoc, doc, setDoc, getDoc, limit, count, deleteDoc } from 'firebase/firestore';
 import { useTranslation } from 'react-i18next';
 import { 
   Search, 
@@ -15,6 +15,8 @@ import {
   ExternalLink,
   Edit2,
   Plus,
+  Trash2,
+  Trash,
   Users,
   Layers,
   Briefcase,
@@ -28,13 +30,16 @@ import {
   Archive,
   UserCheck,
   MoreHorizontal,
-  Clock
+  Clock,
+  CreditCard
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../../lib/auth';
 import { cn, formatDate } from '../../lib/utils';
 import { Toast, ToastType } from '../../components/Toast';
 import { Table, TableRow, TableCell } from '../../components/Table';
+import { Modal } from '../../components/Modal';
+import { ConfirmModal } from '../../components/ConfirmModal';
 
 export function ManageInstitutions() {
   const { t } = useTranslation();
@@ -43,13 +48,20 @@ export function ManageInstitutions() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [view, setView] = useState<'list' | 'details'>('list');
-  const [activeTab, setActiveTab] = useState<'overview' | 'students' | 'batches' | 'config'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'students' | 'batches' | 'config' | 'fees' | 'teachers'>('overview');
   const [selectedInst, setSelectedInst] = useState<any | null>(null);
-  const [instData, setInstData] = useState<{ students: any[], batches: any[] }>({ students: [], batches: [] });
+  const [instData, setInstData] = useState<{ students: any[], batches: any[], teachers: any[], fees: any[] }>({ 
+    students: [], 
+    batches: [], 
+    teachers: [], 
+    fees: [] 
+  });
   const [loadingInstData, setLoadingInstData] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [filterExpiry, setFilterExpiry] = useState<'all' | 'next5' | 'today' | 'ended'>('all');
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [instToDelete, setInstToDelete] = useState<string | null>(null);
+  const [filterExpiry, setFilterExpiry] = useState<'all' | 'next5' | 'today' | 'ended' | 'inactive'>('all');
   const [toast, setToast] = useState<{ message: string; type: ToastType; isVisible: boolean }>({
     message: '',
     type: 'success',
@@ -123,14 +135,23 @@ export function ManageInstitutions() {
     setSelectedInst(inst);
     setView('details');
     try {
-      const [studentsSnapshot, batchesSnapshot] = await Promise.all([
+      const [studentsSnapshot, batchesSnapshot, teachersSnapshot, feesSnapshot] = await Promise.all([
         getDocs(query(collection(db, 'students'), where('institutionId', '==', inst.id))),
-        getDocs(query(collection(db, 'batches'), where('institutionId', '==', inst.id)))
+        getDocs(query(collection(db, 'batches'), where('institutionId', '==', inst.id))),
+        getDocs(query(collection(db, 'teachers'), where('institutionId', '==', inst.id))),
+        getDocs(query(collection(db, 'fees'), where('institutionId', '==', inst.id)))
       ]);
+
+      const fees = feesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const totalRevenue = fees.filter((f: any) => f.status === 'paid').reduce((sum: number, f: any) => sum + (f.amount || 0), 0);
+
+      setSelectedInst((prev: any) => ({ ...prev, totalRevenue }));
 
       setInstData({
         students: studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })),
-        batches: batchesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+        batches: batchesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })),
+        teachers: teachersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })),
+        fees: fees
       });
     } catch (error) {
       console.error("Error fetching institution details:", error);
@@ -216,6 +237,31 @@ export function ManageInstitutions() {
     }
   };
 
+  const handleDeleteInstitution = async () => {
+    if (!instToDelete) return;
+    try {
+      await deleteDoc(doc(db, 'users', instToDelete));
+      // Delete associated credits
+      await deleteDoc(doc(db, 'credits', instToDelete));
+      
+      setToast({
+        message: "Institution data deleted successfully",
+        type: 'success',
+        isVisible: true
+      });
+      setIsDeleteModalOpen(false);
+      setInstToDelete(null);
+      fetchInstitutions();
+    } catch (error: any) {
+      console.error("Error deleting institution:", error);
+      setToast({
+        message: "Error deleting institution",
+        type: 'error',
+        isVisible: true
+      });
+    }
+  };
+
   const filteredInstitutions = institutions.filter(inst => {
     const matchesSearch = inst.displayName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          inst.email?.toLowerCase().includes(searchQuery.toLowerCase());
@@ -238,6 +284,14 @@ export function ManageInstitutions() {
     if (filterExpiry === 'today') return diffDays === 0;
     if (filterExpiry === 'next5') return diffDays > 0 && diffDays <= 5;
     if (filterExpiry === 'ended') return diffDays < 0 && diffDays >= -5;
+
+    if (filterExpiry === 'inactive') {
+      if (!inst.lastLogin) return true; // Never logged in?
+      const lastLogin = new Date(inst.lastLogin);
+      const diffTime = Math.abs(today.getTime() - lastLogin.getTime());
+      const diffInDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      return diffInDays >= 30;
+    }
 
     return true;
   });
@@ -284,9 +338,10 @@ export function ManageInstitutions() {
         </div>
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           {[
             { label: 'Activity Score', value: `${selectedInst.activityScore}%`, icon: TrendingUp, color: 'indigo' },
+            { label: 'Total Revenue', value: `৳${selectedInst.totalRevenue?.toLocaleString() || 0}`, icon: CreditCard, color: 'emerald' },
             { label: 'Total Students', value: selectedInst.studentCount, icon: Users, color: 'emerald' },
             { label: 'Total Batches', value: selectedInst.batchCount, icon: Layers, color: 'amber' },
             { label: 'SMS Balance', value: selectedInst.smsBalance, icon: MessageSquare, color: 'purple' },
@@ -321,6 +376,8 @@ export function ManageInstitutions() {
               { id: 'overview', label: 'Overview', icon: Eye },
               { id: 'students', label: 'Students', icon: Users },
               { id: 'batches', label: 'Batches', icon: Layers },
+              { id: 'teachers', label: 'Faculty', icon: Briefcase },
+              { id: 'fees', label: 'Revenue', icon: CreditCard },
               { id: 'config', label: 'Configuration', icon: ShieldCheck },
             ].map((tab) => (
               <button
@@ -426,6 +483,78 @@ export function ManageInstitutions() {
                 </motion.div>
               )}
 
+              {activeTab === 'teachers' && (
+                <motion.div
+                  key="teachers"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="space-y-4"
+                >
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="text-sm font-black text-gray-900 dark:text-white uppercase tracking-tight">Faculty Members ({instData.teachers.length})</h4>
+                  </div>
+                  {loadingInstData ? (
+                    <div className="py-20 flex justify-center"><div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div></div>
+                  ) : instData.teachers.length > 0 ? (
+                    <Table headers={['Teacher', 'Phone', 'Subject', 'Status']}>
+                      {instData.teachers.map((t) => (
+                        <TableRow key={t.id} className="cursor-default">
+                          <TableCell className="font-bold">{t.name}</TableCell>
+                          <TableCell>{t.phone}</TableCell>
+                          <TableCell className="text-xs">{t.subject || 'N/A'}</TableCell>
+                          <TableCell>
+                            <span className={cn(
+                              "px-2 py-0.5 rounded-full text-[10px] uppercase font-bold",
+                              t.status === 'active' ? "bg-emerald-50 text-emerald-600" : "bg-gray-100 text-gray-400"
+                            )}>
+                              {t.status}
+                            </span>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </Table>
+                  ) : (
+                    <div className="py-20 text-center bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-dashed border-gray-200 dark:border-gray-700">
+                      <Briefcase className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                      <p className="text-gray-500 font-medium">No teachers added yet</p>
+                    </div>
+                  )}
+                </motion.div>
+              )}
+
+              {activeTab === 'fees' && (
+                <motion.div
+                  key="fees"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="space-y-4"
+                >
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="text-sm font-black text-gray-900 dark:text-white uppercase tracking-tight">Recent Collections ({instData.fees.length})</h4>
+                    <div className="text-sm font-bold text-emerald-600">Total: ৳{selectedInst.totalRevenue?.toLocaleString()}</div>
+                  </div>
+                  {loadingInstData ? (
+                    <div className="py-20 flex justify-center"><div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div></div>
+                  ) : instData.fees.length > 0 ? (
+                    <Table headers={['Student', 'Type', 'Amount', 'Month', 'Date']}>
+                      {instData.fees.slice(0, 50).map((f) => (
+                        <TableRow key={f.id} className="cursor-default">
+                          <TableCell className="font-bold">{f.studentName}</TableCell>
+                          <TableCell className="text-xs">{f.type}</TableCell>
+                          <TableCell className="font-black">৳{f.amount}</TableCell>
+                          <TableCell className="text-xs">{f.month} {f.year}</TableCell>
+                          <TableCell className="text-xs text-gray-500">{f.date ? new Date(f.date).toLocaleDateString() : 'N/A'}</TableCell>
+                        </TableRow>
+                      ))}
+                    </Table>
+                  ) : (
+                    <div className="py-20 text-center bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-dashed border-gray-200 dark:border-gray-700">
+                      <CreditCard className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                      <p className="text-gray-500 font-medium">No fee records found</p>
+                    </div>
+                  )}
+                </motion.div>
+              )}
               {activeTab === 'batches' && (
                 <motion.div
                   key="batches"
@@ -598,7 +727,8 @@ export function ManageInstitutions() {
             { id: 'all', label: 'All' },
             { id: 'next5', label: 'Ends in 5d' },
             { id: 'today', label: 'Ends Today' },
-            { id: 'ended', label: 'Ended (5d)' }
+            { id: 'ended', label: 'Ended (5d)' },
+            { id: 'inactive', label: 'Inactive (30d)' }
           ].map((f) => (
             <button
               key={f.id}
@@ -633,6 +763,7 @@ export function ManageInstitutions() {
                 <th className="px-6 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Performance</th>
                 <th className="px-6 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Plan & Expiry</th>
                 <th className="px-6 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">SMS Tokens</th>
+                <th className="px-6 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest text-center">Activity</th>
                 <th className="px-6 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Actions</th>
               </tr>
             </thead>
@@ -728,6 +859,21 @@ export function ManageInstitutions() {
                     </div>
                   </td>
                   <td className="px-6 py-4">
+                    <div className="flex flex-col gap-1">
+                      <span className={cn(
+                        "text-[10px] font-bold",
+                        inst.lastLogin ? "text-gray-900 dark:text-gray-100" : "text-gray-400 italic"
+                      )}>
+                        {inst.lastLogin ? formatDate(inst.lastLogin) : 'Never Logged In'}
+                      </span>
+                      {inst.lastLogin && (
+                        <span className="text-[9px] text-gray-400 font-medium">
+                          {Math.max(0, Math.ceil((new Date().getTime() - new Date(inst.lastLogin).getTime()) / (1000 * 60 * 60 * 24)))} days ago
+                        </span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
                       <button 
                         onClick={() => fetchInstDetails(inst)}
@@ -745,6 +891,16 @@ export function ManageInstitutions() {
                         title="Edit Settings"
                       >
                         <Edit2 className="w-4 h-4" />
+                      </button>
+                      <button 
+                        onClick={() => {
+                          setInstToDelete(inst.id);
+                          setIsDeleteModalOpen(true);
+                        }}
+                        className="p-2 text-gray-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg transition-all"
+                        title="Delete Institution"
+                      >
+                        <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
                   </td>
@@ -932,6 +1088,14 @@ export function ManageInstitutions() {
           </div>
         )}
       </AnimatePresence>
+
+      <ConfirmModal
+        isOpen={isDeleteModalOpen}
+        onClose={() => setIsDeleteModalOpen(false)}
+        onConfirm={handleDeleteInstitution}
+        title="Delete Institution"
+        message="Are you sure you want to delete this institution? This will permanently delete their account and all associated credits. This action cannot be undone."
+      />
 
       <Toast 
         message={toast.message}

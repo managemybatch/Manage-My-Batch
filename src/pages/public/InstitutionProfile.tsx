@@ -294,18 +294,20 @@ export function InstitutionProfile() {
               </button>
             </div>
 
-            <div className="bg-emerald-600 p-8 rounded-3xl text-white space-y-4">
-              <h3 className="text-xl font-bold">Admissions Open!</h3>
-              <p className="text-emerald-50 text-sm leading-relaxed">
-                We are currently accepting new students for the upcoming session. Apply online today!
-              </p>
-              <button 
-                onClick={() => window.location.href = `/public/admission/${id}`}
-                className="w-full py-4 bg-white text-emerald-600 font-bold rounded-2xl hover:bg-emerald-50 transition-all shadow-lg shadow-emerald-900/20"
-              >
-                Apply Now
-              </button>
-            </div>
+            {institution.admissionForm?.active && (
+              <div className="bg-emerald-600 p-8 rounded-3xl text-white space-y-4">
+                <h3 className="text-xl font-bold">Admissions Open!</h3>
+                <p className="text-emerald-50 text-sm leading-relaxed">
+                  We are currently accepting new students for the upcoming session. Apply online today!
+                </p>
+                <button 
+                  onClick={() => window.location.href = `/public/admission/${id}`}
+                  className="w-full py-4 bg-white text-emerald-600 font-bold rounded-2xl hover:bg-emerald-50 transition-all shadow-lg shadow-emerald-900/20"
+                >
+                  Apply Now
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
