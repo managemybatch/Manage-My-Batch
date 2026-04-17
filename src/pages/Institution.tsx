@@ -21,6 +21,10 @@ interface InstitutionData {
   goal?: string;
   target?: string;
   photoURL?: string;
+  logoURL?: string;
+  principalName?: string;
+  principalTitle?: string;
+  principalPhotoURL?: string;
   admissionForm: {
     active: boolean;
     title: string;
@@ -64,133 +68,9 @@ export function Institution() {
 
     const instId = user.institutionId || user.uid;
 
-    const fetchInstitution = async () => {
-      try {
-        const docRef = doc(db, 'institutions', user.uid);
-        const docSnap = await getDoc(docRef);
-        
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          setInstitution({
-            name: data.name,
-            established: data.established,
-            address: data.address,
-            phone: data.phone,
-            email: data.email,
-            description: data.description,
-            vision: data.vision,
-            goal: data.goal,
-            target: data.target,
-            photoURL: data.photoUrl,
-            admissionForm: data.admissionForm
-          } as InstitutionData);
-        } else {
-          // Initialize with default data
-          const defaultData: InstitutionData = {
-            name: user.displayName || '',
-            established: '',
-            address: '',
-            phone: '',
-            email: user.email || '',
-            description: '',
-            vision: '',
-            goal: '',
-            target: '',
-            admissionForm: {
-              active: false,
-              title: 'Admission Form',
-              instructions: 'Please fill out the form below to apply.',
-              fields: {
-                studentName: true,
-                dob: true,
-                birthReg: true,
-                nid: false,
-                fatherName: true,
-                motherName: true,
-                guardianPhone: true,
-                admissionDate: true,
-                batch: true,
-                subjectGroup: false,
-                address: true
-              }
-            }
-          };
-          await setDoc(docRef, { 
-            id: user.uid,
-            name: defaultData.name,
-            established: defaultData.established,
-            address: defaultData.address,
-            phone: defaultData.phone,
-            email: defaultData.email,
-            description: defaultData.description,
-            vision: defaultData.vision,
-            goal: defaultData.goal,
-            target: defaultData.target,
-            admissionForm: defaultData.admissionForm,
-            createdAt: new Date().toISOString()
-          });
-          setInstitution(defaultData);
-        }
-      } catch (error) {
-        console.error("Error fetching institution:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    const fetchApplications = async () => {
-      try {
-        const q = query(
-          collection(db, 'applications'),
-          where('institutionId', '==', user.uid),
-          orderBy('createdAt', 'desc')
-        );
-        const querySnapshot = await getDocs(q);
-        
-        const mappedApps = querySnapshot.docs.map(doc => {
-          const a = doc.data();
-          return {
-            id: doc.id,
-            studentName: a.studentName,
-            guardianPhone: a.guardianPhone,
-            email: a.email,
-            grade: a.grade,
-            status: a.status,
-            createdAt: a.createdAt,
-            formData: a.formData
-          };
-        });
-        setApplications(mappedApps as Application[]);
-      } catch (error) {
-        handleFirestoreError(error, OperationType.LIST, 'applications');
-      }
-    };
-
-    const fetchStats = async () => {
-      try {
-        const [studentsSnap, batchesSnap, teachersSnap] = await Promise.all([
-          getDocs(query(collection(db, 'students'), where('institutionId', '==', instId))),
-          getDocs(query(collection(db, 'batches'), where('institutionId', '==', instId))),
-          getDocs(query(collection(db, 'teachers'), where('institutionId', '==', instId)))
-        ]);
-
-        setStats({
-          students: studentsSnap.size,
-          batches: batchesSnap.size,
-          teachers: teachersSnap.size
-        });
-      } catch (error) {
-        handleFirestoreError(error, OperationType.LIST, 'stats');
-      }
-    };
-
-    fetchInstitution();
-    fetchApplications();
-    fetchStats();
-
-    const unsubInst = onSnapshot(doc(db, 'institutions', user.uid), (doc) => {
-      if (doc.exists()) {
-        const data = doc.data();
+    const unsubInst = onSnapshot(doc(db, 'institutions', instId), (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
         setInstitution({
           name: data.name,
           established: data.established,
@@ -201,14 +81,58 @@ export function Institution() {
           vision: data.vision,
           goal: data.goal,
           target: data.target,
-          photoURL: data.photoUrl,
+          photoURL: data.photoURL || data.photoUrl,
+          logoURL: data.logoURL,
+          principalName: data.principalName,
+          principalTitle: data.principalTitle,
+          principalPhotoURL: data.principalPhotoURL,
           admissionForm: data.admissionForm
         } as InstitutionData);
+      } else {
+        // Initialize default data if not exists
+        const defaultData: InstitutionData = {
+          name: user.displayName || '',
+          established: '',
+          address: '',
+          phone: '',
+          email: user.email || '',
+          description: '',
+          vision: '',
+          goal: '',
+          target: '',
+          admissionForm: {
+            active: false,
+            title: 'Admission Form',
+            instructions: 'Please fill out the form below to apply.',
+            fields: {
+              studentName: true,
+              dob: true,
+              birthReg: true,
+              nid: false,
+              fatherName: true,
+              motherName: true,
+              guardianPhone: true,
+              admissionDate: true,
+              batch: true,
+              subjectGroup: false,
+              address: true
+            }
+          }
+        };
+        setDoc(doc(db, 'institutions', instId), {
+          ...defaultData,
+          id: instId,
+          createdAt: new Date().toISOString()
+        });
       }
+      setLoading(false);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.GET, `institutions/${instId}`);
+      setLoading(false);
     });
 
     const unsubApps = onSnapshot(
-      query(collection(db, 'applications'), where('institutionId', '==', user.uid), orderBy('createdAt', 'desc')),
+      query(collection(db, 'applications'), where('institutionId', '==', instId), orderBy('createdAt', 'desc')),
       (snapshot) => {
         const mappedApps = snapshot.docs.map(doc => {
           const a = doc.data();
@@ -228,6 +152,26 @@ export function Institution() {
       (error) => handleFirestoreError(error, OperationType.LIST, 'applications')
     );
 
+    const fetchStats = async () => {
+      try {
+        const [studentsSnap, batchesSnap, teachersSnap] = await Promise.all([
+          getDocs(query(collection(db, 'students'), where('institutionId', '==', instId))),
+          getDocs(query(collection(db, 'batches'), where('institutionId', '==', instId))),
+          getDocs(query(collection(db, 'teachers'), where('institutionId', '==', instId)))
+        ]);
+
+        setStats({
+          students: studentsSnap.size,
+          batches: batchesSnap.size,
+          teachers: teachersSnap.size
+        });
+      } catch (error) {
+        handleFirestoreError(error, OperationType.LIST, 'stats');
+      }
+    };
+
+    fetchStats();
+
     return () => {
       unsubInst();
       unsubApps();
@@ -237,8 +181,9 @@ export function Institution() {
   const handleSaveProfile = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!user?.uid || !institution) return;
+    const instId = user.institutionId || user.uid;
     const formData = new FormData(e.currentTarget);
-    const updatedData = {
+    const updatedData: any = {
       name: formData.get('name') as string,
       established: formData.get('established') as string,
       address: formData.get('address') as string,
@@ -248,9 +193,14 @@ export function Institution() {
       vision: formData.get('vision') as string,
       goal: formData.get('goal') as string,
       target: formData.get('target') as string,
+      principalName: formData.get('principalName') as string,
+      principalTitle: formData.get('principalTitle') as string,
+      logoURL: institution.logoURL || '',
+      principalPhotoURL: institution.principalPhotoURL || '',
+      photoURL: institution.photoURL || '',
     };
     try {
-      await updateDoc(doc(db, 'institutions', user.uid), updatedData);
+      await updateDoc(doc(db, 'institutions', instId), updatedData);
       setToast({ message: 'Profile updated successfully!', type: 'success' });
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, 'institutions');
@@ -258,15 +208,61 @@ export function Institution() {
     }
   };
 
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 200000) {
+        alert('Image size too large. Please choose an image under 200KB.');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setInstitution(prev => prev ? { ...prev, logoURL: reader.result as string } : null);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handlePrincipalPhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 500000) {
+        alert('Image size too large. Please choose an image under 500KB.');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setInstitution(prev => prev ? { ...prev, principalPhotoURL: reader.result as string } : null);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleInstitutionPhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 800000) {
+        alert('Image size too large. Please choose an image under 800KB.');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setInstitution(prev => prev ? { ...prev, photoURL: reader.result as string } : null);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleToggleField = async (fieldKey: string) => {
     if (!user?.uid || !institution) return;
+    const instId = user.institutionId || user.uid;
     const updatedFields = {
       ...institution.admissionForm.fields,
       [fieldKey]: !institution.admissionForm.fields[fieldKey]
     };
     try {
-      await updateDoc(doc(db, 'institutions', user.uid), {
-        admission_form: {
+      await updateDoc(doc(db, 'institutions', instId), {
+        admissionForm: {
           ...institution.admissionForm,
           fields: updatedFields
         }
@@ -292,9 +288,10 @@ export function Institution() {
 
   const handleToggleAdmission = async () => {
     if (!user?.uid || !institution) return;
+    const instId = user.institutionId || user.uid;
     try {
-      await updateDoc(doc(db, 'institutions', user.uid), {
-        admission_form: {
+      await updateDoc(doc(db, 'institutions', instId), {
+        admissionForm: {
           ...institution.admissionForm,
           active: !institution.admissionForm.active
         }
@@ -318,15 +315,74 @@ export function Institution() {
   };
 
   const shareProfile = () => {
-    const url = `${window.location.origin}/public/institution/${user?.uid}`;
+    const instId = user?.institutionId || user?.uid;
+    const url = `${window.location.origin}/public/institution/${instId}`;
     navigator.clipboard.writeText(url);
     setToast({ message: 'Profile link copied to clipboard!', type: 'success' });
   };
 
   const shareAdmission = () => {
-    const url = `${window.location.origin}/public/admission/${user?.uid}`;
+    const instId = user?.institutionId || user?.uid;
+    const url = `${window.location.origin}/public/admission/${instId}`;
     navigator.clipboard.writeText(url);
     setToast({ message: 'Admission link copied to clipboard!', type: 'success' });
+  };
+
+  const downloadBio = async () => {
+    if (!institution) return;
+    const { jsPDF } = await import('jspdf');
+    const doc = new jsPDF();
+    const instName = institution.name || 'Institution';
+    
+    // Header
+    doc.setFontSize(22);
+    doc.setTextColor(79, 70, 229); // Indigo
+    doc.text(instName, 105, 20, { align: 'center' });
+    
+    doc.setFontSize(10);
+    doc.setTextColor(100);
+    doc.text(`Established: ${institution.established || 'N/A'}`, 105, 28, { align: 'center' });
+    
+    // Line
+    doc.setDrawColor(200);
+    doc.line(20, 35, 190, 35);
+    
+    // Content
+    doc.setFontSize(12);
+    doc.setTextColor(0);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Contact Details', 20, 45);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Phone: ${institution.phone || 'N/A'}`, 25, 52);
+    doc.text(`Email: ${institution.email || 'N/A'}`, 25, 59);
+    doc.text(`Address: ${institution.address || 'N/A'}`, 25, 66);
+    
+    doc.setFont('helvetica', 'bold');
+    doc.text('About Institution', 20, 80);
+    doc.setFont('helvetica', 'normal');
+    const descLines = doc.splitTextToSize(institution.description || 'No description provided.', 160);
+    doc.text(descLines, 25, 87);
+    
+    let y = 87 + (descLines.length * 7);
+    
+    if (institution.vision) {
+      doc.setFont('helvetica', 'bold');
+      doc.text('Vision', 20, y + 10);
+      doc.setFont('helvetica', 'normal');
+      const visionLines = doc.splitTextToSize(institution.vision, 160);
+      doc.text(visionLines, 25, y + 17);
+      y = y + 17 + (visionLines.length * 7);
+    }
+    
+    if (institution.principalName) {
+      doc.setFont('helvetica', 'bold');
+      doc.text('Principal Information', 20, y + 10);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Name: ${institution.principalName}`, 25, y + 17);
+      doc.text(`Title: ${institution.principalTitle || 'Principal'}`, 25, y + 24);
+    }
+    
+    doc.save(`${instName.replace(/\s+/g, '_')}_Profile.pdf`);
   };
 
   if (loading) {
@@ -351,7 +407,10 @@ export function Institution() {
           >
             <Share2 className="w-4 h-4" /> {t('institution.profile.shareLink')}
           </button>
-          <button className="flex items-center gap-2 px-4 py-2.5 bg-gray-900 text-white font-bold rounded-xl hover:bg-gray-800 transition-all shadow-lg shadow-gray-200">
+          <button 
+            onClick={downloadBio}
+            className="flex items-center gap-2 px-4 py-2.5 bg-gray-900 text-white font-bold rounded-xl hover:bg-gray-800 transition-all shadow-lg shadow-gray-200"
+          >
             <Download className="w-4 h-4" /> {t('institution.profile.downloadBio')}
           </button>
         </div>
@@ -384,11 +443,63 @@ export function Institution() {
             className="grid grid-cols-1 lg:grid-cols-3 gap-8"
           >
             <div className="lg:col-span-2 space-y-8">
-              <form onSubmit={handleSaveProfile} className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm space-y-6">
+              <form onSubmit={handleSaveProfile} className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm space-y-8">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-8 pb-8 border-b border-gray-100 mb-8">
+                  <div className="space-y-4 text-center">
+                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block">Logo</label>
+                    <div className="relative group mx-auto w-24 h-24">
+                      <div className="w-full h-full bg-gray-50 border-2 border-dashed border-gray-200 rounded-2xl flex flex-col items-center justify-center text-gray-400 group-hover:border-indigo-500 transition-all cursor-pointer overflow-hidden">
+                        {institution?.logoURL ? (
+                          <img src={institution.logoURL} alt="Logo" className="w-full h-full object-contain p-2" />
+                        ) : (
+                          <Building className="w-8 h-8 opacity-20" />
+                        )}
+                      </div>
+                      <input type="file" accept="image/*" onChange={handleLogoChange} className="absolute inset-0 opacity-0 cursor-pointer" />
+                    </div>
+                  </div>
+
+                  <div className="space-y-4 text-center">
+                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block">Principal Photo</label>
+                    <div className="relative group mx-auto w-24 h-24">
+                      <div className="w-full h-full bg-gray-50 border-2 border-dashed border-gray-200 rounded-2xl flex flex-col items-center justify-center text-gray-400 group-hover:border-indigo-500 transition-all cursor-pointer overflow-hidden">
+                        {institution?.principalPhotoURL ? (
+                          <img src={institution.principalPhotoURL} alt="Principal" className="w-full h-full object-cover" />
+                        ) : (
+                          <Users className="w-8 h-8 opacity-20" />
+                        )}
+                      </div>
+                      <input type="file" accept="image/*" onChange={handlePrincipalPhotoChange} className="absolute inset-0 opacity-0 cursor-pointer" />
+                    </div>
+                  </div>
+
+                  <div className="space-y-4 text-center">
+                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block">Institution Profile Photo</label>
+                    <div className="relative group mx-auto w-full h-24 max-w-[200px]">
+                      <div className="w-full h-full bg-gray-50 border-2 border-dashed border-gray-200 rounded-2xl flex flex-col items-center justify-center text-gray-400 group-hover:border-indigo-500 transition-all cursor-pointer overflow-hidden">
+                        {institution?.photoURL ? (
+                          <img src={institution.photoURL} alt="Institution" className="w-full h-full object-cover" />
+                        ) : (
+                          <Building className="w-8 h-8 opacity-20" />
+                        )}
+                      </div>
+                      <input type="file" accept="image/*" onChange={handleInstitutionPhotoChange} className="absolute inset-0 opacity-0 cursor-pointer" />
+                    </div>
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
                     <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">{t('institution.profile.info.name')}</label>
                     <input name="name" defaultValue={institution?.name} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all" />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Principal Name</label>
+                    <input name="principalName" defaultValue={institution?.principalName} placeholder="Full Name" className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all" />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Principal Title</label>
+                    <input name="principalTitle" defaultValue={institution?.principalTitle} placeholder="e.g. Principal / Director" className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all" />
                   </div>
                   <div className="space-y-2">
                     <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">{t('institution.profile.established')}</label>
@@ -476,7 +587,10 @@ export function Institution() {
                   <p className="text-indigo-100 text-sm mt-1">Your institution profile is live and shareable with parents and students.</p>
                 </div>
                 <button 
-                  onClick={() => window.open(`/public/institution/${user?.uid}`, '_blank')}
+                  onClick={() => {
+                    const instId = user?.institutionId || user?.uid;
+                    window.open(`/public/institution/${instId}`, '_blank');
+                  }}
                   className="w-full py-3 bg-white text-indigo-600 font-bold rounded-xl hover:bg-indigo-50 transition-all flex items-center justify-center gap-2"
                 >
                   <ExternalLink className="w-4 h-4" /> View Public Profile
@@ -521,9 +635,11 @@ export function Institution() {
                     <input 
                       defaultValue={institution?.admissionForm.title}
                     onBlur={async (e) => {
+                        const instId = user?.institutionId || user?.uid;
+                        if (!instId) return;
                         try {
-                          await updateDoc(doc(db, 'institutions', user!.uid), {
-                            admission_form: {
+                          await updateDoc(doc(db, 'institutions', instId), {
+                            admissionForm: {
                               ...institution.admissionForm,
                               title: e.target.value
                             }
@@ -540,9 +656,11 @@ export function Institution() {
                     <textarea 
                       defaultValue={institution?.admissionForm.instructions}
                       onBlur={async (e) => {
+                        const instId = user?.institutionId || user?.uid;
+                        if (!instId) return;
                         try {
-                          await updateDoc(doc(db, 'institutions', user!.uid), {
-                            admission_form: {
+                          await updateDoc(doc(db, 'institutions', instId), {
+                            admissionForm: {
                               ...institution.admissionForm,
                               instructions: e.target.value
                             }
@@ -609,7 +727,7 @@ export function Institution() {
                 <div className="flex items-center gap-2 p-2 bg-white border border-indigo-200 rounded-xl">
                   <input 
                     readOnly 
-                    value={`${window.location.origin}/public/admission/${user?.uid}`}
+                    value={`${window.location.origin}/public/admission/${user?.institutionId || user?.uid}`}
                     className="flex-1 bg-transparent border-none text-xs text-gray-500 focus:ring-0 outline-none truncate"
                   />
                   <button 

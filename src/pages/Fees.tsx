@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { CreditCard, Plus, Search, Filter, Download, CheckCircle2, Clock, Loader2, User, Phone, Calendar, AlertCircle, Send, Wallet, Banknote, Users } from 'lucide-react';
 import { Table, TableRow, TableCell } from '../components/Table';
-import { cn, formatCurrency, formatDate } from '../lib/utils';
+import { cn, formatCurrency, formatDate, formatWhatsAppPhone } from '../lib/utils';
 import { collection, onSnapshot, query, addDoc, serverTimestamp, orderBy, writeBatch, doc, where } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { useAuth } from '../lib/auth';
@@ -59,6 +59,7 @@ export function Fees() {
   const [isSaving, setIsSaving] = useState(false);
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
+  const [pendingWhatsappUrl, setPendingWhatsappUrl] = useState<string | null>(null);
 
   const [paymentData, setPaymentData] = useState({
     months: [] as string[],
@@ -192,11 +193,10 @@ export function Fees() {
       const message = `${t('fees.whatsapp.success')}\n${t('fees.whatsapp.studentName')}: ${selectedStudent.name}\n${t('fees.whatsapp.month')}: ${paymentData.months.join(', ')}\n${t('fees.whatsapp.totalAmount')}: ৳${totalAmount}\n${t('fees.whatsapp.method')}: ${paymentData.method}\n${t('fees.whatsapp.thanks')}`;
       
       const encodedMessage = encodeURIComponent(message);
-      const whatsappUrl = `https://wa.me/${selectedStudent.guardianPhone.replace(/[^0-9]/g, '')}?text=${encodedMessage}`;
+      const cleanPhone = formatWhatsAppPhone(selectedStudent.guardianPhone);
+      const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodedMessage}`;
       
-      // Open WhatsApp in a new tab immediately
-      window.open(whatsappUrl, '_blank');
-
+      setPendingWhatsappUrl(whatsappUrl);
       setIsPaymentModalOpen(false);
       setPaymentData({ months: [], method: 'Cash', bkashNumber: '', transactionId: '', amount: 0 });
       setSuccessMessage(t('common.success', { defaultValue: 'Payment recorded successfully!' }));
@@ -599,12 +599,22 @@ export function Fees() {
 
       <ConfirmModal
         isOpen={isSuccessModalOpen}
-        onClose={() => setIsSuccessModalOpen(false)}
-        onConfirm={() => setIsSuccessModalOpen(false)}
+        onClose={() => {
+          setIsSuccessModalOpen(false);
+          setPendingWhatsappUrl(null);
+        }}
+        onConfirm={() => {
+          if (pendingWhatsappUrl) {
+            window.open(pendingWhatsappUrl, '_blank');
+          }
+          setIsSuccessModalOpen(false);
+          setPendingWhatsappUrl(null);
+        }}
         title={t('common.success', { defaultValue: 'Success' })}
         message={successMessage}
         variant="info"
-        confirmText={t('common.ok', { defaultValue: 'OK' })}
+        confirmText={pendingWhatsappUrl ? t('common.sendWhatsApp', { defaultValue: 'Send WhatsApp' }) : t('common.ok', { defaultValue: 'OK' })}
+        cancelText={pendingWhatsappUrl ? t('common.done', { defaultValue: 'Done' }) : undefined}
       />
     </div>
   );

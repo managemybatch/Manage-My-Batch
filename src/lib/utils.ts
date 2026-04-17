@@ -22,3 +22,12 @@ export function formatCurrency(amount: number) {
     maximumFractionDigits: 0,
   }).format(amount).replace('BDT', '৳');
 }
+
+export function formatWhatsAppPhone(phone: string) {
+  const clean = phone.replace(/[^0-9]/g, '');
+  // Bangladesh standard: 01xxxxxxxxx (11 digits)
+  if (clean.length === 11 && clean.startsWith('0')) {
+    return `88${clean}`;
+  }
+  return clean;
+}

@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Filter, MoreVertical, Mail, Phone, Download, Loader2, Layers, User, MessageSquare } from 'lucide-react';
+import { Plus, Search, Filter, MoreVertical, Mail, Phone, Download, Loader2, Layers, User, MessageSquare, Contact } from 'lucide-react';
 import { Table, TableRow, TableCell } from '../components/Table';
 import { motion } from 'motion/react';
-import { cn } from '../lib/utils';
-import { collection, onSnapshot, query, addDoc, serverTimestamp, deleteDoc, doc, writeBatch, where, orderBy, increment } from 'firebase/firestore';
+import { cn, formatWhatsAppPhone } from '../lib/utils';
+import { collection, onSnapshot, query, addDoc, serverTimestamp, deleteDoc, doc, getDoc, writeBatch, where, orderBy, increment } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { useAuth } from '../lib/auth';
 import { Modal } from '../components/Modal';
@@ -67,6 +67,8 @@ export function Students() {
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [editingStudent, setEditingStudent] = useState<any>(null);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
+  const [successInfo, setSuccessInfo] = useState<{title: string, message: string, whatsappUrl: string} | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -275,14 +277,17 @@ export function Students() {
         total: admissionFee + monthlyFee
       });
       const encodedMessage = encodeURIComponent(message);
-      try {
-        const cleanPhone = newStudent.guardianPhone.replace(/[^0-9]/g, '');
-        window.open(`https://wa.me/${cleanPhone}?text=${encodedMessage}`, '_blank');
-      } catch (e) {
-        console.error('Failed to open WhatsApp', e);
-      }
+      const cleanPhone = formatWhatsAppPhone(newStudent.guardianPhone);
+      const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodedMessage}`;
 
+      setSuccessInfo({
+        title: t('common.success', { defaultValue: 'Admission Successful' }),
+        message,
+        whatsappUrl
+      });
       setIsAddModalOpen(false);
+      setIsSuccessModalOpen(true);
+
       setNewStudent({
         name: '',
         email: '',
@@ -357,7 +362,6 @@ export function Students() {
 
   const filteredStudents = students.filter(s => {
     const matchesSearch = s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      s.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
       s.rollNo.includes(searchTerm);
     
     const batchId = searchParams.get('batch');
@@ -391,6 +395,94 @@ export function Students() {
     window.open(`https://wa.me/${phone}?text=${encodedMessage}`, '_blank');
   };
 
+  const downloadBatchIDCards = async () => {
+    if (filteredStudents.length === 0) return;
+    const { jsPDF } = await import('jspdf');
+    const pdf = new jsPDF({
+      orientation: 'landscape',
+      unit: 'mm',
+      format: [85, 54]
+    });
+
+    // Fetch institution info
+    const instId = user?.institutionId || user?.uid;
+    let institution: any = null;
+    if (instId) {
+      const instDoc = await getDoc(doc(db, 'institutions', instId));
+      if (instDoc.exists()) {
+        institution = instDoc.data();
+      }
+    }
+
+    for (let i = 0; i < filteredStudents.length; i++) {
+      const student = filteredStudents[i];
+      if (i > 0) pdf.addPage([85, 54], 'landscape');
+
+      // Background Color
+      pdf.setFillColor(248, 250, 252); // Stone-50
+      pdf.rect(0, 0, 85, 54, 'F');
+      
+      // Header section
+      pdf.setFillColor(5, 150, 105); // Emerald-600
+      pdf.rect(0, 0, 85, 12, 'F');
+      
+      // Institution Name
+      pdf.setTextColor(255, 255, 255);
+      pdf.setFontSize(10);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text(institution?.name || 'STUDENT ID CARD', 42.5, 6, { align: 'center' });
+      
+      if (institution?.logoURL) {
+        try {
+          pdf.addImage(institution.logoURL, 'JPEG', 5, 2, 8, 8);
+        } catch(e) { console.error("Logo add failed", e); }
+      }
+
+      // Student Photo
+      pdf.setFillColor(255, 255, 255);
+      pdf.setDrawColor(226, 232, 240); // Slate-200
+      pdf.roundedRect(5, 15, 25, 30, 2, 2, 'FD');
+      
+      if (student.photoUrl) {
+        try {
+          pdf.addImage(student.photoUrl, 'JPEG', 6, 16, 23, 28);
+        } catch(e) {
+          pdf.setTextColor(148, 163, 184);
+          pdf.setFontSize(14);
+          pdf.text(student.name[0], 17.5, 32, { align: 'center' });
+        }
+      } else {
+        pdf.setTextColor(148, 163, 184);
+        pdf.setFontSize(14);
+        pdf.text(student.name[0], 17.5, 32, { align: 'center' });
+      }
+
+      // Student Info
+      pdf.setTextColor(30, 41, 59); // Slate-800
+      pdf.setFontSize(10);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text(student.name, 35, 22);
+      
+      pdf.setFontSize(7);
+      pdf.setTextColor(100, 116, 139); // Slate-500
+      pdf.setFont('helvetica', 'normal');
+      pdf.text(`Roll No: ${student.rollNo}`, 35, 27);
+      pdf.text(`Batch: ${student.batchName}`, 35, 31);
+      pdf.text(`Phone: ${student.guardianPhone}`, 35, 35);
+      
+      const expiry = new Date();
+      expiry.setFullYear(expiry.getFullYear() + 1);
+      pdf.text(`Validity: ${expiry.toLocaleDateString()}`, 35, 42);
+      
+      // Footer
+      pdf.line(35, 45, 80, 45);
+      pdf.setFontSize(5);
+      pdf.text('Authorized Signature', 57.5, 48, { align: 'center' });
+    }
+    
+    pdf.save(`ID_Cards_${new Date().getTime()}.pdf`);
+  };
+
   return (
     <div className="space-y-8">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -399,6 +491,12 @@ export function Students() {
           <p className="text-gray-500 mt-1">{t('students.subtitle')}</p>
         </div>
         <div className="flex items-center gap-3">
+          <button 
+            onClick={downloadBatchIDCards}
+            className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-all shadow-sm"
+          >
+            <Contact className="w-4 h-4" /> ID Cards
+          </button>
           <button className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-all shadow-sm">
             <Download className="w-4 h-4" /> {t('students.export')}
           </button>
@@ -511,9 +609,6 @@ export function Students() {
                 <div className="flex flex-col gap-1">
                   <div className="flex items-center gap-1.5 text-xs text-gray-500">
                     <Phone className="w-3 h-3" /> {student.guardianPhone}
-                  </div>
-                  <div className="flex items-center gap-1.5 text-xs text-gray-500">
-                    <Mail className="w-3 h-3" /> {student.email || 'N/A'}
                   </div>
                 </div>
               </TableCell>
@@ -1142,6 +1237,22 @@ export function Students() {
       <SubscriptionModal 
         isOpen={isUpgradeModalOpen} 
         onClose={() => setIsUpgradeModalOpen(false)} 
+      />
+      {/* Success Modal with WhatsApp Action */}
+      <ConfirmModal
+        isOpen={isSuccessModalOpen}
+        onClose={() => setIsSuccessModalOpen(false)}
+        onConfirm={() => {
+          if (successInfo?.whatsappUrl) {
+            window.open(successInfo.whatsappUrl, '_blank');
+          }
+          setIsSuccessModalOpen(false);
+        }}
+        title={successInfo?.title || ''}
+        message={successInfo?.message || ''}
+        variant="info"
+        confirmText={t('common.sendWhatsApp', { defaultValue: 'Send WhatsApp' })}
+        cancelText={t('common.done', { defaultValue: 'Done' })}
       />
     </div>
   );

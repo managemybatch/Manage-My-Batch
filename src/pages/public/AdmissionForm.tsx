@@ -45,7 +45,6 @@ export function AdmissionForm() {
         institutionId: id,
         studentName: data['studentName'] || 'N/A',
         guardianPhone: data['guardianPhone'] || 'N/A',
-        email: data['email'] || '',
         grade: data['batch'] || 'N/A',
         status: 'pending',
         formData: data,
@@ -135,8 +134,14 @@ export function AdmissionForm() {
     <div className="min-h-screen bg-gray-50 py-12 px-6">
       <div className="max-w-2xl mx-auto space-y-8">
         <div className="text-center space-y-4">
-          <div className="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center text-white text-2xl font-black mx-auto shadow-lg shadow-indigo-200">
-            {institution.name.charAt(0)}
+          <div className="w-20 h-20 bg-white rounded-2xl flex items-center justify-center text-white text-2xl font-black mx-auto shadow-lg shadow-indigo-100 overflow-hidden ring-4 ring-indigo-50">
+            {institution.logoURL ? (
+              <img src={institution.logoURL} alt="Logo" className="w-full h-full object-contain p-2" referrerPolicy="no-referrer" />
+            ) : (
+              <div className="w-full h-full bg-indigo-600 flex items-center justify-center">
+                {institution.name.charAt(0)}
+              </div>
+            )}
           </div>
           <div>
             <h1 className="text-3xl font-black text-gray-900 tracking-tight">{institution.admissionForm.title}</h1>

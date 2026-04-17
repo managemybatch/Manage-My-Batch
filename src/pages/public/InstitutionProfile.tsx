@@ -47,6 +47,63 @@ export function InstitutionProfile() {
     fetchData();
   }, [id]);
 
+  const downloadBio = async () => {
+    if (!institution) return;
+    const { jsPDF } = await import('jspdf');
+    const doc = new jsPDF();
+    const instName = institution.name || 'Institution';
+    
+    // Header
+    doc.setFontSize(22);
+    doc.setTextColor(79, 70, 229); // Indigo
+    doc.text(instName, 105, 20, { align: 'center' });
+    
+    doc.setFontSize(10);
+    doc.setTextColor(100);
+    doc.text(`Established: ${institution.established || 'N/A'}`, 105, 28, { align: 'center' });
+    
+    // Line
+    doc.setDrawColor(200);
+    doc.line(20, 35, 190, 35);
+    
+    // Content
+    doc.setFontSize(12);
+    doc.setTextColor(0);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Contact Details', 20, 45);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Phone: ${institution.phone || 'N/A'}`, 25, 52);
+    doc.text(`Email: ${institution.email || 'N/A'}`, 25, 59);
+    doc.text(`Address: ${institution.address || 'N/A'}`, 25, 66);
+    
+    doc.setFont('helvetica', 'bold');
+    doc.text('About Institution', 20, 80);
+    doc.setFont('helvetica', 'normal');
+    const descLines = doc.splitTextToSize(institution.description || 'No description provided.', 160);
+    doc.text(descLines, 25, 87);
+    
+    let y = 87 + (descLines.length * 7);
+    
+    if (institution.vision) {
+      doc.setFont('helvetica', 'bold');
+      doc.text('Vision', 20, y + 10);
+      doc.setFont('helvetica', 'normal');
+      const visionLines = doc.splitTextToSize(institution.vision, 160);
+      doc.text(visionLines, 25, y + 17);
+      y = y + 17 + (visionLines.length * 7);
+    }
+    
+    if (institution.principalName) {
+      doc.setFont('helvetica', 'bold');
+      doc.text('Principal Information', 20, y + 10);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Name: ${institution.principalName}`, 25, y + 17);
+      doc.text(`Title: ${institution.principalTitle || 'Principal'}`, 25, y + 24);
+    }
+    
+    doc.save(`${instName.replace(/\s+/g, '_')}_Profile.pdf`);
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -72,8 +129,12 @@ export function InstitutionProfile() {
       {/* Hero Section */}
       <div className="bg-indigo-600 text-white pt-20 pb-40 px-6">
         <div className="max-w-5xl mx-auto flex flex-col md:flex-row items-center gap-8">
-          <div className="w-32 h-32 bg-white/20 rounded-3xl flex items-center justify-center text-5xl font-black ring-8 ring-white/10">
-            {institution.name.charAt(0)}
+          <div className="w-32 h-32 bg-white/20 rounded-3xl flex items-center justify-center text-5xl font-black ring-8 ring-white/10 overflow-hidden">
+            {institution.logoURL ? (
+              <img src={institution.logoURL} alt="Logo" className="w-full h-full object-contain p-4" referrerPolicy="no-referrer" />
+            ) : (
+              institution.name.charAt(0)
+            )}
           </div>
           <div className="text-center md:text-left space-y-2">
             <div className="flex items-center justify-center md:justify-start gap-2">
@@ -161,6 +222,28 @@ export function InstitutionProfile() {
                 )}
               </section>
             )}
+
+            {institution.principalName && (
+              <section className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm space-y-6">
+                <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                  <Users className="w-6 h-6 text-indigo-600" /> Message from Principal
+                </h2>
+                <div className="flex flex-col md:flex-row gap-6 items-start">
+                  {institution.principalPhotoURL && (
+                    <div className="w-32 h-32 rounded-2xl overflow-hidden shrink-0 shadow-lg ring-4 ring-indigo-50">
+                      <img src={institution.principalPhotoURL} alt="Principal" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                    </div>
+                  )}
+                  <div className="space-y-2">
+                    <p className="text-xl font-bold text-gray-900">{institution.principalName}</p>
+                    <p className="text-indigo-600 font-bold text-xs uppercase tracking-widest">{institution.principalTitle || 'Principal'}</p>
+                    <p className="text-gray-600 italic leading-relaxed">
+                      "Welcome to our institution. We are committed to providing the highest quality education and fostering a nurturing environment for all our students."
+                    </p>
+                  </div>
+                </div>
+              </section>
+            )}
           </div>
 
           <div className="space-y-6">
@@ -195,7 +278,10 @@ export function InstitutionProfile() {
                   </div>
                 </div>
               </div>
-              <button className="w-full py-4 bg-indigo-600 text-white font-bold rounded-2xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 flex items-center justify-center gap-2">
+              <button 
+                onClick={downloadBio}
+                className="w-full py-4 bg-indigo-600 text-white font-bold rounded-2xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 flex items-center justify-center gap-2"
+              >
                 <Download className="w-5 h-5" /> Download Bio
               </button>
             </div>

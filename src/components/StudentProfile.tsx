@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Modal } from './Modal';
 import { cn, formatCurrency, formatDate } from '../lib/utils';
-import { Edit2, Phone, Mail, MapPin, Calendar, CreditCard, User, Shield, Briefcase, MessageSquare, Loader2, ClipboardCheck, GraduationCap, TrendingUp, AlertCircle, CheckCircle2, XCircle, Clock } from 'lucide-react';
+import { Edit2, Phone, Mail, MapPin, Calendar, CreditCard, User, Shield, Briefcase, MessageSquare, Loader2, ClipboardCheck, GraduationCap, TrendingUp, AlertCircle, CheckCircle2, XCircle, Clock, Download, Contact } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useTranslation } from 'react-i18next';
 import { db, handleFirestoreError, OperationType } from '../firebase';
-import { collection, query, where, orderBy, getDocs, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, orderBy, getDocs, onSnapshot, doc, getDoc } from 'firebase/firestore';
 import { useAuth } from '../lib/auth';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell } from 'recharts';
 
@@ -74,12 +74,25 @@ export function StudentProfile({ isOpen, onClose, student, onEdit }: StudentProf
   const [examResults, setExamResults] = useState<any[]>([]);
   const [loadingStats, setLoadingStats] = useState(false);
   const [dueMonths, setDueMonths] = useState<string[]>([]);
+  const [institution, setInstitution] = useState<any>(null);
 
   useEffect(() => {
     if (!student || !isOpen) return;
 
     setLoadingStats(true);
     const instId = user.institutionId || user.uid;
+
+    const fetchInstitution = async () => {
+      try {
+        const instDoc = await getDoc(doc(db, 'institutions', instId));
+        if (instDoc.exists()) {
+          setInstitution(instDoc.data());
+        }
+      } catch (err) {
+        console.error("Error fetching institution:", err);
+      }
+    };
+    fetchInstitution();
 
     const fetchFees = async () => {
       try {
@@ -250,6 +263,137 @@ export function StudentProfile({ isOpen, onClose, student, onEdit }: StudentProf
     { id: 'contact', label: t('studentProfile.tabs.contact'), icon: Phone },
   ];
 
+  const downloadStudentPDF = async () => {
+    if (!student) return;
+    const { jsPDF } = await import('jspdf');
+    const doc = new jsPDF();
+    
+    // Header
+    doc.setFontSize(20);
+    doc.setTextColor(5, 150, 105); // Emerald-600
+    doc.text('Student Profile', 105, 20, { align: 'center' });
+    
+    doc.setFontSize(10);
+    doc.setTextColor(100);
+    doc.text(`Roll No: ${student.rollNo}`, 105, 28, { align: 'center' });
+    
+    doc.line(20, 35, 190, 35);
+    
+    // Personal Info
+    doc.setFontSize(12);
+    doc.setTextColor(0);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Personal Information', 20, 45);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Name: ${student.name}`, 25, 52);
+    doc.text(`Father's Name: ${student.fatherName || 'N/A'}`, 25, 59);
+    doc.text(`Mother's Name: ${student.motherName || 'N/A'}`, 25, 66);
+    doc.text(`Date of Birth: ${student.dateOfBirth ? formatDate(student.dateOfBirth) : 'N/A'}`, 25, 73);
+    doc.text(`Phone: ${student.phone || 'N/A'}`, 25, 80);
+    doc.text(`Guardian Phone: ${student.guardianPhone}`, 25, 87);
+    
+    // Academic Info
+    doc.setFont('helvetica', 'bold');
+    doc.text('Academic Information', 20, 100);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Batch: ${student.batchName}`, 25, 107);
+    doc.text(`Grade: ${student.grade || 'N/A'}`, 25, 114);
+    doc.text(`Section: ${student.section || 'N/A'}`, 25, 121);
+    doc.text(`Join Date: ${student.joinDate ? formatDate(student.joinDate) : 'N/A'}`, 25, 128);
+    doc.text(`Monthly Fee: ${formatCurrency(student.monthlyFee)}`, 25, 135);
+    
+    // Financial Summary
+    doc.setFont('helvetica', 'bold');
+    doc.text('Financial Summary', 20, 150);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Total Paid: ${formatCurrency(totalPaid)}`, 25, 157);
+    doc.text(`Months Paid: ${monthsPaid}`, 25, 164);
+    if (dueMonths.length > 0) {
+      doc.setTextColor(225, 29, 72); // Rose-600
+      doc.text(`Dues: ${dueMonths.join(', ')}`, 25, 171);
+    } else {
+      doc.setTextColor(5, 150, 105); // Emerald-600
+      doc.text('Status: Clear (No Dues)', 25, 171);
+    }
+    
+    doc.save(`${student.name.replace(/\s+/g, '_')}_Profile.pdf`);
+  };
+
+  const downloadIDCard = async () => {
+    if (!student) return;
+    const { jsPDF } = await import('jspdf');
+    
+    // Create standard ID card size (85mm x 54mm)
+    const pdf = new jsPDF({
+      orientation: 'landscape',
+      unit: 'mm',
+      format: [85, 54]
+    });
+
+    // Background Color
+    pdf.setFillColor(248, 250, 252); // Stone-50
+    pdf.rect(0, 0, 85, 54, 'F');
+    
+    // Header section
+    pdf.setFillColor(5, 150, 105); // Emerald-600
+    pdf.rect(0, 0, 85, 12, 'F');
+    
+    // Institution Name
+    pdf.setTextColor(255, 255, 255);
+    pdf.setFontSize(10);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text(institution?.name || 'STUDENT ID CARD', 42.5, 6, { align: 'center' });
+    
+    if (institution?.logoURL) {
+      try {
+        pdf.addImage(institution.logoURL, 'JPEG', 5, 2, 8, 8);
+      } catch(e) { console.error("Logo add failed", e); }
+    }
+
+    // Student Photo
+    pdf.setFillColor(255, 255, 255);
+    pdf.setDrawColor(226, 232, 240); // Slate-200
+    pdf.roundedRect(5, 15, 25, 30, 2, 2, 'FD');
+    
+    if (student.photoUrl) {
+      try {
+        pdf.addImage(student.photoUrl, 'JPEG', 6, 16, 23, 28);
+      } catch(e) {
+        pdf.setTextColor(148, 163, 184);
+        pdf.setFontSize(14);
+        pdf.text(student.name[0], 17.5, 32, { align: 'center' });
+      }
+    } else {
+      pdf.setTextColor(148, 163, 184);
+      pdf.setFontSize(14);
+      pdf.text(student.name[0], 17.5, 32, { align: 'center' });
+    }
+
+    // Student Info
+    pdf.setTextColor(30, 41, 59); // Slate-800
+    pdf.setFontSize(10);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text(student.name, 35, 22);
+    
+    pdf.setFontSize(7);
+    pdf.setTextColor(100, 116, 139); // Slate-500
+    pdf.setFont('helvetica', 'normal');
+    pdf.text(`Roll No: ${student.rollNo}`, 35, 27);
+    pdf.text(`Batch: ${student.batchName}`, 35, 31);
+    pdf.text(`Phone: ${student.guardianPhone}`, 35, 35);
+    
+    const expiry = new Date();
+    expiry.setFullYear(expiry.getFullYear() + 1);
+    pdf.text(`Validity: ${expiry.toLocaleDateString()}`, 35, 42);
+    
+    // Footer
+    pdf.line(35, 45, 80, 45);
+    pdf.setFontSize(5);
+    pdf.text('Authorized Signature', 57.5, 48, { align: 'center' });
+    
+    pdf.save(`${student.name.replace(/\s+/g, '_')}_ID_Card.pdf`);
+  };
+
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="" maxWidth="max-w-2xl">
       <div className="-mt-6 -mx-6 overflow-hidden rounded-t-2xl">
@@ -280,12 +424,28 @@ export function StudentProfile({ isOpen, onClose, student, onEdit }: StudentProf
                 </div>
               </div>
             </div>
-            <button 
-              onClick={() => onEdit?.(student)}
-              className="p-2 bg-white/10 hover:bg-white/20 rounded-xl transition-all border border-white/10 shadow-lg"
-            >
-              <Edit2 className="w-5 h-5" />
-            </button>
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={downloadIDCard}
+                className="p-2 bg-white/10 hover:bg-white/20 rounded-xl transition-all border border-white/10 shadow-lg text-white"
+                title="Download ID Card"
+              >
+                <Contact className="w-5 h-5" />
+              </button>
+              <button 
+                onClick={downloadStudentPDF}
+                className="p-2 bg-white/10 hover:bg-white/20 rounded-xl transition-all border border-white/10 shadow-lg text-white"
+                title="Download PDF Profile"
+              >
+                <Download className="w-5 h-5" />
+              </button>
+              <button 
+                onClick={() => onEdit?.(student)}
+                className="p-2 bg-white/10 hover:bg-white/20 rounded-xl transition-all border border-white/10 shadow-lg text-white"
+              >
+                <Edit2 className="w-5 h-5" />
+              </button>
+            </div>
           </div>
 
           {/* Stats Grid */}
@@ -645,16 +805,6 @@ export function StudentProfile({ isOpen, onClose, student, onEdit }: StudentProf
                   >
                     <MessageSquare className="w-5 h-5" />
                   </button>
-                </div>
-
-                <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4">
-                  <div className="w-10 h-10 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-600">
-                    <Mail className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{t('common.email', { defaultValue: 'Email Address' })}</p>
-                    <p className="font-bold text-gray-900">{student.email || '—'}</p>
-                  </div>
                 </div>
 
                 <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4">
