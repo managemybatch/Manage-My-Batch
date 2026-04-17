@@ -897,11 +897,11 @@ function HiddenBioTemplate({ institution, stats, bioRef }: { institution: any, s
     <div className="fixed top-0 left-0 -z-[100] opacity-0 pointer-events-none overflow-hidden" style={{ width: '800px' }}>
       <div 
         ref={bioRef}
-        className="w-[800px] p-12 bg-white space-y-12 text-gray-900"
-        style={{ fontFamily: '"Inter", sans-serif', minHeight: '1000px' }}
+        className="w-[800px] p-12 bg-white space-y-12"
+        style={{ fontFamily: '"Inter", sans-serif', minHeight: '1000px', color: '#111827' }}
       >
-        <div className="flex items-center gap-8 border-b-4 border-indigo-600 pb-8">
-          <div className="w-32 h-32 bg-indigo-50 rounded-3xl flex items-center justify-center text-4xl font-black text-indigo-600 shrink-0 overflow-hidden">
+        <div className="flex items-center gap-8 border-b-4 pb-8" style={{ borderColor: '#4f46e5' }}>
+          <div className="w-32 h-32 rounded-3xl flex items-center justify-center text-4xl font-black shrink-0 overflow-hidden" style={{ backgroundColor: '#eef2ff', color: '#4f46e5' }}>
             {institution.logoURL ? (
               <img src={institution.logoURL} alt="Logo" className="w-full h-full object-contain p-4" crossOrigin="anonymous" referrerPolicy="no-referrer" />
             ) : (
@@ -909,53 +909,53 @@ function HiddenBioTemplate({ institution, stats, bioRef }: { institution: any, s
             )}
           </div>
           <div className="space-y-2">
-            <h1 className="text-4xl font-black tracking-tight text-gray-900">{institution.name}</h1>
-            <p className="text-gray-500 font-bold flex items-center gap-2">
+            <h1 className="text-4xl font-black tracking-tight" style={{ color: '#111827' }}>{institution.name}</h1>
+            <p className="font-bold flex items-center gap-2" style={{ color: '#6b7280' }}>
               <MapPin className="w-4 h-4" /> {institution.address || 'Address not provided'}
             </p>
-            <p className="text-indigo-600 font-bold uppercase tracking-widest text-xs">Established: {institution.established || 'N/A'}</p>
+            <p className="font-bold uppercase tracking-widest text-xs" style={{ color: '#4f46e5' }}>Established: {institution.established || 'N/A'}</p>
           </div>
         </div>
 
         <div className="grid grid-cols-3 gap-6">
           {[
-            { label: 'Students', value: stats.students, color: 'text-blue-600' },
-            { label: 'Teachers', value: stats.teachers, color: 'text-emerald-600' },
-            { label: 'Batches', value: stats.batches, color: 'text-amber-600' },
+            { label: 'Students', value: stats.students, color: '#2563eb' },
+            { label: 'Teachers', value: stats.teachers, color: '#059669' },
+            { label: 'Batches', value: stats.batches, color: '#d97706' },
           ].map((stat, idx) => (
-            <div key={idx} className="bg-gray-50 p-6 rounded-2xl text-center border border-gray-100">
-              <p className="text-[10px] font-black text-gray-400 border uppercase tracking-widest mb-1">{stat.label}</p>
-              <h3 className={cn("text-2xl font-black", stat.color)}>{stat.value}</h3>
+            <div key={idx} className="p-6 rounded-2xl text-center border" style={{ backgroundColor: '#f9fafb', borderColor: '#f3f4f6' }}>
+              <p className="text-[10px] font-black border uppercase tracking-widest mb-1" style={{ color: '#9ca3af' }}>{stat.label}</p>
+              <h3 className="text-2xl font-black" style={{ color: stat.color }}>{stat.value}</h3>
             </div>
           ))}
         </div>
 
         <div className="space-y-8">
           <section className="space-y-4">
-            <h2 className="text-2xl font-black text-indigo-600 border-l-4 border-indigo-600 pl-4 uppercase tracking-tight">About Institution</h2>
-            <p className="text-gray-600 leading-relaxed text-lg whitespace-pre-wrap">
+            <h2 className="text-2xl font-black border-l-4 pl-4 uppercase tracking-tight" style={{ color: '#4f46e5', borderColor: '#4f46e5' }}>About Institution</h2>
+            <p className="leading-relaxed text-lg whitespace-pre-wrap" style={{ color: '#4b5563' }}>
               {institution.description || 'No description provided.'}
             </p>
           </section>
 
           {(institution.vision || institution.goal || institution.target) && (
-            <section className="space-y-6 bg-indigo-50/50 p-8 rounded-3xl border border-indigo-100">
+            <section className="space-y-6 p-8 rounded-3xl border" style={{ backgroundColor: '#f5f7ff', borderColor: '#eef2ff' }}>
               {institution.vision && (
                 <div className="space-y-2">
-                  <h3 className="text-lg font-black text-gray-900">Vision & Mission</h3>
-                  <p className="text-gray-600 leading-relaxed whitespace-pre-wrap">{institution.vision}</p>
+                  <h3 className="text-lg font-black" style={{ color: '#111827' }}>Vision & Mission</h3>
+                  <p className="leading-relaxed whitespace-pre-wrap" style={{ color: '#4b5563' }}>{institution.vision}</p>
                 </div>
               )}
               {institution.goal && (
                 <div className="space-y-2">
-                  <h3 className="text-lg font-black text-gray-900">Our Goal</h3>
-                  <p className="text-gray-600 leading-relaxed whitespace-pre-wrap">{institution.goal}</p>
+                  <h3 className="text-lg font-black" style={{ color: '#111827' }}>Our Goal</h3>
+                  <p className="leading-relaxed whitespace-pre-wrap" style={{ color: '#4b5563' }}>{institution.goal}</p>
                 </div>
               )}
               {institution.target && (
                 <div className="space-y-2">
-                  <h3 className="text-lg font-black text-gray-900">Our Target</h3>
-                  <p className="text-gray-600 leading-relaxed whitespace-pre-wrap">{institution.target}</p>
+                  <h3 className="text-lg font-black" style={{ color: '#111827' }}>Our Target</h3>
+                  <p className="leading-relaxed whitespace-pre-wrap" style={{ color: '#4b5563' }}>{institution.target}</p>
                 </div>
               )}
             </section>
@@ -963,7 +963,7 @@ function HiddenBioTemplate({ institution, stats, bioRef }: { institution: any, s
 
           {institution.principalName && (
             <section className="space-y-6">
-              <h2 className="text-2xl font-black text-indigo-600 border-l-4 border-indigo-600 pl-4 uppercase tracking-tight">Message from Principal</h2>
+              <h2 className="text-2xl font-black border-l-4 pl-4 uppercase tracking-tight" style={{ color: '#4f46e5', borderColor: '#4f46e5' }}>Message from Principal</h2>
               <div className="flex gap-8 items-start">
                 {institution.principalPhotoURL && (
                   <div className="w-32 h-32 rounded-2xl overflow-hidden shrink-0 shadow-lg border-4 border-white ring-1 ring-gray-100">
@@ -971,9 +971,9 @@ function HiddenBioTemplate({ institution, stats, bioRef }: { institution: any, s
                   </div>
                 )}
                 <div className="space-y-2">
-                  <p className="text-xl font-bold text-gray-900">{institution.principalName}</p>
-                  <p className="text-indigo-600 font-bold text-xs uppercase tracking-widest">{institution.principalTitle || 'Principal'}</p>
-                  <p className="text-gray-600 italic leading-relaxed text-lg">
+                  <p className="text-xl font-bold" style={{ color: '#111827' }}>{institution.principalName}</p>
+                  <p className="font-bold text-xs uppercase tracking-widest" style={{ color: '#4f46e5' }}>{institution.principalTitle || 'Principal'}</p>
+                  <p className="italic leading-relaxed text-lg" style={{ color: '#4b5563' }}>
                     "Welcome to our institution. We are committed to providing the highest quality education and fostering a nurturing environment for all our students."
                   </p>
                 </div>
@@ -981,33 +981,33 @@ function HiddenBioTemplate({ institution, stats, bioRef }: { institution: any, s
             </section>
           )}
 
-          <div className="pt-8 border-t border-gray-100">
-            <h3 className="text-lg font-black text-gray-900 mb-4">Contact Information</h3>
+          <div className="pt-8 border-t" style={{ borderColor: '#f3f4f6' }}>
+            <h3 className="text-lg font-black mb-4" style={{ color: '#111827' }}>Contact Information</h3>
             <div className="grid grid-cols-2 gap-8">
               <div className="space-y-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-gray-50 rounded-xl flex items-center justify-center text-gray-400">
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: '#f9fafb', color: '#9ca3af' }}>
                     <Phone className="w-5 h-5" />
                   </div>
                   <div>
-                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Phone</p>
-                    <p className="font-bold text-gray-900">{institution.phone || 'N/A'}</p>
+                    <p className="text-[10px] font-black uppercase tracking-widest" style={{ color: '#9ca3af' }}>Phone</p>
+                    <p className="font-bold" style={{ color: '#111827' }}>{institution.phone || 'N/A'}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-gray-50 rounded-xl flex items-center justify-center text-gray-400">
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: '#f9fafb', color: '#9ca3af' }}>
                     <Mail className="w-5 h-5" />
                   </div>
                   <div>
-                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Email</p>
-                    <p className="font-bold text-gray-900">{institution.email || 'N/A'}</p>
+                    <p className="text-[10px] font-black uppercase tracking-widest" style={{ color: '#9ca3af' }}>Email</p>
+                    <p className="font-bold" style={{ color: '#111827' }}>{institution.email || 'N/A'}</p>
                   </div>
                 </div>
               </div>
-              <div className="bg-gray-50 p-6 rounded-2xl border border-gray-100">
-                <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">Generated by</p>
-                <p className="font-black text-indigo-600 text-xl tracking-tight">Manage My Batch</p>
-                <p className="text-xs text-gray-400">Your education partner</p>
+              <div className="p-6 rounded-2xl border" style={{ backgroundColor: '#f9fafb', borderColor: '#f3f4f6' }}>
+                <p className="text-[10px] font-black uppercase tracking-widest mb-1" style={{ color: '#818cf8' }}>Generated by</p>
+                <p className="font-black text-xl tracking-tight" style={{ color: '#4f46e5' }}>Manage My Batch</p>
+                <p className="text-xs" style={{ color: '#9ca3af' }}>Your education partner</p>
               </div>
             </div>
           </div>
