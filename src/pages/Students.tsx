@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Filter, MoreVertical, Mail, Phone, Download, Loader2, Layers, User, MessageSquare, Contact, FileText, CheckCircle2, XCircle, Users } from 'lucide-react';
+import { Plus, Search, Filter, MoreVertical, Mail, Phone, Download, Loader2, Layers, User, MessageSquare, Contact, FileText, CheckCircle2, XCircle, Users, HelpCircle, FileDown } from 'lucide-react';
 import { Table, TableRow, TableCell } from '../components/Table';
 import { motion } from 'motion/react';
 import { cn, formatWhatsAppPhone, formatDate } from '../lib/utils';
@@ -74,8 +74,21 @@ export function Students() {
   const [isSaving, setIsSaving] = useState(false);
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showImportHelp, setShowImportHelp] = useState(false);
   const importInputRef = React.useRef<HTMLInputElement>(null);
 
+  const handleDownloadTemplate = () => {
+    const headers = ['Name', 'Phone', 'Batch', 'RollNo'];
+    const csvContent = headers.join(',') + '\nJohn Doe,017xxxxxxxx,Class 10 - A,101';
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'student_import_template.csv';
+    a.click();
+    window.URL.revokeObjectURL(url);
+  };
+  
   const handleImportCSV = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !user) return;
@@ -687,6 +700,13 @@ export function Students() {
             className="hidden"
           />
           <button
+            onClick={() => setShowImportHelp(true)}
+            className="p-2.5 text-indigo-600 bg-indigo-50 border border-indigo-100 rounded-xl hover:bg-indigo-100 transition-all shadow-sm"
+            title="Import Help"
+          >
+            <HelpCircle className="w-4 h-4" />
+          </button>
+          <button
             onClick={() => importInputRef.current?.click()}
             disabled={isSaving}
             className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-all shadow-sm"
@@ -762,6 +782,53 @@ export function Students() {
           </select>
         </div>
       </div>
+
+      <Modal 
+        isOpen={showImportHelp} 
+        onClose={() => setShowImportHelp(false)} 
+        title={t('students.importInstructions.title', { defaultValue: 'Import Instructions' })}
+        maxWidth="max-w-xl"
+      >
+        <div className="space-y-6">
+          <div className="p-4 bg-indigo-50 rounded-2xl border border-indigo-100 italic text-sm text-indigo-700">
+            {t('students.importInstructions.description', { defaultValue: 'Follow this exact format to import students. The first row must be the header.' })}
+          </div>
+          
+          <div className="space-y-3">
+            <h4 className="text-sm font-bold text-gray-900">{t('students.importInstructions.requiredColumns', { defaultValue: 'Required Columns (in order):' })}</h4>
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                { name: t('students.addModal.name'), desc: t('students.importInstructions.nameDesc') },
+                { name: t('students.addModal.guardianPhone'), desc: t('students.importInstructions.phoneDesc') },
+                { name: t('students.addModal.batch'), desc: t('students.importInstructions.batchDesc') },
+                { name: t('students.addModal.rollNo'), desc: t('students.importInstructions.rollDesc') }
+              ].map((col) => (
+                <div key={col.name} className="p-3 bg-gray-50 rounded-xl border border-gray-100">
+                  <p className="text-xs font-black text-indigo-600 uppercase tracking-widest">{col.name}</p>
+                  <p className="text-[10px] text-gray-500 mt-1">{col.desc}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="bg-gray-900 p-4 rounded-2xl overflow-x-auto border border-gray-800">
+            <p className="text-[10px] text-gray-500 uppercase font-black mb-2 tracking-widest">Example CSV Content</p>
+            <code className="text-xs text-indigo-300 font-mono whitespace-nowrap">
+              Name,Phone,Batch,RollNo<br />
+              Abir Hasan,01700000000,Science Batch 1,101<br />
+              Samiul Islam,01800000000,Arts Batch A,102
+            </code>
+          </div>
+
+          <button
+            onClick={handleDownloadTemplate}
+            className="w-full flex items-center justify-center gap-2 py-4 bg-indigo-600 text-white font-bold rounded-2xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200"
+          >
+            <FileDown className="w-5 h-5" />
+            {t('students.importInstructions.downloadTemplate', { defaultValue: 'Download CSV Template' })}
+          </button>
+        </div>
+      </Modal>
 
       {loading ? (
         <div className="flex items-center justify-center py-20">

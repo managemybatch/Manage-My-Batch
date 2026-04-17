@@ -48,6 +48,8 @@ const resources = {
         subtitle: "Manage and view all students in your institution.",
         export: "Export",
         addStudent: "Add Student",
+        allStudents: "All Students",
+        applications: "Applications",
         searchPlaceholder: "Search by name or roll no...",
         filter: "Filter",
         allGrades: "All Grades",
@@ -58,6 +60,7 @@ const resources = {
           rollNo: "Roll No",
           contact: "Contact",
           status: "Status",
+          date: "Date",
           actions: "Actions"
         },
         addModal: {
@@ -83,7 +86,17 @@ const resources = {
           addressPlaceholder: "Enter full address...",
           skipAdmissionFee: "Mark admission fee as already paid",
           skipMonthlyFee: "Mark current month fee as already paid",
-          successMsg: "Congratulations! {{name}}'s admission is successful.\nAdmission Fee: ৳{{aFee}}\nMonthly Fee: ৳{{mFee}}\nTotal Received: ৳{{total}}\nThank you, Manage My Batch."
+          successMsg: "Congratulations! {{name}}'s admission is successful.\nAdmission Fee: ৳{{aFee}}\nMonthly Fee: ৳{{mFee}}\nTotal Received: ৳{{total}}\nThank you, Manage My Batch.",
+        },
+        importInstructions: {
+          title: "Import Instructions",
+          description: "To import multiple students at once, use a CSV file with correctly mapped headers. You can download our template below to ensure accuracy.",
+          requiredColumns: "Required Columns (CSV Headers):",
+          downloadTemplate: "Download CSV Template",
+          nameDesc: "Full student name",
+          phoneDesc: "11-digit mobile number",
+          batchDesc: "Exact batch name (Must match your existing batches)",
+          rollDesc: "Student roll or ID number"
         }
       },
       batches: {
@@ -635,6 +648,8 @@ bn: {
         subtitle: "আপনার প্রতিষ্ঠানের সকল ছাত্রদের পরিচালনা এবং দেখুন।",
         export: "এক্সপোর্ট",
         addStudent: "ছাত্র যোগ করুন",
+        allStudents: "সকল ছাত্র",
+        applications: "আবেদনসমূহ",
         searchPlaceholder: "নাম বা রোল নম্বর দিয়ে খুঁজুন...",
         filter: "ফিল্টার",
         allGrades: "সব গ্রেড",
@@ -645,6 +660,7 @@ bn: {
           rollNo: "রোল নম্বর",
           contact: "যোগাযোগ",
           status: "অবস্থা",
+          date: "তারিখ",
           actions: "অ্যাকশন"
         },
         addModal: {
@@ -670,7 +686,17 @@ bn: {
           addressPlaceholder: "সম্পূর্ণ ঠিকানা লিখুন...",
           skipAdmissionFee: "ভর্তি ফি পরিশোধ করা হয়েছে",
           skipMonthlyFee: "চলতি মাসের ফি পরিশোধ করা হয়েছে",
-          successMsg: "অভিনন্দন! {{name}} এর ভর্তি সফল হয়েছে।\nভর্তি ফি: ৳{{aFee}}\nমাসিক ফি: ৳{{mFee}}\nমোট গ্রহণ করা হয়েছে: ৳{{total}}\nধন্যবাদ, Manage My Batch।"
+          successMsg: "অভিনন্দন! {{name}} এর ভর্তি সফল হয়েছে।\nভর্তি ফি: ৳{{aFee}}\nমাসিক ফি: ৳{{mFee}}\nমোট গ্রহণ করা হয়েছে: ৳{{total}}\nধন্যবাদ, Manage My Batch।",
+        },
+        importInstructions: {
+          title: "ইমপোর্ট নির্দেশিকা",
+          description: "একসাথে অনেক ছাত্র যোগ করতে সঠিক হেডার সহ একটি সিএসভি ফাইল ব্যবহার করুন। নির্ভুলতা নিশ্চিত করতে আপনি নিচের টেমপ্লেটটি ডাউনলোড করতে পারেন।",
+          requiredColumns: "প্রয়োজনীয় কলাম (CSV হেডার):",
+          downloadTemplate: "সিএসভি টেমপ্লেট ডাউনলোড করুন",
+          nameDesc: "ছাত্রের পুরো নাম",
+          phoneDesc: "১১ সংখ্যার মোবাইল নম্বর",
+          batchDesc: "সঠিক ব্যাচের নাম (আপনার বিদ্যমান ব্যাচের সাথে মিলতে হবে)",
+          rollDesc: "ছাত্রের রোল বা আইডি নম্বর"
         }
       },
       batches: {
