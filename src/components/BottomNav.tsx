@@ -17,18 +17,45 @@ import {
   Bell,
   ShieldCheck,
   TrendingUp,
-  HelpCircle
+  HelpCircle,
+  Zap
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../lib/auth';
 import { motion, AnimatePresence } from 'motion/react';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { db } from '../firebase';
 
 export function BottomNav() {
   const { t } = useTranslation();
   const { user, logout } = useAuth();
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
+  const [birthdayCount, setBirthdayCount] = useState(0);
   const location = useLocation();
+
+  React.useEffect(() => {
+    if (!user) return;
+    const instId = user.institutionId || user.uid;
+    const q = query(collection(db, 'students'), where('institutionId', '==', instId));
+    
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const today = new Date();
+      const m = today.getMonth() + 1;
+      const d = today.getDate();
+      
+      const count = snapshot.docs.filter(doc => {
+        const student = doc.data();
+        if (!student.dob) return false;
+        const dob = new Date(student.dob);
+        return (dob.getMonth() + 1) === m && dob.getDate() === d;
+      }).length;
+      
+      setBirthdayCount(count);
+    });
+
+    return () => unsubscribe();
+  }, [user]);
 
   const navItems = user?.isSuperAdmin ? [
     { icon: LayoutDashboard, label: 'Dashboard', path: '/super-admin' },
@@ -83,7 +110,7 @@ export function BottomNav() {
           <button
             onClick={() => setIsMoreMenuOpen(true)}
             className={cn(
-              "flex flex-col items-center justify-center gap-1 flex-1 min-w-0 transition-colors duration-200",
+              "flex flex-col items-center justify-center gap-1 flex-1 min-w-0 transition-colors duration-200 relative",
               isMoreMenuOpen 
                 ? "text-indigo-600 dark:text-indigo-400" 
                 : "text-gray-500 dark:text-gray-400"
@@ -93,6 +120,11 @@ export function BottomNav() {
             <span className="text-[10px] font-bold uppercase tracking-tighter truncate w-full text-center px-1">
               {t('common.more') || 'More'}
             </span>
+            {birthdayCount > 0 && (
+              <span className="absolute top-2 right-4 bg-red-500 text-white text-[8px] font-black w-4 h-4 rounded-full flex items-center justify-center animate-pulse">
+                {birthdayCount}
+              </span>
+            )}
           </button>
         </div>
       </nav>
@@ -151,7 +183,7 @@ export function BottomNav() {
                     to={item.path}
                     onClick={() => setIsMoreMenuOpen(false)}
                     className={cn(
-                      "flex flex-col items-center gap-3 p-4 rounded-2xl border transition-all",
+                      "flex flex-col items-center gap-3 p-4 rounded-2xl border transition-all relative",
                       location.pathname === item.path
                         ? "bg-indigo-50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-800 text-indigo-600 dark:text-indigo-400"
                         : "bg-gray-50 dark:bg-gray-800/50 border-gray-100 dark:border-gray-800 text-gray-600 dark:text-gray-400"
@@ -159,8 +191,34 @@ export function BottomNav() {
                   >
                     <item.icon className="w-6 h-6" />
                     <span className="text-sm font-bold">{item.label}</span>
+                    {item.path === '/marketing' && birthdayCount > 0 && (
+                      <span className="absolute top-2 right-2 bg-red-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full animate-pulse shadow-lg">
+                        {birthdayCount} Birthdays
+                      </span>
+                    )}
                   </NavLink>
                 ))}
+                
+                {!user?.isSuperAdmin && (
+                  <NavLink
+                    to="/marketing"
+                    onClick={() => setIsMoreMenuOpen(false)}
+                    className={cn(
+                      "flex flex-col items-center gap-3 p-4 rounded-2xl border transition-all relative",
+                      location.pathname === '/marketing'
+                        ? "bg-indigo-50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-800 text-indigo-600 dark:text-indigo-400"
+                        : "bg-gray-50 dark:bg-gray-800/50 border-gray-100 dark:border-gray-800 text-gray-600 dark:text-gray-400"
+                    )}
+                  >
+                    <Zap className="w-6 h-6" />
+                    <span className="text-sm font-bold">{t('nav.marketing')}</span>
+                    {birthdayCount > 0 && (
+                      <span className="absolute top-3 right-3 bg-red-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full animate-pulse shadow-lg">
+                        {birthdayCount}
+                      </span>
+                    )}
+                  </NavLink>
+                )}
               </div>
 
               <div className="mt-8 pt-8 border-t border-gray-100 dark:border-gray-800">

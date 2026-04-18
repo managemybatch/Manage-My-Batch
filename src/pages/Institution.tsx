@@ -1,11 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Building, Share2, Download, Users, Briefcase, Layers, MapPin, Phone, Mail, Globe, Info, CheckCircle, ExternalLink, Loader2, Plus, Trash2, UserPlus, MessageSquare } from 'lucide-react';
+import { 
+  Building, Share2, Download, Users, Briefcase, Layers, 
+  MapPin, Phone, Mail, Globe, Info, CheckCircle, 
+  ExternalLink, Loader2, Plus, Trash2, UserPlus, 
+  MessageSquare, Calendar, Newspaper, Megaphone, Send, Edit2
+} from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { cn, compressImage } from '../lib/utils';
 import { db, handleFirestoreError, OperationType } from '../firebase';
-import { collection, doc, getDoc, setDoc, updateDoc, query, where, getDocs, onSnapshot, orderBy, limit } from 'firebase/firestore';
+import { collection, doc, getDoc, setDoc, updateDoc, query, where, getDocs, onSnapshot, orderBy, limit, addDoc, deleteDoc } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
 import { Modal } from '../components/Modal';
 import { ConfirmModal } from '../components/ConfirmModal';
@@ -21,6 +26,7 @@ interface InstitutionData {
   vision: string;
   goal?: string;
   target?: string;
+  slug?: string;
   photoURL?: string;
   logoURL?: string;
   principalName?: string;
@@ -49,7 +55,7 @@ export function Institution() {
   const { user } = useAuth();
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'profile' | 'admissionForm' | 'applications'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'website' | 'admissionForm' | 'applications'>('profile');
   const [newFieldName, setNewFieldName] = useState('');
   const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState(false);
@@ -59,6 +65,16 @@ export function Institution() {
   const [applications, setApplications] = useState<Application[]>([]);
   const [stats, setStats] = useState({ students: 0, teachers: 0, batches: 0 });
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [slugStatus, setSlugStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle');
+  
+  const [notices, setNotices] = useState<any[]>([]);
+  const [events, setEvents] = useState<any[]>([]);
+  const [circulars, setCirculars] = useState<any[]>([]);
+  
+  const [showNoticeModal, setShowNoticeModal] = useState(false);
+  const [showEventModal, setShowEventModal] = useState(false);
+  const [showCircularModal, setShowCircularModal] = useState(false);
+  const [editingItem, setEditingItem] = useState<any>(null);
 
   useEffect(() => {
     if (toast) {
@@ -85,6 +101,7 @@ export function Institution() {
           vision: data.vision,
           goal: data.goal,
           target: data.target,
+          slug: data.slug || '',
           photoURL: data.photoURL || data.photoUrl,
           logoURL: data.logoURL,
           principalName: data.principalName,
@@ -176,11 +193,77 @@ export function Institution() {
 
     fetchStats();
 
+    // Fetch Notices, Events, Circulars
+    const unsubNotices = onSnapshot(query(collection(db, 'notices'), where('institutionId', '==', instId), orderBy('createdAt', 'desc')), (s) => {
+      setNotices(s.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+    const unsubEvents = onSnapshot(query(collection(db, 'events'), where('institutionId', '==', instId), orderBy('createdAt', 'desc')), (s) => {
+      setEvents(s.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+    const unsubCirculars = onSnapshot(query(collection(db, 'circulars'), where('institutionId', '==', instId), orderBy('createdAt', 'desc')), (s) => {
+      setCirculars(s.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+
     return () => {
       unsubInst();
       unsubApps();
+      unsubNotices();
+      unsubEvents();
+      unsubCirculars();
     };
   }, [user]);
+
+  const handleDeleteItem = async (col: string, id: string) => {
+    if (!window.confirm('Are you sure you want to delete this item?')) return;
+    try {
+      await deleteDoc(doc(db, col, id));
+      setToast({ message: 'Item deleted!', type: 'success' });
+    } catch (error) {
+      setToast({ message: 'Failed to delete!', type: 'error' });
+    }
+  };
+
+  const handleSaveItem = async (col: string, data: any) => {
+    const instId = user?.institutionId || user?.uid;
+    if (!instId) return;
+    setIsSaving(true);
+    try {
+      if (editingItem) {
+        await updateDoc(doc(db, col, editingItem.id), data);
+      } else {
+        await addDoc(collection(db, col), {
+          ...data,
+          institutionId: instId,
+          createdAt: new Date().toISOString()
+        });
+      }
+      setToast({ message: 'Saved successfully!', type: 'success' });
+      setShowNoticeModal(false);
+      setShowEventModal(false);
+      setShowCircularModal(false);
+      setEditingItem(null);
+    } catch (error) {
+      setToast({ message: 'Failed to save!', type: 'error' });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const checkSlugAvailability = async (slug: string) => {
+    if (!slug || slug === institution?.slug) {
+      setSlugStatus('idle');
+      return;
+    }
+    setSlugStatus('checking');
+    try {
+      const q = query(collection(db, 'institutions'), where('slug', '==', slug), limit(1));
+      const snap = await getDocs(q);
+      setSlugStatus(snap.empty ? 'available' : 'taken');
+    } catch (error) {
+      console.error("Error checking slug:", error);
+      setSlugStatus('idle');
+    }
+  };
 
   const handleSaveProfile = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -199,6 +282,7 @@ export function Institution() {
       vision: formData.get('vision') as string,
       goal: formData.get('goal') as string,
       target: formData.get('target') as string,
+      slug: formData.get('slug') as string,
       principalName: formData.get('principalName') as string,
       principalTitle: formData.get('principalTitle') as string,
       logoURL: institution.logoURL || '',
@@ -318,7 +402,9 @@ export function Institution() {
 
   const shareProfile = () => {
     const instId = user?.institutionId || user?.uid;
-    const url = `${window.location.origin}/public/institution/${instId}`;
+    const url = institution?.slug 
+      ? `${window.location.origin}/i/${institution.slug}`
+      : `${window.location.origin}/public/institution/${instId}`;
     navigator.clipboard.writeText(url);
     setToast({ message: 'Profile link copied to clipboard!', type: 'success' });
   };
@@ -420,7 +506,7 @@ export function Institution() {
       </div>
 
       <div className="flex items-center gap-2 p-1 bg-gray-100 rounded-2xl w-fit">
-        {(['profile', 'admissionForm', 'applications'] as const).map((tab) => (
+        {(['profile', 'website', 'admissionForm', 'applications'] as const).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -431,7 +517,7 @@ export function Institution() {
                 : "text-gray-500 hover:text-gray-700"
             )}
           >
-            {t(`institution.tabs.${tab}`)}
+            {tab === 'website' ? 'Web Settings' : t(`institution.tabs.${tab}`)}
           </button>
         ))}
       </div>
@@ -527,6 +613,10 @@ export function Institution() {
                     <input name="target" defaultValue={institution?.target} placeholder="e.g. 1000+ Students" className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all" />
                   </div>
                 </div>
+                <div className="space-y-2 hidden">
+                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Custom Link (Slug)</label>
+                  <input name="slug" defaultValue={institution?.slug} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all" />
+                </div>
                 <div className="space-y-2">
                   <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">{t('institution.profile.info.address')}</label>
                   <textarea name="address" defaultValue={institution?.address} rows={2} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all resize-none" />
@@ -610,6 +700,177 @@ export function Institution() {
                   <ExternalLink className="w-4 h-4" /> View Public Profile
                 </button>
               </div>
+            </div>
+          </motion.div>
+        )}
+
+        {activeTab === 'website' && (
+          <motion.div
+            key="website"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="space-y-8"
+          >
+           {/* Website Settings */}
+            <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm space-y-6">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-indigo-100 rounded-2xl flex items-center justify-center text-indigo-600">
+                  <Globe className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900">Custom Profile URL</h3>
+                  <p className="text-sm text-gray-500">Set a human-readable link for your coaching center.</p>
+                </div>
+              </div>
+
+              <div className="max-w-xl space-y-4">
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Your Website Address</label>
+                  <div className="flex items-center gap-2">
+                    <div className="px-4 py-3 bg-gray-100 border border-gray-200 rounded-xl text-sm text-gray-500 font-medium">
+                      {window.location.origin}/i/
+                    </div>
+                    <input 
+                      value={institution?.slug || ''}
+                      onChange={(e) => {
+                        const val = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '');
+                        setInstitution(prev => prev ? { ...prev, slug: val } : null);
+                        checkSlugAvailability(val);
+                      }}
+                      placeholder="coaching-name"
+                      className="flex-1 px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all font-bold"
+                    />
+                  </div>
+                  {slugStatus === 'checking' && <p className="text-xs text-gray-400 animate-pulse ml-1">Checking availability...</p>}
+                  {slugStatus === 'available' && <p className="text-xs text-emerald-600 font-bold ml-1 flex items-center gap-1"><CheckCircle className="w-3 h-3" /> URL available!</p>}
+                  {slugStatus === 'taken' && <p className="text-xs text-rose-500 font-bold ml-1 flex items-center gap-1"><Info className="w-3 h-3" /> This URL is already taken.</p>}
+                </div>
+                <button 
+                  onClick={async () => {
+                    const instId = user?.institutionId || user?.uid;
+                    if (!instId || !institution?.slug) return;
+                    setIsSaving(true);
+                    try {
+                      await updateDoc(doc(db, 'institutions', instId), { slug: institution.slug });
+                      setToast({ message: 'URL Updated!', type: 'success' });
+                    } catch (error) {
+                      setToast({ message: 'Update failed!', type: 'error' });
+                    } finally {
+                      setIsSaving(false);
+                    }
+                  }}
+                  disabled={isSaving || slugStatus === 'taken' || slugStatus === 'checking'}
+                  className="px-6 py-2.5 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 disabled:opacity-50 transition-all text-sm"
+                >
+                  Save URL
+                </button>
+              </div>
+            </div>
+
+            {/* Content Management */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm space-y-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center text-amber-600">
+                      <Megaphone className="w-5 h-5" />
+                    </div>
+                    <h4 className="font-bold text-gray-900">News & Notices</h4>
+                  </div>
+                  <button onClick={() => { setEditingItem(null); setShowNoticeModal(true); }} className="p-2 bg-indigo-50 text-indigo-600 rounded-lg transition-transform hover:scale-110"><Plus className="w-4 h-4" /></button>
+                </div>
+                <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                  {notices.map(n => (
+                    <div key={n.id} className="p-4 bg-gray-50 rounded-2xl border border-gray-100 flex items-center justify-between group hover:bg-white hover:shadow-md transition-all">
+                      <div className="min-w-0">
+                        <p className="font-bold text-gray-900 truncate">{n.title}</p>
+                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{n.date}</p>
+                      </div>
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button onClick={() => { setEditingItem(n); setShowNoticeModal(true); }} className="p-2 text-gray-400 hover:text-indigo-600"><Edit2 className="w-4 h-4" /></button>
+                        <button onClick={() => handleDeleteItem('notices', n.id)} className="p-2 text-gray-400 hover:text-rose-600"><Trash2 className="w-4 h-4" /></button>
+                      </div>
+                    </div>
+                  ))}
+                  {notices.length === 0 && (
+                    <div className="text-center py-12 space-y-3">
+                      <Newspaper className="w-12 h-12 text-gray-200 mx-auto" />
+                      <p className="text-gray-400 text-sm italic">No notices published yet.</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm space-y-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center text-indigo-600">
+                      <Calendar className="w-5 h-5" />
+                    </div>
+                    <h4 className="font-bold text-gray-900">Events</h4>
+                  </div>
+                  <button onClick={() => { setEditingItem(null); setShowEventModal(true); }} className="p-2 bg-indigo-50 text-indigo-600 rounded-lg transition-transform hover:scale-110"><Plus className="w-4 h-4" /></button>
+                </div>
+                <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                  {events.map(e => (
+                    <div key={e.id} className="p-4 bg-gray-50 rounded-2xl border border-gray-100 flex items-center justify-between group hover:bg-white hover:shadow-md transition-all">
+                      <div className="min-w-0">
+                        <p className="font-bold text-gray-900 truncate">{e.title}</p>
+                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{e.date}</p>
+                      </div>
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button onClick={() => { setEditingItem(e); setShowEventModal(true); }} className="p-2 text-gray-400 hover:text-indigo-600"><Edit2 className="w-4 h-4" /></button>
+                        <button onClick={() => handleDeleteItem('events', e.id)} className="p-2 text-gray-400 hover:text-rose-600"><Trash2 className="w-4 h-4" /></button>
+                      </div>
+                    </div>
+                  ))}
+                  {events.length === 0 && (
+                    <div className="text-center py-12 space-y-3">
+                      <Calendar className="w-12 h-12 text-gray-200 mx-auto" />
+                      <p className="text-gray-400 text-sm italic">No upcoming events.</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm space-y-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 bg-emerald-100 rounded-2xl flex items-center justify-center text-emerald-600">
+                    <Briefcase className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-gray-900">Job Circulars</h3>
+                    <p className="text-sm text-gray-500">Recruit teachers and staff directly through your landing page.</p>
+                  </div>
+                </div>
+                <button onClick={() => { setEditingItem(null); setShowCircularModal(true); }} className="px-6 py-2.5 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition-all text-sm flex items-center gap-2"><Plus className="w-4 h-4" /> Post New Circular</button>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {circulars.map(c => (
+                  <div key={c.id} className="p-6 bg-gray-50 rounded-2xl border border-gray-100 space-y-4 group relative hover:shadow-lg transition-all">
+                    <div className={cn("absolute top-6 right-6 px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-widest", c.active ? "bg-emerald-50 text-emerald-600" : "bg-gray-200 text-gray-500")}>
+                      {c.active ? 'Active' : 'Draft'}
+                    </div>
+                    <div>
+                      <h5 className="font-bold text-gray-900 pr-12 line-clamp-1">{c.title}</h5>
+                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Deadline: {c.deadline}</p>
+                    </div>
+                    <div className="flex items-center gap-2 pt-4 border-t border-gray-100">
+                      <button onClick={() => { setEditingItem(c); setShowCircularModal(true); }} className="flex-1 py-2 bg-white text-indigo-600 text-xs font-bold rounded-lg border border-gray-100 hover:bg-indigo-50 transition-all">Edit</button>
+                      <button onClick={() => handleDeleteItem('circulars', c.id)} className="p-2 bg-white text-rose-600 text-xs font-bold rounded-lg border border-rose-100 hover:bg-rose-50 transition-all"><Trash2 className="w-4 h-4" /></button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {circulars.length === 0 && (
+                <div className="text-center py-12 space-y-3">
+                  <Briefcase className="w-12 h-12 text-gray-200 mx-auto" />
+                  <p className="text-gray-400 text-sm italic">No active circulars.</p>
+                </div>
+              )}
             </div>
           </motion.div>
         )}
@@ -886,6 +1147,136 @@ export function Institution() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Notice Modal */}
+      <Modal 
+        isOpen={showNoticeModal} 
+        onClose={() => setShowNoticeModal(false)}
+        title={editingItem ? "Edit Notice" : "Add New Notice"}
+      >
+        <form onSubmit={(e) => {
+          e.preventDefault();
+          const formData = new FormData(e.currentTarget);
+          handleSaveItem('notices', {
+            title: formData.get('title'),
+            date: formData.get('date'),
+            content: formData.get('content'),
+            active: true
+          });
+        }} className="space-y-4">
+          <div className="space-y-1">
+            <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Title</label>
+            <input name="title" defaultValue={editingItem?.title} required className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500/20" />
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Date</label>
+            <input name="date" type="date" defaultValue={editingItem?.date || new Date().toISOString().split('T')[0]} required className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500/20" />
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Content</label>
+            <textarea name="content" defaultValue={editingItem?.content} rows={4} required className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500/20 resize-none" />
+          </div>
+          <button type="submit" disabled={isSaving} className="w-full py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 disabled:opacity-50 transition-all">
+            {isSaving ? 'Saving...' : 'Save Notice'}
+          </button>
+        </form>
+      </Modal>
+
+      {/* Event Modal */}
+      <Modal 
+        isOpen={showEventModal} 
+        onClose={() => setShowEventModal(false)}
+        title={editingItem ? "Edit Event" : "Add New Event"}
+      >
+        <form onSubmit={(e) => {
+          e.preventDefault();
+          const formData = new FormData(e.currentTarget);
+          handleSaveItem('events', {
+            title: formData.get('title'),
+            date: formData.get('date'),
+            time: formData.get('time'),
+            location: formData.get('location'),
+            description: formData.get('description'),
+            active: true
+          });
+        }} className="space-y-4">
+          <div className="space-y-1">
+            <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Event Title</label>
+            <input name="title" defaultValue={editingItem?.title} required className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500/20" />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Date</label>
+              <input name="date" type="date" defaultValue={editingItem?.date} required className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500/20" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Time</label>
+              <input name="time" type="time" defaultValue={editingItem?.time} required className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500/20" />
+            </div>
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Location</label>
+            <input name="location" defaultValue={editingItem?.location} required className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500/20" />
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Description</label>
+            <textarea name="description" defaultValue={editingItem?.description} rows={3} required className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500/20 resize-none" />
+          </div>
+          <button type="submit" disabled={isSaving} className="w-full py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 disabled:opacity-50 transition-all">
+            {isSaving ? 'Saving...' : 'Save Event'}
+          </button>
+        </form>
+      </Modal>
+
+      {/* Circular Modal */}
+      <Modal 
+        isOpen={showCircularModal} 
+        onClose={() => setShowCircularModal(false)}
+        title={editingItem ? "Edit Job Circular" : "Add New Circular"}
+      >
+        <form onSubmit={(e) => {
+          e.preventDefault();
+          const formData = new FormData(e.currentTarget);
+          handleSaveItem('circulars', {
+            title: formData.get('title'),
+            deadline: formData.get('deadline'),
+            salaryRange: formData.get('salaryRange'),
+            description: formData.get('description'),
+            requirements: (formData.get('requirements') as string).split('\n').filter(r => r.trim()),
+            active: formData.get('active') === 'on'
+          });
+        }} className="space-y-4">
+          <div className="space-y-1">
+            <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Job Title</label>
+            <input name="title" defaultValue={editingItem?.title} required className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500/20" />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Deadline</label>
+              <input name="deadline" type="date" defaultValue={editingItem?.deadline} required className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500/20" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Salary Range</label>
+              <input name="salaryRange" defaultValue={editingItem?.salaryRange} placeholder="e.g. 15k - 20k" className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500/20" />
+            </div>
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Job Description</label>
+            <textarea name="description" defaultValue={editingItem?.description} rows={3} required className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500/20 resize-none" />
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Requirements (one per line)</label>
+            <textarea name="requirements" defaultValue={editingItem?.requirements?.join('\n')} rows={4} required placeholder="Post Graduate&#10;2 Years Experience..." className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500/20 resize-none" />
+          </div>
+          <div className="flex items-center gap-2 px-2 py-4">
+            <input type="checkbox" name="active" defaultChecked={editingItem ? editingItem.active : true} className="w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500" />
+            <label className="text-sm font-bold text-gray-700">Make this circular active</label>
+          </div>
+          <button type="submit" disabled={isSaving} className="w-full py-3 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 disabled:opacity-50 transition-all">
+            {isSaving ? 'Saving...' : 'Save Circular'}
+          </button>
+        </form>
+      </Modal>
       <HiddenBioTemplate institution={institution} stats={stats} bioRef={bioRef} />
     </div>
   );

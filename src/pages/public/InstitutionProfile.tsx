@@ -1,46 +1,71 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { db, handleFirestoreError, OperationType } from '../../firebase';
-import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
-import { useParams } from 'react-router-dom';
-import { Building, MapPin, Phone, Mail, Globe, Users, Briefcase, Layers, CheckCircle, Loader2, GraduationCap, Calendar, Download } from 'lucide-react';
-import { motion } from 'motion/react';
+import { doc, getDoc, collection, query, where, getDocs, limit, orderBy } from 'firebase/firestore';
+import { useParams, useNavigate } from 'react-router-dom';
+import { Building, MapPin, Phone, Mail, Globe, Users, Briefcase, Layers, CheckCircle, Loader2, GraduationCap, Calendar, Download, Megaphone, Newspaper, ArrowRight, Clock, Info } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../../lib/utils';
 import html2canvas from 'html2canvas';
 
 export function InstitutionProfile() {
-  const { id } = useParams();
+  const { id, slug } = useParams();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState(false);
   const [institution, setInstitution] = useState<any>(null);
   const [stats, setStats] = useState({ students: 0, teachers: 0, batches: 0 });
+  const [notices, setNotices] = useState<any[]>([]);
+  const [events, setEvents] = useState<any[]>([]);
+  const [circulars, setCirculars] = useState<any[]>([]);
   const bioRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     async function fetchData() {
-      if (!id) return;
+      if (!id && !slug) return;
       
       try {
-        const instDoc = await getDoc(doc(db, 'institutions', id));
-        if (!instDoc.exists()) {
+        let instData: any = null;
+        let instId = id;
+
+        if (slug) {
+          const q = query(collection(db, 'institutions'), where('slug', '==', slug), limit(1));
+          const snap = await getDocs(q);
+          if (!snap.empty) {
+            instData = { id: snap.docs[0].id, ...snap.docs[0].data() };
+            instId = instData.id;
+          }
+        } else if (id) {
+          const instDoc = await getDoc(doc(db, 'institutions', id));
+          if (instDoc.exists()) {
+            instData = { id: instDoc.id, ...instDoc.data() };
+          }
+        }
+
+        if (!instData) {
           setLoading(false);
           return;
         }
         
-        const instData = { id: instDoc.id, ...instDoc.data() } as any;
         setInstitution(instData);
         
-        // Fetch stats
-        const [studentsSnapshot, teachersSnapshot, batchesSnapshot] = await Promise.all([
-          getDocs(query(collection(db, 'students'), where('institutionId', '==', id))),
-          getDocs(query(collection(db, 'teachers'), where('institutionId', '==', id))),
-          getDocs(query(collection(db, 'batches'), where('institutionId', '==', id)))
+        // Fetch stats & Content
+        const [studentsSnap, teachersSnap, batchesSnap, noticesSnap, eventsSnap, circularsSnap] = await Promise.all([
+          getDocs(query(collection(db, 'students'), where('institutionId', '==', instId))),
+          getDocs(query(collection(db, 'teachers'), where('institutionId', '==', instId))),
+          getDocs(query(collection(db, 'batches'), where('institutionId', '==', instId))),
+          getDocs(query(collection(db, 'notices'), where('institutionId', '==', instId), where('active', '==', true), orderBy('createdAt', 'desc'), limit(5))),
+          getDocs(query(collection(db, 'events'), where('institutionId', '==', instId), where('active', '==', true), orderBy('createdAt', 'desc'), limit(5))),
+          getDocs(query(collection(db, 'circulars'), where('institutionId', '==', instId), where('active', '==', true), orderBy('createdAt', 'desc'), limit(5)))
         ]);
 
         setStats({
-          students: studentsSnapshot.size,
-          teachers: teachersSnapshot.size,
-          batches: batchesSnapshot.size
+          students: studentsSnap.size,
+          teachers: teachersSnap.size,
+          batches: batchesSnap.size
         });
+        setNotices(noticesSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+        setEvents(eventsSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+        setCirculars(circularsSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       } catch (err) {
         handleFirestoreError(err, OperationType.GET, 'institutions');
       } finally {
@@ -48,7 +73,7 @@ export function InstitutionProfile() {
       }
     }
     fetchData();
-  }, [id]);
+  }, [id, slug]);
 
   const downloadBio = async () => {
     if (!institution || !bioRef.current || downloading) return;
@@ -246,9 +271,87 @@ export function InstitutionProfile() {
                 </div>
               </section>
             )}
+
+            {/* News & Notices */}
+            {notices.length > 0 && (
+              <section className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm space-y-6">
+                <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                  <Megaphone className="w-6 h-6 text-amber-500" /> News & Notices
+                </h2>
+                <div className="space-y-4">
+                  {notices.map(notice => (
+                    <div key={notice.id} className="p-5 bg-gray-50 rounded-2xl border border-gray-100 space-y-2 hover:bg-white hover:shadow-md transition-all cursor-default group">
+                      <div className="flex items-center justify-between">
+                        <h4 className="font-bold text-gray-900 group-hover:text-amber-600 transition-colors">{notice.title}</h4>
+                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{notice.date}</span>
+                      </div>
+                      <p className="text-sm text-gray-500 leading-relaxed line-clamp-3">{notice.content}</p>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* Job Circulars */}
+            {circulars.length > 0 && (
+              <section className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm space-y-6">
+                <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                  <Briefcase className="w-6 h-6 text-emerald-500" /> Job Circulars
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {circulars.map(circular => (
+                    <div key={circular.id} className="p-6 bg-emerald-50 rounded-2xl border border-emerald-100 space-y-4 hover:shadow-lg transition-all group">
+                      <div>
+                        <h4 className="font-bold text-gray-900 text-lg">{circular.title}</h4>
+                        <div className="flex items-center gap-2 text-[10px] font-black text-emerald-600 uppercase tracking-widest mt-1">
+                          <Clock className="w-3 h-3" /> Deadline: {circular.deadline}
+                        </div>
+                      </div>
+                      <button 
+                        onClick={() => navigate(`/public/circular/${circular.id}`)}
+                        className="w-full py-2.5 bg-white text-emerald-600 font-bold text-sm rounded-xl hover:bg-emerald-600 hover:text-white transition-all border border-emerald-200 flex items-center justify-center gap-2"
+                      >
+                        Details & Apply <ArrowRight className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
           </div>
 
           <div className="space-y-6">
+            {/* Events Sidebar */}
+            {events.length > 0 && (
+              <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm space-y-6">
+                <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                  <Calendar className="w-5 h-5 text-indigo-600" /> Upcoming Events
+                </h3>
+                <div className="space-y-6">
+                  {events.map(event => (
+                    <div key={event.id} className="flex gap-4 group">
+                      <div className="w-14 h-14 bg-indigo-50 rounded-2xl flex flex-col items-center justify-center shrink-0 border border-indigo-100 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                        <span className="text-xs font-black uppercase tracking-widest leading-none mb-1">
+                          {new Date(event.date).toLocaleDateString('en-US', { month: 'short' })}
+                        </span>
+                        <span className="text-xl font-black leading-none">
+                          {new Date(event.date).getDate()}
+                        </span>
+                      </div>
+                      <div className="min-w-0">
+                        <h5 className="font-bold text-gray-900 truncate">{event.title}</h5>
+                        <p className="text-xs text-gray-500 flex items-center gap-1 mt-1">
+                          <Clock className="w-3 h-3" /> {event.time || 'All Day'}
+                        </p>
+                        <p className="text-xs text-indigo-600 font-bold truncate mt-1">
+                          <MapPin className="w-3 h-3 inline mr-1" /> {event.location || 'Institution Premises'}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
             <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm space-y-6">
               <h3 className="text-xl font-bold text-gray-900">Contact Information</h3>
               <div className="space-y-4">

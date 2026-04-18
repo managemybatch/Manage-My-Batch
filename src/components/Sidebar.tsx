@@ -23,13 +23,46 @@ import { cn } from '../lib/utils';
 import { useAuth } from '../lib/auth';
 import { useTranslation } from 'react-i18next';
 import { SubscriptionModal } from './SubscriptionModal';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { db } from '../firebase';
 
 export function Sidebar() {
   const { logout, user } = useAuth();
   const { t } = useTranslation();
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = React.useState(false);
+  const [birthdayCount, setBirthdayCount] = React.useState(0);
 
-  const regularItems = [
+  React.useEffect(() => {
+    if (!user) return;
+    const instId = user.institutionId || user.uid;
+    const q = query(collection(db, 'students'), where('institutionId', '==', instId));
+    
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const today = new Date();
+      const m = today.getMonth() + 1;
+      const d = today.getDate();
+      
+      const count = snapshot.docs.filter(doc => {
+        const student = doc.data();
+        if (!student.dob) return false;
+        const dob = new Date(student.dob);
+        return (dob.getMonth() + 1) === m && dob.getDate() === d;
+      }).length;
+      
+      setBirthdayCount(count);
+    });
+
+    return () => unsubscribe();
+  }, [user]);
+
+  interface NavItem {
+    icon: any;
+    label: string;
+    path: string;
+    badge?: number | string;
+  }
+
+  const regularItems: NavItem[] = [
     { icon: LayoutDashboard, label: t('nav.dashboard'), path: '/' },
     { icon: Layers, label: t('nav.batches'), path: '/batches' },
     { icon: Users, label: t('nav.students'), path: '/students' },
@@ -39,12 +72,12 @@ export function Sidebar() {
     { icon: CreditCard, label: t('nav.fees'), path: '/fees' },
     { icon: School, label: t('nav.institution'), path: '/institution' },
     { icon: Briefcase, label: t('nav.teachers'), path: '/teachers' },
-    { icon: Zap, label: t('nav.marketing'), path: '/marketing' },
+    { icon: Zap, label: t('nav.marketing'), path: '/marketing', badge: birthdayCount > 0 ? birthdayCount : undefined },
     { icon: Settings, label: t('nav.settings'), path: '/settings' },
     { icon: HelpCircle, label: t('Help'), path: '/help' },
   ];
 
-  const superAdminItems = [
+  const superAdminItems: NavItem[] = [
     { icon: LayoutDashboard, label: 'Super Admin', path: '/' },
     { icon: Building2, label: 'Institutions', path: '/super-admin/institutions' },
     { icon: MessageSquare, label: 'Support Inbox', path: '/super-admin/support' },
@@ -85,7 +118,12 @@ export function Sidebar() {
             }
           >
             <item.icon className={cn("w-5 h-5", "group-hover:scale-110 transition-transform")} />
-            <span>{item.label}</span>
+            <span className="flex-1">{item.label}</span>
+            {item.badge && (
+              <span className="bg-red-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full min-w-[18px] text-center shadow-lg shadow-red-200 animate-pulse">
+                {item.badge}
+              </span>
+            )}
           </NavLink>
         ))}
       </nav>

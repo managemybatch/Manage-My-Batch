@@ -85,6 +85,7 @@ function AppRoutes() {
       <Route path="/signup" element={user ? <Navigate to="/" /> : <Signup />} />
       
       {/* Public Routes */}
+      <Route path="/i/:slug" element={<InstitutionProfile />} />
       <Route path="/public/institution/:id" element={<InstitutionProfile />} />
       <Route path="/public/admission/:id" element={<AdmissionForm />} />
       <Route path="/public/circular/:id" element={<JobCircular />} />

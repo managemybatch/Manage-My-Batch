@@ -8,6 +8,8 @@ export interface Student {
   rollNo: string;
   admissionDate: string;
   status: 'active' | 'inactive';
+  dob?: string;
+  photoUrl?: string;
 }
 
 export interface FeeRecord {
