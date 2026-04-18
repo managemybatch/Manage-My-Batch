@@ -1,15 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { CreditCard, Plus, Search, Filter, Download, CheckCircle2, Clock, Loader2, User, Phone, Calendar, AlertCircle, Send, Wallet, Banknote, Users } from 'lucide-react';
+import { CreditCard, Plus, Search, Filter, Download, CheckCircle2, Clock, Loader2, User, Phone, Calendar, AlertCircle, Send, Wallet, Banknote, Users, Receipt, Printer } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import { Table, TableRow, TableCell } from '../components/Table';
 import { cn, formatCurrency, formatDate, formatWhatsAppPhone } from '../lib/utils';
-import { collection, onSnapshot, query, addDoc, serverTimestamp, orderBy, writeBatch, doc, where } from 'firebase/firestore';
+import { collection, onSnapshot, query, addDoc, serverTimestamp, orderBy, writeBatch, doc, where, getDoc } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { useAuth } from '../lib/auth';
 import { Modal } from '../components/Modal';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { MONTHS } from '../constants';
 import { useTranslation } from 'react-i18next';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
 
 interface Student {
   id: string;
@@ -62,6 +64,11 @@ export function Fees() {
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [pendingWhatsappUrl, setPendingWhatsappUrl] = useState<string | null>(null);
+  const [selectedFeeForReceipt, setSelectedFeeForReceipt] = useState<FeeRecord | null>(null);
+  const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
+  const [isGeneratingReceipt, setIsGeneratingReceipt] = useState(false);
+  const [instData, setInstData] = useState<any>(null);
+  const receiptRef = React.useRef<HTMLDivElement>(null);
 
   const [paymentData, setPaymentData] = useState({
     months: [] as string[],
@@ -131,6 +138,50 @@ export function Fees() {
       unsubBatches();
     };
   }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+    const fetchInstData = async () => {
+      const docRef = doc(db, 'institutions', user.institutionId || user.uid);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        setInstData(docSnap.data());
+      }
+    };
+    fetchInstData();
+  }, [user]);
+
+  const generateReceiptPDF = async () => {
+    if (!receiptRef.current) return;
+    try {
+      setIsGeneratingReceipt(true);
+      const canvas = await html2canvas(receiptRef.current, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff'
+      });
+      
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4'
+      });
+      
+      const imgProps = pdf.getImageProperties(imgData);
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+      
+      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      pdf.save(`Receipt_${selectedFeeForReceipt?.studentName}_${selectedFeeForReceipt?.month}.pdf`);
+    } catch (err) {
+      console.error('Failed to generate receipt:', err);
+      alert('Failed to generate receipt. Please try again.');
+    } finally {
+      setIsGeneratingReceipt(false);
+    }
+  };
 
   const getStudentDues = (student: Student) => {
     const currentYear = new Date().getFullYear();
@@ -356,6 +407,57 @@ export function Fees() {
         </div>
       </div>
 
+      {activeTab === 'all' && (
+        <div className="space-y-4">
+          <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+            <Clock className="w-5 h-5 text-indigo-600" /> Recent Payments
+          </h2>
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden overflow-x-auto">
+            <table className="w-full text-left">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-100">
+                  <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">Student</th>
+                  <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">Purpose</th>
+                  <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">Amount</th>
+                  <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">Date</th>
+                  <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {fees.slice(0, 10).map(fee => (
+                  <tr key={fee.id} className="hover:bg-gray-50/50 transition-colors">
+                    <td className="px-6 py-4">
+                      <p className="font-bold text-gray-900">{fee.studentName}</p>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="text-xs font-medium text-gray-600 bg-gray-100 px-2 py-1 rounded">
+                        {fee.type === 'Monthly Fee' ? `${fee.month} ${fee.year}` : fee.type}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 font-black text-gray-900">৳{fee.amount}</td>
+                    <td className="px-6 py-4 text-xs text-gray-500 font-medium">
+                      {new Date(fee.date).toLocaleDateString()}
+                    </td>
+                    <td className="px-6 py-4">
+                      <button 
+                        onClick={() => {
+                          setSelectedFeeForReceipt(fee);
+                          setIsReceiptModalOpen(true);
+                        }}
+                        className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
+                        title="Print Receipt"
+                      >
+                        <Receipt className="w-4 h-4" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       {loading ? (
         <div className="flex items-center justify-center py-20">
           <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
@@ -544,10 +646,11 @@ export function Fees() {
               </div>
               <button
                 type="submit"
-                disabled={paymentData.months.length === 0}
+                disabled={paymentData.months.length === 0 || isSaving}
                 className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
-                <Send className="w-5 h-5" /> {t('fees.paymentModal.confirm')}
+                {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
+                {t('fees.paymentModal.confirm')}
               </button>
             </div>
           </form>
@@ -596,6 +699,89 @@ export function Fees() {
           >
             <Download className="w-5 h-5" /> {t('fees.reportModal.download')}
           </button>
+        </div>
+      </Modal>
+
+      {/* Receipt Modal */}
+      <Modal
+        isOpen={isReceiptModalOpen}
+        onClose={() => setIsReceiptModalOpen(false)}
+        title="Payment Receipt"
+        maxWidth="max-w-2xl"
+      >
+        <div className="space-y-6">
+          <div className="flex justify-end gap-2">
+            <button 
+              onClick={generateReceiptPDF}
+              disabled={isGeneratingReceipt}
+              className="px-6 py-2 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-700 transition-all flex items-center gap-2 disabled:opacity-50"
+            >
+              {isGeneratingReceipt ? <Loader2 className="w-4 h-4 animate-spin" /> : <Printer className="w-4 h-4" />}
+              Print Receipt
+            </button>
+          </div>
+
+          <div className="bg-gray-100 p-8 rounded-2xl flex justify-center">
+            <div ref={receiptRef} className="bg-white w-[140mm] p-10 relative shadow-xl font-sans" style={{ minHeight: '140mm' }}>
+              <div className="border-4 border-indigo-600 p-8 h-full relative">
+                <div className="flex justify-between items-start mb-8">
+                  <div className="flex items-center gap-3">
+                    {instData?.logoUrl && <img src={instData.logoUrl} className="h-10 object-contain" referrerPolicy="no-referrer" />}
+                    <div>
+                      <h2 className="text-xl font-black text-indigo-700 leading-none">{instData?.name || 'Manage My Batch'}</h2>
+                      <p className="text-[8px] font-bold text-gray-400 tracking-widest uppercase mt-1">Payment Receipt</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[9px] font-black text-gray-400 uppercase">Receipt No</p>
+                    <p className="text-xs font-black text-indigo-600">#{selectedFeeForReceipt?.id.slice(-6).toUpperCase()}</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-6 mb-8 border-y border-gray-100 py-6">
+                  <div className="space-y-3">
+                    <div>
+                      <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Student Name</p>
+                      <p className="text-sm font-black text-gray-900">{selectedFeeForReceipt?.studentName}</p>
+                    </div>
+                    <div>
+                      <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Date</p>
+                      <p className="text-sm font-bold text-gray-700">{selectedFeeForReceipt?.date && new Date(selectedFeeForReceipt.date).toLocaleDateString()}</p>
+                    </div>
+                  </div>
+                  <div className="space-y-3">
+                    <div>
+                      <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Purpose</p>
+                      <p className="text-sm font-bold text-gray-900">
+                        {selectedFeeForReceipt?.type === 'Monthly Fee' ? `${selectedFeeForReceipt.month} ${selectedFeeForReceipt.year}` : selectedFeeForReceipt?.type}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Payment Method</p>
+                      <p className="text-sm font-bold text-indigo-600">{selectedFeeForReceipt?.paymentMethod || 'Cash'}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-indigo-50 p-4 rounded-xl mb-12 flex justify-between items-center group">
+                  <span className="text-xs font-black text-indigo-700 uppercase tracking-widest">Total Amount Paid</span>
+                  <span className="text-2xl font-black text-indigo-700">৳{selectedFeeForReceipt?.amount}</span>
+                </div>
+
+                <div className="flex justify-between items-end mt-auto">
+                  <div className="text-[8px] text-gray-400 italic">
+                    This is a computer-generated receipt. No signature required.
+                  </div>
+                  <div className="text-center">
+                    <div className="h-px w-24 bg-gray-200 mb-1"></div>
+                    <p className="text-[8px] font-black text-gray-900 uppercase">Authorized By</p>
+                  </div>
+                </div>
+
+                <div className="absolute inset-0 border border-gray-100 pointer-events-none -m-1"></div>
+              </div>
+            </div>
+          </div>
         </div>
       </Modal>
 

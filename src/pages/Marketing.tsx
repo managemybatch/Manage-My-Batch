@@ -6,7 +6,7 @@ import {
   QrCode, Users, Star, Layout, Palette, Image as ImageIcon,
   CheckCircle2, Loader2, Sparkles, TrendingUp, Trophy,
   Briefcase, GraduationCap, ShieldCheck, Zap, BoxIcon,
-  Cake, Gift
+  Cake, Gift, Phone, Mail
 } from 'lucide-react';
 import { collection, onSnapshot, query, where, doc, getDoc } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';

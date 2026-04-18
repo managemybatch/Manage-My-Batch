@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Briefcase, Plus, Search, Filter, Download, Calendar, CheckCircle, Clock, Share2, ExternalLink, Loader2, Trash2, Edit2, UserPlus, Mail, Phone, MapPin, ChevronDown, MessageSquare, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Briefcase, Plus, Search, Filter, Download, Calendar, CheckCircle, Clock, Share2, ExternalLink, Loader2, Trash2, Edit2, UserPlus, Mail, Phone, MapPin, ChevronDown, MessageSquare, CheckCircle2, AlertCircle, Info, X } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
@@ -7,6 +7,8 @@ import { cn } from '../lib/utils';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { collection, query, where, orderBy, getDocs, onSnapshot, addDoc, serverTimestamp, doc, updateDoc, deleteDoc, setDoc } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
+import { Modal } from '../components/Modal';
+import { ConfirmModal } from '../components/ConfirmModal';
 
 interface Teacher {
   id: string;
@@ -74,6 +76,7 @@ export function Teachers() {
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [showApplicationsModal, setShowApplicationsModal] = useState(false);
   const [selectedCircular, setSelectedCircular] = useState<Circular | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
   const [selectedApplication, setSelectedApplication] = useState<JobApplication | null>(null);
   const [showCopyToast, setShowCopyToast] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
@@ -86,6 +89,10 @@ export function Teachers() {
   }, [toast]);
   const [scheduleSort, setScheduleSort] = useState<{ field: keyof Schedule, direction: 'asc' | 'desc' } | null>(null);
   const [batches, setBatches] = useState<{id: string, name: string}[]>([]);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [teacherToDelete, setTeacherToDelete] = useState<Teacher | null>(null);
+  const [isCircularDeleteModalOpen, setIsCircularDeleteModalOpen] = useState(false);
+  const [circularToDelete, setCircularToDelete] = useState<Circular | null>(null);
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -303,6 +310,9 @@ export function Teachers() {
 
   const handleAddTeacher = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (isSaving) return;
+    setIsSaving(true);
+    
     const form = e.currentTarget;
     const formData = new FormData(form);
     const name = formData.get('name') as string;
@@ -327,6 +337,7 @@ export function Teachers() {
         // 1. Create Auth account for the teacher
         if (!password) {
           setToast({ message: "Password is required for new staff accounts.", type: 'error' });
+          setIsSaving(false);
           return;
         }
         
@@ -361,6 +372,8 @@ export function Teachers() {
     } catch (error: any) {
       handleFirestoreError(error, OperationType.WRITE, 'teachers');
       setToast({ message: error.message || 'Failed to add teacher.', type: 'error' });
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -415,7 +428,9 @@ export function Teachers() {
 
   const handleCreateCircular = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!user?.uid) return;
+    if (!user?.uid || isSaving) return;
+    setIsSaving(true);
+    
     const form = e.currentTarget;
     const formData = new FormData(form);
     const instId = user.institutionId || user.uid;
@@ -426,14 +441,21 @@ export function Teachers() {
         salaryRange: formData.get('salaryRange'),
         deadline: formData.get('deadline'),
         requirements: (formData.get('requirements') as string).split('\n').filter(r => r.trim()),
+        vacancies: formData.get('vacancies'),
+        education: formData.get('education'),
+        experience: formData.get('experience'),
+        jobType: formData.get('jobType'),
         active: true,
         institutionId: instId,
         createdAt: serverTimestamp()
       });
       
       if (form) form.reset();
+      setToast({ message: 'Circular posted successfully!', type: 'success' });
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, 'circulars');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -545,15 +567,9 @@ export function Teachers() {
                             <Edit2 className="w-4 h-4" />
                           </button>
                           <button 
-                            onClick={async () => {
-                              if (window.confirm('Are you sure you want to delete this teacher?')) {
-                                try {
-                                  await deleteDoc(doc(db, 'teachers', teacher.id));
-                                  setToast({ message: 'Teacher deleted successfully', type: 'success' });
-                                } catch (error) {
-                                  handleFirestoreError(error, OperationType.DELETE, 'teachers');
-                                }
-                              }
+                            onClick={() => {
+                              setTeacherToDelete(teacher);
+                              setIsDeleteModalOpen(true);
                             }}
                             className="p-2 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg"
                           >
@@ -619,7 +635,12 @@ export function Teachers() {
                         {t('common.cancel')}
                       </button>
                     )}
-                    <button type="submit" className="flex-[2] py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100">
+                    <button 
+                      type="submit" 
+                      disabled={isSaving}
+                      className="flex-[2] py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                      {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
                       {editingTeacher ? t('common.save') : t('common.add')}
                     </button>
                   </div>
@@ -918,23 +939,78 @@ export function Teachers() {
 
             <div className="space-y-6">
               <form onSubmit={handleCreateCircular} className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm space-y-4">
-                <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                  <Briefcase className="w-5 h-5 text-indigo-600" /> {t('teachers.hiring.createCircular')}
-                </h3>
-                <div className="space-y-3">
-                  <input name="title" required placeholder="Job Title (e.g. Senior Math Teacher)" className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500/20" />
-                  <textarea name="description" required placeholder="Job Description" rows={3} className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500/20 resize-none" />
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold">৳</span>
-                    <input name="salaryRange" required placeholder="Salary Range (e.g. 20,000 - 30,000)" className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500/20" />
+                <div className="flex items-center gap-3 text-indigo-900 mb-2">
+                  <div className="w-10 h-10 bg-indigo-50 rounded-xl flex items-center justify-center">
+                    <Briefcase className="w-5 h-5 text-indigo-600" />
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Deadline</label>
-                    <input name="deadline" type="date" required className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500/20" />
-                  </div>
-                  <textarea name="requirements" required placeholder="Requirements (one per line)" rows={3} className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500/20 resize-none" />
+                  <h3 className="font-black text-lg">{t('teachers.hiring.createCircular')}</h3>
                 </div>
-                <button type="submit" className="w-full py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100">
+                
+                <div className="grid grid-cols-1 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Position Name</label>
+                    <input name="title" type="text" placeholder="e.g. Senior Math Teacher" required className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-sm" />
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Job Type</label>
+                      <select name="jobType" className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-sm font-bold text-gray-700">
+                        <option>Full Time</option>
+                        <option>Part Time</option>
+                        <option>Contractual</option>
+                        <option>Remote</option>
+                      </select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">{t('teachers.hiring.vacancies')}</label>
+                      <input name="vacancies" type="number" placeholder="1" required className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-sm" />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">{t('teachers.hiring.salaryRange')}</label>
+                      <input name="salaryRange" type="text" placeholder="e.g. 15k - 20k" className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-sm" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">{t('teachers.hiring.deadline')}</label>
+                      <input name="deadline" type="date" required className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-sm" />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">{t('teachers.hiring.education')}</label>
+                      <input name="education" type="text" placeholder="e.g. Honours/Masters/NTRCA" required className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-sm" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">{t('teachers.hiring.experience')}</label>
+                      <input name="experience" type="text" placeholder="e.g. 2 Years" required className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-sm" />
+                    </div>
+                  </div>
+
+                  <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 mb-2">
+                    <div className="flex gap-3">
+                      <Info className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-[11px] font-bold text-blue-900 leading-tight">Public Form Features</p>
+                        <p className="text-[10px] text-blue-700 mt-1">The application form will automatically include photo upload, resume attachment, and up to 5 additional document slots for applicants.</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">{t('teachers.hiring.description')}</label>
+                    <textarea name="description" rows={3} placeholder="Describe the role..." required className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-sm resize-none" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Requirements (one per line)</label>
+                    <textarea name="requirements" rows={3} placeholder="Requirement 1&#10;Requirement 2..." className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-sm resize-none" />
+                  </div>
+                </div>
+                <button type="submit" disabled={isSaving} className="w-full py-4 bg-indigo-600 text-white font-bold rounded-2xl hover:bg-indigo-700 disabled:opacity-50 transition-all shadow-lg shadow-indigo-100 flex items-center justify-center gap-2">
+                  {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
                   {t('teachers.hiring.createCircular')}
                 </button>
               </form>
@@ -1168,6 +1244,35 @@ export function Teachers() {
                             </a>
                           </div>
                         )}
+                        {selectedApplication.attachments && selectedApplication.attachments.length > 0 && (
+                          <div className="pt-4 border-t border-gray-200 space-y-3">
+                            <p className="text-[10px] font-bold text-gray-400 uppercase">Uploaded Files</p>
+                            <div className="grid grid-cols-1 gap-2">
+                              {selectedApplication.attachments.map((file: any, index: number) => (
+                                <button
+                                  key={index}
+                                  onClick={() => {
+                                    const win = window.open();
+                                    win?.document.write(`<img src="${file.data}" style="max-width: 100%; height: auto;" />`);
+                                  }}
+                                  className="flex items-center gap-3 p-3 bg-white border border-gray-200 rounded-xl hover:border-indigo-300 hover:bg-indigo-50 transition-all text-left"
+                                >
+                                  <div className="w-10 h-10 bg-indigo-50 rounded-lg flex items-center justify-center overflow-hidden flex-shrink-0">
+                                    {file.data.startsWith('data:image') ? (
+                                      <img src={file.data} className="w-full h-full object-cover" />
+                                    ) : (
+                                      <Info className="w-5 h-5 text-indigo-500" />
+                                    )}
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-xs font-bold text-gray-900 truncate">{file.name}</p>
+                                    <p className="text-[10px] text-gray-500">Click to view</p>
+                                  </div>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -1196,6 +1301,26 @@ export function Teachers() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <ConfirmModal
+        isOpen={isDeleteModalOpen}
+        onClose={() => setIsDeleteModalOpen(false)}
+        onConfirm={async () => {
+          if (!teacherToDelete) return;
+          try {
+            await deleteDoc(doc(db, 'teachers', teacherToDelete.id));
+            setToast({ message: 'Teacher deleted successfully', type: 'success' });
+          } catch (error) {
+            handleFirestoreError(error, OperationType.DELETE, 'teachers');
+          } finally {
+            setIsDeleteModalOpen(false);
+            setTeacherToDelete(null);
+          }
+        }}
+        title="Delete Teacher"
+        message={`Are you sure you want to delete ${teacherToDelete?.name}? This action cannot be undone.`}
+        variant="danger"
+      />
     </div>
   );
 }

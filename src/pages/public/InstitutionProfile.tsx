@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { db, handleFirestoreError, OperationType } from '../../firebase';
 import { doc, getDoc, collection, query, where, getDocs, limit, orderBy } from 'firebase/firestore';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Building, MapPin, Phone, Mail, Globe, Users, Briefcase, Layers, CheckCircle, Loader2, GraduationCap, Calendar, Download, Megaphone, Newspaper, ArrowRight, Clock, Info } from 'lucide-react';
+import { Building, MapPin, Phone, Mail, Globe, Users, Briefcase, Layers, CheckCircle, Loader2, GraduationCap, Calendar, Download, Megaphone, Newspaper, ArrowRight, Clock, Info, FileText, TrendingUp } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../../lib/utils';
 import html2canvas from 'html2canvas';
@@ -17,6 +17,7 @@ export function InstitutionProfile() {
   const [notices, setNotices] = useState<any[]>([]);
   const [events, setEvents] = useState<any[]>([]);
   const [circulars, setCirculars] = useState<any[]>([]);
+  const [exams, setExams] = useState<any[]>([]);
   const bioRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -47,15 +48,30 @@ export function InstitutionProfile() {
         }
         
         setInstitution(instData);
+
+        // SEO Update
+        if (instData.websiteConfig) {
+          document.title = instData.websiteConfig.metaTitle || `${instData.name} | Official Website`;
+          const metaDesc = document.querySelector('meta[name="description"]');
+          if (metaDesc) {
+            metaDesc.setAttribute('content', instData.websiteConfig.metaDescription || '');
+          } else {
+            const meta = document.createElement('meta');
+            meta.name = "description";
+            meta.content = instData.websiteConfig.metaDescription || '';
+            document.head.appendChild(meta);
+          }
+        }
         
         // Fetch stats & Content
-        const [studentsSnap, teachersSnap, batchesSnap, noticesSnap, eventsSnap, circularsSnap] = await Promise.all([
+        const [studentsSnap, teachersSnap, batchesSnap, noticesSnap, eventsSnap, circularsSnap, examsSnap] = await Promise.all([
           getDocs(query(collection(db, 'students'), where('institutionId', '==', instId))),
           getDocs(query(collection(db, 'teachers'), where('institutionId', '==', instId))),
           getDocs(query(collection(db, 'batches'), where('institutionId', '==', instId))),
           getDocs(query(collection(db, 'notices'), where('institutionId', '==', instId), where('active', '==', true), orderBy('createdAt', 'desc'), limit(5))),
           getDocs(query(collection(db, 'events'), where('institutionId', '==', instId), where('active', '==', true), orderBy('createdAt', 'desc'), limit(5))),
-          getDocs(query(collection(db, 'circulars'), where('institutionId', '==', instId), where('active', '==', true), orderBy('createdAt', 'desc'), limit(5)))
+          getDocs(query(collection(db, 'circulars'), where('institutionId', '==', instId), where('active', '==', true), orderBy('createdAt', 'desc'), limit(5))),
+          getDocs(query(collection(db, 'offlineExams'), where('institutionId', '==', instId), where('status', '==', 'published'), orderBy('date', 'desc'), limit(6)))
         ]);
 
         setStats({
@@ -66,6 +82,7 @@ export function InstitutionProfile() {
         setNotices(noticesSnap.docs.map(d => ({ id: d.id, ...d.data() })));
         setEvents(eventsSnap.docs.map(d => ({ id: d.id, ...d.data() })));
         setCirculars(circularsSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+        setExams(examsSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       } catch (err) {
         handleFirestoreError(err, OperationType.GET, 'institutions');
       } finally {
@@ -151,282 +168,351 @@ export function InstitutionProfile() {
     );
   }
 
-  return (
-    <div className="min-h-screen bg-gray-50 pb-20">
-      {/* Hero Section */}
-      <div className="bg-indigo-600 text-white pt-20 pb-40 px-6">
-        <div className="max-w-5xl mx-auto flex flex-col md:flex-row items-center gap-8">
-          <div className="w-32 h-32 bg-white/20 rounded-3xl flex items-center justify-center text-5xl font-black ring-8 ring-white/10 overflow-hidden">
-            {institution.logoURL ? (
-              <img src={institution.logoURL} alt="Logo" className="w-full h-full object-contain p-4" referrerPolicy="no-referrer" />
-            ) : (
-              institution.name.charAt(0)
-            )}
-          </div>
-          <div className="text-center md:text-left space-y-2">
-            <div className="flex items-center justify-center md:justify-start gap-2">
-              <span className="px-3 py-1 bg-white/20 text-xs font-bold uppercase tracking-widest rounded-full">Coaching Center</span>
-              <span className="px-3 py-1 bg-emerald-500 text-xs font-bold uppercase tracking-widest rounded-full flex items-center gap-1">
-                <CheckCircle className="w-3 h-3" /> Verified
-              </span>
+  const renderSection = (section: any) => {
+    if (!section.active) return null;
+
+    switch (section.type) {
+      case 'hero':
+        return (
+          <div key={section.id} className="bg-indigo-600 text-white pt-20 pb-40 px-6">
+            <div className="max-w-5xl mx-auto flex flex-col md:flex-row items-center gap-8">
+              <div className="w-32 h-32 bg-white/20 rounded-3xl flex items-center justify-center text-5xl font-black ring-8 ring-white/10 overflow-hidden">
+                {institution.logoURL ? (
+                  <img src={institution.logoURL} alt="Logo" className="w-full h-full object-contain p-4" referrerPolicy="no-referrer" />
+                ) : (
+                  institution.name.charAt(0)
+                )}
+              </div>
+              <div className="text-center md:text-left space-y-2">
+                <div className="flex items-center justify-center md:justify-start gap-2">
+                  <span className="px-3 py-1 bg-white/20 text-xs font-bold uppercase tracking-widest rounded-full">Coaching Center</span>
+                  <span className="px-3 py-1 bg-emerald-500 text-xs font-bold uppercase tracking-widest rounded-full flex items-center gap-1">
+                    <CheckCircle className="w-3 h-3" /> Verified
+                  </span>
+                </div>
+                <h1 className="text-4xl md:text-5xl font-black tracking-tight">{institution.name}</h1>
+                <p className="text-indigo-100 flex items-center justify-center md:justify-start gap-2">
+                  <MapPin className="w-4 h-4" /> {institution.address || 'Address not provided'}
+                </p>
+              </div>
             </div>
-            <h1 className="text-4xl md:text-5xl font-black tracking-tight">{institution.name}</h1>
-            <p className="text-indigo-100 flex items-center justify-center md:justify-start gap-2">
-              <MapPin className="w-4 h-4" /> {institution.address || 'Address not provided'}
-            </p>
           </div>
-        </div>
-      </div>
+        );
 
-      {/* Stats & Content */}
-      <div className="max-w-5xl mx-auto px-6 -mt-20">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-          {[
-            { label: 'Students', value: stats.students, icon: Users, color: 'bg-blue-500' },
-            { label: 'Teachers', value: stats.teachers, icon: Briefcase, color: 'bg-emerald-500' },
-            { label: 'Batches', value: stats.batches, icon: Layers, color: 'bg-amber-500' },
-          ].map((stat, idx) => (
-            <motion.div 
-              key={idx}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: idx * 0.1 }}
-              className="bg-white p-6 rounded-3xl shadow-xl shadow-indigo-100/50 border border-gray-100 flex items-center gap-6"
-            >
-              <div className={cn("w-14 h-14 rounded-2xl flex items-center justify-center text-white", stat.color)}>
-                <stat.icon className="w-7 h-7" />
-              </div>
-              <div>
-                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">{stat.label}</p>
-                <h3 className="text-2xl font-black text-gray-900">{stat.value}</h3>
-              </div>
-            </motion.div>
-          ))}
-        </div>
+      case 'stats':
+        return (
+          <div key={section.id} className="max-w-5xl mx-auto px-6 -mt-20 mb-12">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {[
+                { label: 'Students', value: stats.students, icon: Users, color: 'bg-blue-500' },
+                { label: 'Teachers', value: stats.teachers, icon: Briefcase, color: 'bg-emerald-500' },
+                { label: 'Batches', value: stats.batches, icon: Layers, color: 'bg-amber-500' },
+              ].map((stat, idx) => (
+                <motion.div 
+                  key={idx}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: idx * 0.1 }}
+                  className="bg-white p-6 rounded-3xl shadow-xl shadow-indigo-100/50 border border-gray-100 flex items-center gap-6"
+                >
+                  <div className={cn("w-14 h-14 rounded-2xl flex items-center justify-center text-white", stat.color)}>
+                    <stat.icon className="w-7 h-7" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">{stat.label}</p>
+                    <h3 className="text-2xl font-black text-gray-900">{stat.value}</h3>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          </div>
+        );
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-2 space-y-8">
-            <section className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm space-y-4">
-              <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                <GraduationCap className="w-6 h-6 text-indigo-600" /> About Institution
-              </h2>
-              <p className="text-gray-600 leading-relaxed whitespace-pre-wrap">
-                {institution.description || 'No description provided.'}
-              </p>
-            </section>
-
+      case 'about':
+        return (
+          <section key={section.id} className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm space-y-4">
+            <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+              <GraduationCap className="w-6 h-6 text-indigo-600" /> {section.title || 'About Institution'}
+            </h2>
+            <p className="text-gray-600 leading-relaxed whitespace-pre-wrap">
+              {institution.description || 'No description provided.'}
+            </p>
             {(institution.vision || institution.goal || institution.target) && (
-              <section className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-6">
                 {institution.vision && (
-                  <div className="space-y-2">
-                    <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                      <Calendar className="w-5 h-5 text-indigo-600" /> Vision & Mission
-                    </h3>
-                    <p className="text-gray-600 leading-relaxed whitespace-pre-wrap pl-7">
-                      {institution.vision}
-                    </p>
+                  <div className="p-4 bg-indigo-50 rounded-2xl border border-indigo-100">
+                    <h5 className="font-bold text-indigo-900 text-sm mb-1 uppercase tracking-wider">Vision</h5>
+                    <p className="text-xs text-indigo-700 leading-relaxed">{institution.vision}</p>
                   </div>
                 )}
                 {institution.goal && (
-                  <div className="space-y-2">
-                    <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                      <CheckCircle className="w-5 h-5 text-indigo-600" /> Our Goal
-                    </h3>
-                    <p className="text-gray-600 leading-relaxed whitespace-pre-wrap pl-7">
-                      {institution.goal}
-                    </p>
+                  <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-100">
+                    <h5 className="font-bold text-emerald-900 text-sm mb-1 uppercase tracking-wider">Goal</h5>
+                    <p className="text-xs text-emerald-700 leading-relaxed">{institution.goal}</p>
                   </div>
                 )}
                 {institution.target && (
-                  <div className="space-y-2">
-                    <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                      <Layers className="w-5 h-5 text-indigo-600" /> Our Target
-                    </h3>
-                    <p className="text-gray-600 leading-relaxed whitespace-pre-wrap pl-7">
-                      {institution.target}
-                    </p>
+                  <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100">
+                    <h5 className="font-bold text-amber-900 text-sm mb-1 uppercase tracking-wider">Target</h5>
+                    <p className="text-xs text-amber-700 leading-relaxed">{institution.target}</p>
                   </div>
                 )}
-              </section>
+              </div>
             )}
+          </section>
+        );
 
-            {institution.principalName && (
-              <section className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm space-y-6">
-                <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                  <Users className="w-6 h-6 text-indigo-600" /> Message from Principal
-                </h2>
-                <div className="flex flex-col md:flex-row gap-6 items-start">
+      case 'gallery':
+        return (section.images || []).length > 0 && (
+          <section key={section.id} className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm space-y-6">
+            <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+              <Info className="w-6 h-6 text-indigo-600" /> {section.title || 'Photo Gallery'}
+            </h2>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {(section.images || []).map((img: string, idx: number) => (
+                <motion.div 
+                  key={idx}
+                  whileHover={{ scale: 1.05 }}
+                  className="aspect-square rounded-2xl overflow-hidden shadow-md ring-4 ring-gray-50 bg-gray-100"
+                >
+                  <img src={img} alt={`Gallery ${idx}`} className="w-full h-full object-cover" />
+                </motion.div>
+              ))}
+            </div>
+          </section>
+        );
+
+      case 'news':
+        return notices.length > 0 && (
+          <section key={section.id} className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm space-y-6">
+            <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+              <Megaphone className="w-6 h-6 text-amber-500" /> {section.title || 'Latest Notices'}
+            </h2>
+            <div className="space-y-4">
+              {notices.map(notice => (
+                <div key={notice.id} className="p-5 bg-gray-50 rounded-2xl border border-gray-100 space-y-2 hover:bg-white hover:shadow-md transition-all cursor-default group">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-bold text-gray-900 group-hover:text-amber-600 transition-colors">{notice.title}</h4>
+                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{notice.date}</span>
+                  </div>
+                  <p className="text-sm text-gray-500 leading-relaxed line-clamp-3">{notice.content}</p>
+                </div>
+              ))}
+            </div>
+          </section>
+        );
+
+      case 'results':
+        return exams.length > 0 && (
+          <section key={section.id} className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm space-y-6">
+            <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+              <CheckCircle className="w-6 h-6 text-emerald-500" /> {section.title || 'Exam Results'}
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {exams.map(exam => (
+                <button 
+                  key={exam.id}
+                  onClick={() => navigate(`/public/exam/${exam.id}`)}
+                  className="p-5 bg-gradient-to-br from-indigo-600 to-indigo-800 text-white rounded-[24px] text-left hover:shadow-xl hover:-translate-y-1 transition-all space-y-4 group"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
+                      <FileText className="w-5 h-5 text-white" />
+                    </div>
+                    <ArrowRight className="w-5 h-5 opacity-0 group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all text-white/50" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-lg leading-tight line-clamp-2">{exam.title}</h4>
+                    <p className="text-xs text-indigo-100 font-medium tracking-wide mt-2">{exam.batchName} • {exam.date}</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </section>
+        );
+
+      case 'circulars':
+        return circulars.length > 0 && (
+          <section key={section.id} className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm space-y-6">
+            <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+              <Briefcase className="w-6 h-6 text-emerald-500" /> {section.title || 'Career Opportunities'}
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {circulars.map(circular => (
+                <div key={circular.id} className="p-6 bg-emerald-50 rounded-3xl border border-emerald-100 space-y-4 hover:shadow-lg transition-all group">
+                  <div>
+                    <h4 className="font-bold text-gray-900 text-lg">{circular.title}</h4>
+                    <div className="flex items-center gap-2 text-[10px] font-black text-emerald-600 uppercase tracking-widest mt-1">
+                      <Clock className="w-3 h-3" /> Deadline: {circular.deadline}
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => navigate(`/public/circular/${circular.id}`)}
+                    className="w-full py-3 bg-white text-emerald-600 font-bold text-sm rounded-xl hover:bg-emerald-600 hover:text-white transition-all border border-emerald-200 flex items-center justify-center gap-2"
+                  >
+                    View Details <ArrowRight className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </section>
+        );
+
+      case 'custom_text':
+        return section.content && (
+          <section key={section.id} className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm space-y-4">
+            {section.title && <h2 className="text-2xl font-bold text-gray-900">{section.title}</h2>}
+            <div 
+              className="text-gray-600 leading-relaxed whitespace-pre-wrap prose prose-indigo max-w-none"
+              dangerouslySetInnerHTML={{ __html: section.content }}
+            />
+          </section>
+        );
+
+      case 'events':
+        return events.length > 0 && (
+          <section key={section.id} className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm space-y-6">
+            <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+              <Calendar className="w-6 h-6 text-indigo-600" /> {section.title || 'Timeline & Events'}
+            </h2>
+            <div className="space-y-6">
+              {events.map(event => (
+                <div key={event.id} className="flex gap-4 group">
+                  <div className="w-16 h-16 bg-indigo-50 rounded-2xl flex flex-col items-center justify-center shrink-0 border border-indigo-100 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                    <span className="text-[10px] font-black uppercase tracking-widest leading-none mb-1">
+                      {new Date(event.date).toLocaleDateString('en-US', { month: 'short' })}
+                    </span>
+                    <span className="text-2xl font-black leading-none">
+                      {new Date(event.date).getDate()}
+                    </span>
+                  </div>
+                  <div className="min-w-0 flex-1 pt-1">
+                    <h5 className="font-bold text-gray-900 text-lg group-hover:text-indigo-600 transition-colors">{event.title}</h5>
+                    <div className="flex flex-wrap items-center gap-4 mt-2">
+                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-1">
+                        <Clock className="w-3 h-3" /> {event.time || 'All Day'}
+                      </p>
+                      <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest flex items-center gap-1">
+                        <MapPin className="w-3 h-3" /> {event.location || 'Institution Premises'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        );
+
+      default:
+        return null;
+    }
+  };
+
+  const sections = institution.websiteConfig?.sections?.sort((a: any, b: any) => a.order - b.order) || [
+    { id: 'sec_hero', type: 'hero', active: true, order: 0 },
+    { id: 'sec_stats', type: 'stats', active: true, order: 1 },
+    { id: 'sec_about', type: 'about', active: true, order: 2 },
+    { id: 'sec_news', type: 'news', active: true, order: 3 },
+    { id: 'sec_results', type: 'results', active: true, order: 4 },
+  ];
+
+  return (
+    <div className="min-h-screen bg-gray-50 pb-20">
+      {/* Dynamic Sections */}
+      {sections.map(section => renderSection(section))}
+
+      {/* Persistent Footer and Contact Card */}
+      <div className="max-w-5xl mx-auto px-6 mt-12 grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="lg:col-span-2">
+          {institution.principalName && !sections.find(s => s.type === 'about') && (
+            <div className="bg-white p-8 rounded-[40px] border border-gray-100 shadow-sm">
+                <div className="flex flex-col md:flex-row gap-8 items-start">
                   {institution.principalPhotoURL && (
-                    <div className="w-32 h-32 rounded-2xl overflow-hidden shrink-0 shadow-lg ring-4 ring-indigo-50">
+                    <div className="w-32 h-32 rounded-3xl overflow-hidden shrink-0 shadow-lg ring-8 ring-indigo-50">
                       <img src={institution.principalPhotoURL} alt="Principal" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                     </div>
                   )}
                   <div className="space-y-2">
-                    <p className="text-xl font-bold text-gray-900">{institution.principalName}</p>
+                    <p className="text-2xl font-black text-gray-900">{institution.principalName}</p>
                     <p className="text-indigo-600 font-bold text-xs uppercase tracking-widest">{institution.principalTitle || 'Principal'}</p>
-                    <p className="text-gray-600 italic leading-relaxed">
+                    <p className="text-gray-500 italic leading-relaxed text-lg pt-4 line-clamp-4">
                       "Welcome to our institution. We are committed to providing the highest quality education and fostering a nurturing environment for all our students."
                     </p>
                   </div>
                 </div>
-              </section>
-            )}
+            </div>
+          )}
+        </div>
 
-            {/* News & Notices */}
-            {notices.length > 0 && (
-              <section className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm space-y-6">
-                <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                  <Megaphone className="w-6 h-6 text-amber-500" /> News & Notices
-                </h2>
-                <div className="space-y-4">
-                  {notices.map(notice => (
-                    <div key={notice.id} className="p-5 bg-gray-50 rounded-2xl border border-gray-100 space-y-2 hover:bg-white hover:shadow-md transition-all cursor-default group">
-                      <div className="flex items-center justify-between">
-                        <h4 className="font-bold text-gray-900 group-hover:text-amber-600 transition-colors">{notice.title}</h4>
-                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{notice.date}</span>
-                      </div>
-                      <p className="text-sm text-gray-500 leading-relaxed line-clamp-3">{notice.content}</p>
-                    </div>
-                  ))}
-                </div>
-              </section>
-            )}
-
-            {/* Job Circulars */}
-            {circulars.length > 0 && (
-              <section className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm space-y-6">
-                <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                  <Briefcase className="w-6 h-6 text-emerald-500" /> Job Circulars
-                </h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {circulars.map(circular => (
-                    <div key={circular.id} className="p-6 bg-emerald-50 rounded-2xl border border-emerald-100 space-y-4 hover:shadow-lg transition-all group">
-                      <div>
-                        <h4 className="font-bold text-gray-900 text-lg">{circular.title}</h4>
-                        <div className="flex items-center gap-2 text-[10px] font-black text-emerald-600 uppercase tracking-widest mt-1">
-                          <Clock className="w-3 h-3" /> Deadline: {circular.deadline}
-                        </div>
-                      </div>
-                      <button 
-                        onClick={() => navigate(`/public/circular/${circular.id}`)}
-                        className="w-full py-2.5 bg-white text-emerald-600 font-bold text-sm rounded-xl hover:bg-emerald-600 hover:text-white transition-all border border-emerald-200 flex items-center justify-center gap-2"
-                      >
-                        Details & Apply <ArrowRight className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </section>
-            )}
-          </div>
-
-          <div className="space-y-6">
-            {/* Events Sidebar */}
-            {events.length > 0 && (
-              <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm space-y-6">
-                <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                  <Calendar className="w-5 h-5 text-indigo-600" /> Upcoming Events
-                </h3>
-                <div className="space-y-6">
-                  {events.map(event => (
-                    <div key={event.id} className="flex gap-4 group">
-                      <div className="w-14 h-14 bg-indigo-50 rounded-2xl flex flex-col items-center justify-center shrink-0 border border-indigo-100 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
-                        <span className="text-xs font-black uppercase tracking-widest leading-none mb-1">
-                          {new Date(event.date).toLocaleDateString('en-US', { month: 'short' })}
-                        </span>
-                        <span className="text-xl font-black leading-none">
-                          {new Date(event.date).getDate()}
-                        </span>
-                      </div>
-                      <div className="min-w-0">
-                        <h5 className="font-bold text-gray-900 truncate">{event.title}</h5>
-                        <p className="text-xs text-gray-500 flex items-center gap-1 mt-1">
-                          <Clock className="w-3 h-3" /> {event.time || 'All Day'}
-                        </p>
-                        <p className="text-xs text-indigo-600 font-bold truncate mt-1">
-                          <MapPin className="w-3 h-3 inline mr-1" /> {event.location || 'Institution Premises'}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-            <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm space-y-6">
-              <h3 className="text-xl font-bold text-gray-900">Contact Information</h3>
-              <div className="space-y-4">
-                <div className="flex items-center gap-3 text-gray-600">
-                  <div className="w-10 h-10 bg-gray-50 rounded-xl flex items-center justify-center text-gray-400">
-                    <Phone className="w-5 h-5" />
+        <div className="space-y-6">
+           <div className="bg-white p-8 rounded-[40px] border border-gray-100 shadow-sm space-y-8">
+              <h3 className="text-xl font-bold text-gray-900 border-b pb-4">Contact Information</h3>
+              <div className="space-y-6">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-600 border border-indigo-100">
+                    <Phone className="w-6 h-6" />
                   </div>
                   <div>
-                    <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Phone</p>
-                    <p className="font-bold text-gray-900">{institution.phone || 'N/A'}</p>
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Phone</p>
+                    <p className="font-bold text-gray-900 text-lg">{institution.phone || 'N/A'}</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-3 text-gray-600">
-                  <div className="w-10 h-10 bg-gray-50 rounded-xl flex items-center justify-center text-gray-400">
-                    <Mail className="w-5 h-5" />
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-600 border border-emerald-100">
+                    <Mail className="w-6 h-6" />
                   </div>
                   <div>
-                    <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Email</p>
-                    <p className="font-bold text-gray-900">{institution.email || 'N/A'}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 text-gray-600">
-                  <div className="w-10 h-10 bg-gray-50 rounded-xl flex items-center justify-center text-gray-400">
-                    <Calendar className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Established</p>
-                    <p className="font-bold text-gray-900">{institution.established || 'N/A'}</p>
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Email</p>
+                    <p className="font-bold text-gray-900 break-all">{institution.email || 'N/A'}</p>
                   </div>
                 </div>
               </div>
               <button 
                 onClick={downloadBio}
                 disabled={downloading}
-                className="w-full py-4 bg-indigo-600 text-white font-bold rounded-2xl hover:bg-indigo-700 disabled:opacity-50 transition-all shadow-lg shadow-indigo-100 flex items-center justify-center gap-2"
+                className="w-full py-4 bg-gray-900 text-white font-bold rounded-2xl hover:bg-black disabled:opacity-50 transition-all shadow-xl shadow-gray-200 flex items-center justify-center gap-2"
               >
-                {downloading ? (
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                ) : (
-                  <Download className="w-5 h-5" />
-                )}
-                {downloading ? 'Generating...' : 'Download Bio'}
+                {downloading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Download className="w-5 h-5" />}
+                Download Institution Bio
               </button>
-            </div>
+          </div>
 
-            {institution.admissionForm?.active && (
-              <div className="bg-emerald-600 p-8 rounded-3xl text-white space-y-4">
-                <h3 className="text-xl font-bold">Admissions Open!</h3>
-                <p className="text-emerald-50 text-sm leading-relaxed">
-                  We are currently accepting new students for the upcoming session. Apply online today!
+          {institution.admissionForm?.active && (
+            <div className="bg-indigo-600 p-8 rounded-[40px] text-white space-y-6 relative overflow-hidden group">
+              <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-3xl group-hover:scale-150 transition-transform duration-700" />
+              <div className="relative space-y-4">
+                <h3 className="text-2xl font-black italic">Admissions Open!</h3>
+                <p className="text-indigo-100 text-sm leading-relaxed font-medium">
+                  Be a part of our community. Join our batches and start your journey towards success.
                 </p>
                 <button 
-                  onClick={() => window.location.href = `/public/admission/${id}`}
-                  className="w-full py-4 bg-white text-emerald-600 font-bold rounded-2xl hover:bg-emerald-50 transition-all shadow-lg shadow-emerald-900/20"
+                  onClick={() => navigate(`/public/admission/${institution.id}`)}
+                  className="w-full py-4 bg-white text-indigo-600 font-black rounded-2xl hover:bg-yellow-400 hover:text-white transition-all shadow-lg"
                 >
-                  Apply Now
+                  Apply Online Now
                 </button>
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </div>
-      <div className="max-w-5xl mx-auto px-6 mt-12 pb-12">
-        <div className="flex flex-col items-center gap-2">
-          <div className="w-6 h-6 bg-indigo-600 rounded-lg flex items-center justify-center overflow-hidden">
-            <img 
-              src="https://placehold.co/400x400/4f46e5/white?text=MMB" 
-              alt="MMB Logo" 
-              className="w-full h-full object-cover"
-              referrerPolicy="no-referrer"
-            />
+
+      <div className="max-w-5xl mx-auto px-6 mt-20 pt-12 border-t border-gray-100">
+        <div className="flex flex-col items-center gap-4">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center overflow-hidden">
+               <TrendingUp className="w-5 h-5 text-white" />
+            </div>
+            <span className="font-black text-gray-900 tracking-tighter text-xl">Manage My Batch</span>
           </div>
-          <p className="text-center text-gray-400 text-xs">
-            Powered by <span className="font-bold text-indigo-600">Manage My Batch</span> • সুরক্ষিত ও নির্ভরযোগ্য
+          <p className="text-center text-gray-400 text-xs font-medium max-w-sm">
+            Everything you need to manage your coaching center efficiently.
           </p>
+          <div className="flex items-center gap-6 mt-4">
+            <p className="text-[10px] font-black text-gray-300 uppercase tracking-[0.2em] italic">Secure</p>
+            <p className="text-[10px] font-black text-gray-300 uppercase tracking-[0.2em] italic">Reliable</p>
+            <p className="text-[10px] font-black text-gray-300 uppercase tracking-[0.2em] italic">Professional</p>
+          </div>
         </div>
       </div>
       <HiddenBioTemplate institution={institution} stats={stats} bioRef={bioRef} />

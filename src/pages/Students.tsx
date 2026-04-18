@@ -6,6 +6,7 @@ import { cn, formatWhatsAppPhone, formatDate } from '../lib/utils';
 import { collection, onSnapshot, query, addDoc, serverTimestamp, deleteDoc, doc, getDoc, writeBatch, where, orderBy, increment } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { useAuth } from '../lib/auth';
+import html2canvas from 'html2canvas';
 import { Modal } from '../components/Modal';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { GRADES, SECTIONS, SUBSCRIPTION_PLANS, MONTHS } from '../constants';
@@ -598,6 +599,7 @@ export function Students() {
 
   const downloadBatchIDCards = async () => {
     if (filteredStudents.length === 0) return;
+    setIsSaving(true);
     const { jsPDF } = await import('jspdf');
     const pdf = new jsPDF({
       orientation: 'landscape',
@@ -605,7 +607,6 @@ export function Students() {
       format: [85, 54]
     });
 
-    // Fetch institution info
     const instId = user?.institutionId || user?.uid;
     let institution: any = null;
     if (instId) {
@@ -615,83 +616,89 @@ export function Students() {
       }
     }
 
-    for (let i = 0; i < filteredStudents.length; i++) {
-      const student = filteredStudents[i];
-      if (i > 0) pdf.addPage([85, 54], 'landscape');
+    // Create a temporary hidden container for rendering
+    const container = document.createElement('div');
+    container.style.position = 'fixed';
+    container.style.left = '-9999px';
+    container.style.top = '0';
+    document.body.appendChild(container);
 
-      // Background Color
-      pdf.setFillColor(248, 250, 252); // Stone-50
-      pdf.rect(0, 0, 85, 54, 'F');
+    try {
+      // Ensure we are at top
+      window.scrollTo(0, 0);
       
-      // Header section
-      pdf.setFillColor(5, 150, 105); // Emerald-600
-      pdf.rect(0, 0, 85, 12, 'F');
-      
-      // Institution Name
-      pdf.setTextColor(255, 255, 255);
-      pdf.setFontSize(10);
-      pdf.setFont('helvetica', 'bold');
-      pdf.text(institution?.name || 'STUDENT ID CARD', 42.5, 6, { align: 'center' });
-      
-      if (institution?.logoURL) {
-        try {
-          pdf.addImage(institution.logoURL, 'JPEG', 5, 2, 8, 8);
-        } catch(e) { console.error("Logo add failed", e); }
-      }
+      for (let i = 0; i < filteredStudents.length; i++) {
+        const student = filteredStudents[i];
+        if (i > 0) pdf.addPage([85, 54], 'landscape');
 
-      // Student Photo
-      pdf.setFillColor(255, 255, 255);
-      pdf.setDrawColor(226, 232, 240); // Slate-200
-      pdf.roundedRect(5, 15, 25, 30, 2, 2, 'FD');
-      
-      if (student.photoUrl) {
-        try {
-          pdf.addImage(student.photoUrl, 'JPEG', 6, 16, 23, 28);
-        } catch(e) {
-          pdf.setTextColor(148, 163, 184);
-          pdf.setFontSize(14);
-          pdf.text(student.name[0], 17.5, 32, { align: 'center' });
+        // Render ID Card to DOM
+        container.innerHTML = `
+          <div id="id-card-temp" style="width: 321px; height: 204px; background: #f8fafc; font-family: 'Inter', 'Noto Sans Bengali', sans-serif; position: relative; overflow: hidden; border: 1px solid #e2e2e2;">
+            <div style="background: #059669; height: 45px; display: flex; align-items: center; justify-content: center; padding: 0 10px; gap: 8px;">
+              ${institution?.logoURL ? `<img src="${institution.logoURL}" style="width: 25px; height: 25px; object-fit: contain; border-radius: 4px;" />` : ''}
+              <h1 style="color: white; font-size: 14px; margin: 0; font-weight: bold; text-align: center;">${institution?.name || 'STUDENT ID CARD'}</h1>
+            </div>
+            <div style="display: flex; padding: 15px; gap: 15px;">
+              <div style="width: 90px; height: 110px; background: white; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; display: flex; align-items: center; justify-content: center;">
+                ${student.photoUrl ? `<img src="${student.photoUrl}" style="width: 100%; height: 100%; object-fit: cover;" />` : `<span style="font-size: 40px; color: #94a3b8;">${student.name[0]}</span>`}
+              </div>
+              <div style="flex: 1;">
+                <h2 style="font-size: 16px; margin: 0; color: #1e293b; font-weight: bold;">${student.name}</h2>
+                <div style="margin-top: 8px; font-size: 11px; color: #64748b; line-height: 1.6;">
+                  <p style="margin: 0;"><b>Roll No:</b> ${student.rollNo}</p>
+                  <p style="margin: 0;"><b>Batch:</b> ${student.batchName}</p>
+                  <p style="margin: 0;"><b>Phone:</b> ${student.guardianPhone}</p>
+                  <p style="margin: 20px 0 0 0; font-size: 10px; border-top: 1px solid #e2e8f0; padding-top: 5px; text-align: center;">Authorized Signature</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+
+        const cardElement = document.getElementById('id-card-temp');
+        if (cardElement) {
+          const canvas = await html2canvas(cardElement, { scale: 2, useCORS: true });
+          const imgData = canvas.toDataURL('image/png');
+          pdf.addImage(imgData, 'PNG', 0, 0, 85, 54);
         }
-      } else {
-        pdf.setTextColor(148, 163, 184);
-        pdf.setFontSize(14);
-        pdf.text(student.name[0], 17.5, 32, { align: 'center' });
       }
-
-      // Student Info
-      pdf.setTextColor(30, 41, 59); // Slate-800
-      pdf.setFontSize(10);
-      pdf.setFont('helvetica', 'bold');
-      pdf.text(student.name, 35, 22);
-      
-      pdf.setFontSize(7);
-      pdf.setTextColor(100, 116, 139); // Slate-500
-      pdf.setFont('helvetica', 'normal');
-      pdf.text(`Roll No: ${student.rollNo}`, 35, 27);
-      pdf.text(`Batch: ${student.batchName}`, 35, 31);
-      pdf.text(`Phone: ${student.guardianPhone}`, 35, 35);
-      
-      const expiry = new Date();
-      expiry.setFullYear(expiry.getFullYear() + 1);
-      pdf.text(`Validity: ${expiry.toLocaleDateString()}`, 35, 42);
-      
-      // Footer
-      pdf.line(35, 45, 80, 45);
-      pdf.setFontSize(5);
-      pdf.text('Authorized Signature', 57.5, 48, { align: 'center' });
+      pdf.save(`ID_Cards_${new Date().getTime()}.pdf`);
+    } catch (err) {
+      console.error("PDF Generation failed:", err);
+      alert("Failed to generate PDF. Please try again.");
+    } finally {
+      document.body.removeChild(container);
+      setIsSaving(false);
     }
-    
-    pdf.save(`ID_Cards_${new Date().getTime()}.pdf`);
   };
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 tracking-tight">{t('students.title')}</h1>
-          <p className="text-gray-500 mt-1">{t('students.subtitle')}</p>
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+        <div className="flex items-center justify-between w-full lg:w-auto overflow-x-auto pb-1 sm:pb-0">
+          <div className="shrink-0 mr-4">
+            <h1 className="text-2xl sm:text-3xl font-black text-gray-900 tracking-tight leading-none">{t('students.title')}</h1>
+            <p className="text-gray-500 mt-1 text-xs sm:text-sm font-medium">{t('students.subtitle')}</p>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button 
+              onClick={() => setIsAddModalOpen(true)}
+              className="lg:hidden flex items-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-black text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 transition-all shadow-md shadow-indigo-100 uppercase tracking-widest whitespace-nowrap"
+            >
+              <Plus className="w-4 h-4" /> {t('students.addStudent')}
+            </button>
+            <button 
+              onClick={downloadBatchIDCards}
+              disabled={isSaving || filteredStudents.length === 0}
+              className="lg:hidden p-2.5 bg-emerald-50 text-emerald-600 rounded-xl border border-emerald-100 flex items-center justify-center shadow-sm"
+              title={t('students.downloadID')}
+            >
+              {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+            </button>
+          </div>
         </div>
-        <div className="flex items-center gap-3">
+        
+        <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
           <input
             type="file"
             ref={importInputRef}
@@ -709,23 +716,23 @@ export function Students() {
           <button
             onClick={() => importInputRef.current?.click()}
             disabled={isSaving}
-            className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-all shadow-sm"
+            className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-all shadow-sm"
             title="CSV Format: Name, Phone, Batch, RollNo"
           >
             <Download className="w-4 h-4 rotate-180" /> {t('common.import', { defaultValue: 'Import' })}
           </button>
           <button 
             onClick={downloadBatchIDCards}
-            className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-all shadow-sm"
+            className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-all shadow-sm"
           >
             <Contact className="w-4 h-4" /> ID Cards
           </button>
-          <button className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-all shadow-sm">
+          <button className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-all shadow-sm">
             <Download className="w-4 h-4" /> {t('students.export')}
           </button>
           <button 
             onClick={() => setIsAddModalOpen(true)}
-            className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 transition-all shadow-md shadow-indigo-200"
+            className="hidden lg:flex items-center gap-2 px-4 py-2.5 text-sm font-bold text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 transition-all shadow-md shadow-indigo-200"
           >
             <Plus className="w-4 h-4" /> {t('students.addStudent')}
           </button>

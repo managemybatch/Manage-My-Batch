@@ -300,77 +300,135 @@ export function Attendance() {
           </div>
         ) : (
           <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
-            <Table headers={[
-              t('attendance.table.student'),
-              t('attendance.table.rollNo'),
-              t('attendance.table.status'),
-              t('attendance.table.actions')
-            ]}>
+            {/* Desktop Table View */}
+            <div className="hidden sm:block">
+              <Table headers={[
+                t('attendance.table.student'),
+                t('attendance.table.rollNo'),
+                t('attendance.table.status'),
+                t('attendance.table.actions')
+              ]}>
+                {students.map((student) => {
+                  const record = attendance[student.id];
+                  return (
+                    <TableRow key={student.id}>
+                      <TableCell>
+                        <p className="font-bold text-gray-900 group-hover:text-indigo-600 transition-colors">{student.name}</p>
+                      </TableCell>
+                      <TableCell>
+                        <span className="font-mono font-bold text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-lg text-xs">
+                          {student.rollNo}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        {record ? (
+                          <div className={cn(
+                            "flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider w-fit",
+                            record.status === 'present' ? "bg-emerald-50 text-emerald-600" : 
+                            record.status === 'absent' ? "bg-rose-50 text-rose-600" : "bg-amber-50 text-amber-600"
+                          )}>
+                            {record.status === 'present' ? <CheckCircle2 className="w-3 h-3" /> : 
+                             record.status === 'absent' ? <XCircle className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
+                            {t(`attendance.status.${record.status}`)}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-gray-400 italic font-medium">{t('attendance.status.notMarked')}</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <button 
+                            onClick={() => handleMarkAttendance(student, 'present')}
+                            className={cn(
+                              "p-2.5 rounded-xl transition-all",
+                              record?.status === 'present' ? "bg-emerald-100 text-emerald-700 shadow-sm" : "text-gray-300 hover:bg-emerald-50 hover:text-emerald-600"
+                            )} 
+                            title={t('attendance.status.present')}
+                          >
+                            <CheckCircle2 className="w-5 h-5" />
+                          </button>
+                          <button 
+                            onClick={() => handleMarkAttendance(student, 'absent')}
+                            className={cn(
+                              "p-2.5 rounded-xl transition-all",
+                              record?.status === 'absent' ? "bg-rose-100 text-rose-700 shadow-sm" : "text-gray-300 hover:bg-rose-50 hover:text-rose-600"
+                            )} 
+                            title={t('attendance.status.absent')}
+                          >
+                            <XCircle className="w-5 h-5" />
+                          </button>
+                          <button 
+                            onClick={() => handleMarkAttendance(student, 'late')}
+                            className={cn(
+                              "p-2.5 rounded-xl transition-all",
+                              record?.status === 'late' ? "bg-amber-100 text-amber-700 shadow-sm" : "text-gray-300 hover:bg-amber-50 hover:text-amber-600"
+                            )} 
+                            title={t('attendance.status.late')}
+                          >
+                            <Clock className="w-5 h-5" />
+                          </button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </Table>
+            </div>
+
+            {/* Mobile Card View */}
+            <div className="sm:hidden divide-y divide-gray-100">
               {students.map((student) => {
                 const record = attendance[student.id];
                 return (
-                  <TableRow key={student.id}>
-                    <TableCell>
-                      <p className="font-bold text-gray-900 group-hover:text-indigo-600 transition-colors">{student.name}</p>
-                    </TableCell>
-                    <TableCell>
-                      <span className="font-mono font-bold text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-lg text-xs">
-                        {student.rollNo}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      {record ? (
+                  <div key={student.id} className="p-4 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-black text-gray-900">{student.name}</p>
+                        <p className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest mt-0.5">Roll: {student.rollNo}</p>
+                      </div>
+                      {record && (
                         <div className={cn(
-                          "flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider w-fit",
+                          "flex items-center gap-1 px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wider",
                           record.status === 'present' ? "bg-emerald-50 text-emerald-600" : 
                           record.status === 'absent' ? "bg-rose-50 text-rose-600" : "bg-amber-50 text-amber-600"
                         )}>
-                          {record.status === 'present' ? <CheckCircle2 className="w-3 h-3" /> : 
-                           record.status === 'absent' ? <XCircle className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
                           {t(`attendance.status.${record.status}`)}
                         </div>
-                      ) : (
-                        <span className="text-xs text-gray-400 italic font-medium">{t('attendance.status.notMarked')}</span>
                       )}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <button 
-                          onClick={() => handleMarkAttendance(student, 'present')}
-                          className={cn(
-                            "p-2.5 rounded-xl transition-all",
-                            record?.status === 'present' ? "bg-emerald-100 text-emerald-700 shadow-sm" : "text-gray-300 hover:bg-emerald-50 hover:text-emerald-600"
-                          )} 
-                          title={t('attendance.status.present')}
-                        >
-                          <CheckCircle2 className="w-5 h-5" />
-                        </button>
-                        <button 
-                          onClick={() => handleMarkAttendance(student, 'absent')}
-                          className={cn(
-                            "p-2.5 rounded-xl transition-all",
-                            record?.status === 'absent' ? "bg-rose-100 text-rose-700 shadow-sm" : "text-gray-300 hover:bg-rose-50 hover:text-rose-600"
-                          )} 
-                          title={t('attendance.status.absent')}
-                        >
-                          <XCircle className="w-5 h-5" />
-                        </button>
-                        <button 
-                          onClick={() => handleMarkAttendance(student, 'late')}
-                          className={cn(
-                            "p-2.5 rounded-xl transition-all",
-                            record?.status === 'late' ? "bg-amber-100 text-amber-700 shadow-sm" : "text-gray-300 hover:bg-amber-50 hover:text-amber-600"
-                          )} 
-                          title={t('attendance.status.late')}
-                        >
-                          <Clock className="w-5 h-5" />
-                        </button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <button 
+                        onClick={() => handleMarkAttendance(student, 'present')}
+                        className={cn(
+                          "flex-1 flex items-center justify-center py-3 rounded-xl border transition-all",
+                          record?.status === 'present' ? "bg-emerald-600 text-white border-emerald-600 shadow-md" : "bg-white text-emerald-600 border-emerald-100"
+                        )}
+                      >
+                        <CheckCircle2 className="w-5 h-5" />
+                      </button>
+                      <button 
+                        onClick={() => handleMarkAttendance(student, 'absent')}
+                        className={cn(
+                          "flex-1 flex items-center justify-center py-3 rounded-xl border transition-all",
+                          record?.status === 'absent' ? "bg-rose-600 text-white border-rose-600 shadow-md" : "bg-white text-rose-600 border-rose-100"
+                        )}
+                      >
+                        <XCircle className="w-5 h-5" />
+                      </button>
+                      <button 
+                        onClick={() => handleMarkAttendance(student, 'late')}
+                        className={cn(
+                          "flex-1 flex items-center justify-center py-3 rounded-xl border transition-all",
+                          record?.status === 'late' ? "bg-amber-600 text-white border-amber-600 shadow-md" : "bg-white text-amber-600 border-amber-100"
+                        )}
+                      >
+                        <Clock className="w-5 h-5" />
+                      </button>
+                    </div>
+                  </div>
                 );
               })}
-            </Table>
+            </div>
           </div>
         )}
       </div>

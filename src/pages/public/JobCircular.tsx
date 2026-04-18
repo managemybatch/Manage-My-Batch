@@ -2,8 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { db, handleFirestoreError, OperationType } from '../../firebase';
 import { doc, getDoc, collection, addDoc } from 'firebase/firestore';
-import { Briefcase, CheckCircle, Loader2, Send, Info, User, Phone, Mail, Calendar, MapPin, Building, GraduationCap, Globe, Camera, Home, Hash } from 'lucide-react';
+import { Briefcase, CheckCircle, Loader2, Send, Info, User, Phone, Mail, Calendar, MapPin, Building, GraduationCap, Globe, Camera, Home, Hash, Clock, Plus } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+
+interface Attachment {
+  name: string;
+  data: string;
+}
 
 export function JobCircular() {
   const { id } = useParams();
@@ -12,22 +17,32 @@ export function JobCircular() {
   const [institution, setInstitution] = useState<any>(null);
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [photoBase64, setPhotoBase64] = useState<string | null>(null);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
 
-  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+
+    Array.from(files).forEach((file: File) => {
       if (file.size > 500000) { // 500KB limit
-        alert('Photo size should be less than 500KB');
-        e.target.value = '';
+        alert(`File ${file.name} is too large. Max 500KB.`);
         return;
       }
+      if (attachments.length >= 5) {
+        alert('Max 5 files allowed.');
+        return;
+      }
+
       const reader = new FileReader();
       reader.onloadend = () => {
-        setPhotoBase64(reader.result as string);
+        setAttachments(prev => [...prev, { name: file.name, data: reader.result as string }]);
       };
       reader.readAsDataURL(file);
-    }
+    });
+  };
+
+  const removeAttachment = (index: number) => {
+    setAttachments(prev => prev.filter((_, i) => i !== index));
   };
 
   useEffect(() => {
@@ -72,8 +87,9 @@ export function JobCircular() {
         email: data['Email'],
         age: data['Age'],
         address: data['Address'],
-        photoUrl: photoBase64,
-        resumeUrl: data['Resume URL'],
+        attachments: attachments,
+        photoUrl: attachments.find(a => a.name.match(/\.(jpg|jpeg|png|webp)$/i))?.data || null,
+        resumeUrl: data['Resume URL'] || null,
         status: 'pending',
         formData: data,
         createdAt: new Date().toISOString()
@@ -140,13 +156,50 @@ export function JobCircular() {
             <div className="space-y-4">
               <div className="flex items-center gap-2">
                 <span className="px-3 py-1 bg-indigo-50 text-indigo-600 text-xs font-bold uppercase tracking-widest rounded-full">চাকরির সার্কুলার</span>
-                <span className="px-3 py-1 bg-emerald-50 text-emerald-600 text-xs font-bold uppercase tracking-widest rounded-full">ফুল টাইম</span>
+                <span className="px-3 py-1 bg-emerald-50 text-emerald-600 text-xs font-bold uppercase tracking-widest rounded-full">{circular.jobType || 'ফুল টাইম'}</span>
               </div>
               <h1 className="text-3xl md:text-4xl font-black text-gray-900 tracking-tight">{circular.title}</h1>
               <div className="flex flex-wrap gap-4 text-sm text-gray-500 font-bold uppercase tracking-widest">
                 <span className="flex items-center gap-1.5"><Building className="w-4 h-4" /> {institution?.name}</span>
-                <span className="flex items-center gap-1.5"><span className="font-bold">৳</span> {circular.salaryRange}</span>
-                <span className="flex items-center gap-1.5"><Calendar className="w-4 h-4" /> শেষ সময়: {circular.deadline}</span>
+                <span className="flex items-center gap-1.5"><MapPin className="w-4 h-4" /> {institution?.address}</span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 p-6 bg-gray-50/50 rounded-2xl border border-gray-100">
+              <div className="space-y-1">
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">বেতন পরিসীমা</p>
+                <p className="text-indigo-600 font-bold flex items-center gap-1">৳ {circular.salaryRange || 'আলোচনা সাপেক্ষে'}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">শূন্যপদ</p>
+                <p className="text-gray-900 font-bold flex items-center gap-1"><User className="w-3 h-3 text-gray-400" /> {circular.vacancies || '১'} জন</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">চাকরির ধরন</p>
+                <p className="text-gray-900 font-bold flex items-center gap-1"><Clock className="w-3 h-3 text-gray-400" /> {circular.jobType || 'ফুল টাইম'}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">শেষ সময়</p>
+                <p className="text-rose-600 font-bold flex items-center gap-1"><Calendar className="w-3 h-3" /> {circular.deadline}</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-6 border-t border-gray-100">
+              <div className="space-y-4">
+                <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                  <GraduationCap className="w-5 h-5 text-indigo-600" /> শিক্ষাগত যোগ্যতা
+                </h3>
+                <div className="p-4 bg-white border border-gray-100 rounded-xl">
+                  <span className="text-gray-700 font-medium text-sm">{circular.education || 'উল্লেখ নেই'}</span>
+                </div>
+              </div>
+              <div className="space-y-4">
+                <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                  <Briefcase className="w-5 h-5 text-indigo-600" /> অভিজ্ঞতা
+                </h3>
+                <div className="p-4 bg-white border border-gray-100 rounded-xl">
+                  <span className="text-gray-700 font-medium text-sm">{circular.experience || 'উল্লেখ নেই'}</span>
+                </div>
               </div>
             </div>
 
@@ -180,24 +233,38 @@ export function JobCircular() {
               </p>
             </div>
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">আপনার ছবি</label>
-                <div className="relative">
-                  <div className="flex items-center gap-4 p-4 bg-gray-50 border border-gray-200 rounded-xl">
-                    <div className="w-12 h-12 bg-white rounded-xl border border-gray-100 flex items-center justify-center overflow-hidden flex-shrink-0">
-                      {photoBase64 ? (
-                        <img src={photoBase64} alt="Preview" className="w-full h-full object-cover" />
-                      ) : (
-                        <Camera className="w-6 h-6 text-gray-300" />
-                      )}
+              <div className="space-y-3">
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">প্রয়োজনীয় নথিপত্র (ছবি, সিভি, সনদপত্র)</label>
+                <div className="grid grid-cols-1 gap-3">
+                  <label className="w-full flex flex-col items-center justify-center py-6 px-4 bg-gray-50 border-2 border-dashed border-gray-200 rounded-2xl cursor-pointer hover:border-indigo-400 hover:bg-indigo-50/30 transition-all group">
+                    <div className="flex flex-col items-center justify-center space-y-2">
+                      <div className="w-10 h-10 bg-white shadow-sm rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <Plus className="w-5 h-5 text-indigo-600" />
+                      </div>
+                      <p className="text-xs font-bold text-gray-600">ক্লিক করে ফাইল সিলেক্ট করুন বা ড্র্যাগ করুন</p>
+                      <p className="text-[10px] text-gray-400">সর্বোচ্চ ৫টি ফাইল (প্রতিটি ৫০০ কেবি)</p>
                     </div>
                     <input 
                       type="file" 
-                      accept="image/*" 
-                      onChange={handlePhotoChange}
-                      required
-                      className="text-xs text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100" 
+                      multiple
+                      accept="image/*,.pdf,.doc,.docx" 
+                      onChange={handleFileChange}
+                      className="hidden" 
                     />
+                  </label>
+
+                  <div className="flex flex-wrap gap-2">
+                    {attachments.map((file, idx) => (
+                      <div key={idx} className="flex items-center gap-2 px-3 py-2 bg-indigo-50 text-indigo-700 rounded-lg text-xs font-bold border border-indigo-100 group">
+                        <div className="w-4 h-4 overflow-hidden rounded">
+                          {file.data.startsWith('data:image') ? <img src={file.data} className="w-full h-full object-cover" /> : <Info className="w-4 h-4" />}
+                        </div>
+                        <span className="truncate max-w-[100px]">{file.name}</span>
+                        <button type="button" onClick={() => removeAttachment(idx)} className="hover:text-rose-500">
+                          <Plus className="w-4 h-4 rotate-45" />
+                        </button>
+                      </div>
+                    ))}
                   </div>
                 </div>
               </div>

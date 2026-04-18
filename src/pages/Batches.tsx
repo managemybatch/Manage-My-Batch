@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Search, Filter, Layers, MoreVertical, Users, Loader2, ChevronDown, ChevronUp, X, Clock, Calendar, CreditCard, BookOpen, MessageSquare } from 'lucide-react';
+import { Plus, Search, Filter, Layers, MoreVertical, Users, Loader2, ChevronDown, ChevronUp, X, Clock, Calendar, CreditCard, BookOpen, MessageSquare, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { collection, onSnapshot, query, addDoc, serverTimestamp, deleteDoc, doc, orderBy, updateDoc, where } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { useAuth } from '../lib/auth';
 import { Modal } from '../components/Modal';
+import { ConfirmModal } from '../components/ConfirmModal';
 import { GRADES, SECTIONS, SUBSCRIPTION_PLANS } from '../constants';
 import { useTranslation } from 'react-i18next';
 import { SubscriptionModal } from '../components/SubscriptionModal';
@@ -61,10 +62,14 @@ export function Batches() {
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [subjectInput, setSubjectInput] = useState('');
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [batchToDelete, setBatchToDelete] = useState<string | null>(null);
+  const [batchToDeleteName, setBatchToDeleteName] = useState('');
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
   const [editingBatch, setEditingBatch] = useState<Batch | null>(null);
   const [selectedBatch, setSelectedBatch] = useState<Batch | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   const handleViewDetails = (batch: Batch) => {
     setSelectedBatch(batch);
@@ -117,7 +122,7 @@ export function Batches() {
 
   const handleAddBatch = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return;
+    if (!user || isSaving) return;
 
     const plan = SUBSCRIPTION_PLANS.find(p => p.id === user.subscriptionPlan) || SUBSCRIPTION_PLANS[0];
     if (batches.length >= plan.batchLimit) {
@@ -125,6 +130,7 @@ export function Batches() {
       return;
     }
 
+    setIsSaving(true);
     try {
       const instId = user.institutionId || user.uid;
       await addDoc(collection(db, 'batches'), {
@@ -138,6 +144,8 @@ export function Batches() {
       resetForm();
     } catch (error) {
       handleFirestoreError(error, OperationType.CREATE, 'batches');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -192,13 +200,12 @@ export function Batches() {
   };
 
   const handleDeleteBatch = async (id: string) => {
-    if (!window.confirm(t('common.deleteConfirm', { defaultValue: 'Are you sure you want to delete this batch?' }))) return;
-    try {
-      await deleteDoc(doc(db, 'batches', id));
-      setActiveMenu(null);
-    } catch (error) {
-      handleFirestoreError(error, OperationType.DELETE, `batches/${id}`);
-    }
+    // Handled by ConfirmModal now
+    setBatchToDelete(id);
+    const batch = batches.find(b => b.id === id);
+    setBatchToDeleteName(batch?.name || '');
+    setIsDeleteModalOpen(true);
+    setActiveMenu(null);
   };
 
   const handleEditBatch = (batch: Batch) => {
@@ -222,8 +229,9 @@ export function Batches() {
 
   const handleUpdateBatch = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user || !editingBatch) return;
+    if (!user || !editingBatch || isSaving) return;
 
+    setIsSaving(true);
     try {
       const batchRef = doc(db, 'batches', editingBatch.id);
       const { id, createdAt, ...updateData } = { ...editingBatch, ...newBatch };
@@ -238,6 +246,8 @@ export function Batches() {
       resetForm();
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, `batches/${editingBatch.id}`);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -329,7 +339,7 @@ export function Batches() {
                                 onClick={() => handleDeleteBatch(batch.id)}
                                 className="w-full px-4 py-2 text-left text-sm font-bold text-rose-600 hover:bg-rose-50 flex items-center gap-2 transition-colors"
                               >
-                                <MoreVertical className="w-4 h-4" /> {t('common.delete', { defaultValue: 'Delete' })}
+                                <Trash2 className="w-4 h-4" /> {t('common.delete', { defaultValue: 'Delete' })}
                               </button>
                             </motion.div>
                           </>
@@ -1027,8 +1037,10 @@ export function Batches() {
             </button>
             <button
               type="submit"
-              className="flex-1 py-3.5 bg-indigo-600 text-white rounded-2xl font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200"
+              disabled={isSaving}
+              className="flex-1 py-3.5 bg-indigo-600 text-white rounded-2xl font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
+              {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
               {t('batches.createBatch')}
             </button>
           </div>
@@ -1038,6 +1050,26 @@ export function Batches() {
       <SubscriptionModal 
         isOpen={isUpgradeModalOpen} 
         onClose={() => setIsUpgradeModalOpen(false)} 
+      />
+      <ConfirmModal
+        isOpen={isDeleteModalOpen}
+        onClose={() => setIsDeleteModalOpen(false)}
+        onConfirm={async () => {
+          if (!batchToDelete || isSaving) return;
+          setIsSaving(true);
+          try {
+            await deleteDoc(doc(db, 'batches', batchToDelete));
+          } catch (error) {
+            handleFirestoreError(error, OperationType.DELETE, `batches/${batchToDelete}`);
+          } finally {
+            setIsSaving(false);
+            setIsDeleteModalOpen(false);
+            setBatchToDelete(null);
+          }
+        }}
+        title="Delete Batch"
+        message={`Are you sure you want to delete ${batchToDeleteName}? All students in this batch will be affected.`}
+        variant="danger"
       />
     </div>
   );

@@ -3,7 +3,8 @@ import {
   Building, Share2, Download, Users, Briefcase, Layers, 
   MapPin, Phone, Mail, Globe, Info, CheckCircle, 
   ExternalLink, Loader2, Plus, Trash2, UserPlus, 
-  MessageSquare, Calendar, Newspaper, Megaphone, Send, Edit2
+  MessageSquare, Calendar, Newspaper, Megaphone, Send, Edit2,
+  Settings, TrendingUp
 } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import { useTranslation } from 'react-i18next';
@@ -15,6 +16,16 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Modal } from '../components/Modal';
 import { ConfirmModal } from '../components/ConfirmModal';
 import html2canvas from 'html2canvas';
+
+interface WebsiteSection {
+  id: string;
+  type: 'hero' | 'stats' | 'about' | 'gallery' | 'news' | 'events' | 'circulars' | 'results' | 'custom_text';
+  title?: string;
+  content?: string;
+  images?: string[];
+  active: boolean;
+  order: number;
+}
 
 interface InstitutionData {
   name: string;
@@ -32,6 +43,11 @@ interface InstitutionData {
   principalName?: string;
   principalTitle?: string;
   principalPhotoURL?: string;
+  websiteConfig: {
+    metaTitle: string;
+    metaDescription: string;
+    sections: WebsiteSection[];
+  };
   admissionForm: {
     active: boolean;
     title: string;
@@ -64,6 +80,7 @@ export function Institution() {
   const bioRef = useRef<HTMLDivElement>(null);
   const [applications, setApplications] = useState<Application[]>([]);
   const [stats, setStats] = useState({ students: 0, teachers: 0, batches: 0 });
+  const [exams, setExams] = useState<any[]>([]);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [slugStatus, setSlugStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle');
   
@@ -74,7 +91,9 @@ export function Institution() {
   const [showNoticeModal, setShowNoticeModal] = useState(false);
   const [showEventModal, setShowEventModal] = useState(false);
   const [showCircularModal, setShowCircularModal] = useState(false);
+  const [showSectionModal, setShowSectionModal] = useState(false);
   const [editingItem, setEditingItem] = useState<any>(null);
+  const [editingSection, setEditingSection] = useState<WebsiteSection | null>(null);
 
   useEffect(() => {
     if (toast) {
@@ -107,7 +126,23 @@ export function Institution() {
           principalName: data.principalName,
           principalTitle: data.principalTitle,
           principalPhotoURL: data.principalPhotoURL,
-          admissionForm: data.admissionForm
+          websiteConfig: data.websiteConfig || {
+            metaTitle: `${data.name} | Official Website`,
+            metaDescription: data.description?.substring(0, 160) || `Welcome to ${data.name}.`,
+            sections: [
+              { id: 'sec_hero', type: 'hero', active: true, order: 0 },
+              { id: 'sec_stats', type: 'stats', active: true, order: 1 },
+              { id: 'sec_about', type: 'about', active: true, order: 2 },
+              { id: 'sec_news', type: 'news', title: 'Latest Notices', active: true, order: 3 },
+              { id: 'sec_results', type: 'results', title: 'Exam Results', active: true, order: 4 },
+            ]
+          },
+          admissionForm: data.admissionForm || {
+            active: false,
+            title: 'Admission Form',
+            instructions: 'Please fill out the form below to apply.',
+            fields: { studentName: true, guardianPhone: true, address: true }
+          }
         } as InstitutionData);
       } else {
         // Initialize default data if not exists
@@ -121,6 +156,17 @@ export function Institution() {
           vision: '',
           goal: '',
           target: '',
+          websiteConfig: {
+            metaTitle: `${user.displayName} | Official Profile`,
+            metaDescription: `Welcome to the official portal of ${user.displayName}. View news, notices, and exam results.`,
+            sections: [
+              { id: 'sec_hero', type: 'hero', active: true, order: 0 },
+              { id: 'sec_stats', type: 'stats', active: true, order: 1 },
+              { id: 'sec_about', type: 'about', active: true, order: 2 },
+              { id: 'sec_news', type: 'news', title: 'Latest Notices', active: true, order: 3 },
+              { id: 'sec_results', type: 'results', title: 'Exam Results', active: true, order: 4 },
+            ]
+          },
           admissionForm: {
             active: false,
             title: 'Admission Form',
@@ -175,10 +221,11 @@ export function Institution() {
 
     const fetchStats = async () => {
       try {
-        const [studentsSnap, batchesSnap, teachersSnap] = await Promise.all([
+        const [studentsSnap, batchesSnap, teachersSnap, examsSnap] = await Promise.all([
           getDocs(query(collection(db, 'students'), where('institutionId', '==', instId))),
           getDocs(query(collection(db, 'batches'), where('institutionId', '==', instId))),
-          getDocs(query(collection(db, 'teachers'), where('institutionId', '==', instId)))
+          getDocs(query(collection(db, 'teachers'), where('institutionId', '==', instId))),
+          getDocs(query(collection(db, 'offlineExams'), where('institutionId', '==', instId), orderBy('date', 'desc')))
         ]);
 
         setStats({
@@ -186,6 +233,7 @@ export function Institution() {
           batches: batchesSnap.size,
           teachers: teachersSnap.size
         });
+        setExams(examsSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       } catch (error) {
         handleFirestoreError(error, OperationType.LIST, 'stats');
       }
@@ -712,75 +760,296 @@ export function Institution() {
             exit={{ opacity: 0, y: -20 }}
             className="space-y-8"
           >
-           {/* Website Settings */}
-            <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm space-y-6">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-indigo-100 rounded-2xl flex items-center justify-center text-indigo-600">
-                  <Globe className="w-6 h-6" />
+            {/* SEO & URL Settings */}
+            <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm space-y-8">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-gray-50">
+                <div className="flex items-center gap-4">
+                  <div className="w-14 h-14 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-indigo-100">
+                    <Globe className="w-7 h-7" />
+                  </div>
+                  <div>
+                    <h3 className="text-2xl font-black text-gray-900 tracking-tight">Website & SEO</h3>
+                    <p className="text-gray-500 font-medium">Manage your public presence and search ranking.</p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-xl font-bold text-gray-900">Custom Profile URL</h3>
-                  <p className="text-sm text-gray-500">Set a human-readable link for your coaching center.</p>
+                <button 
+                  onClick={() => {
+                    const instId = user?.institutionId || user?.uid;
+                    const url = institution?.slug ? `${window.location.origin}/i/${institution.slug}` : `${window.location.origin}/public/institution/${instId}`;
+                    window.open(url, '_blank');
+                  }}
+                  className="flex items-center gap-2 px-6 py-3 bg-indigo-50 text-indigo-700 font-bold rounded-xl hover:bg-indigo-100 transition-all border border-indigo-100"
+                >
+                  <ExternalLink className="w-4 h-4" /> Preview Live Site
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div className="space-y-6">
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Custom Profile URL (Slug)</label>
+                    <div className="flex items-center gap-2">
+                      <div className="px-4 py-3 bg-gray-100 border border-gray-200 rounded-xl text-sm text-gray-500 font-bold">
+                        /i/
+                      </div>
+                      <input 
+                        value={institution?.slug || ''}
+                        onChange={(e) => {
+                          const val = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '');
+                          setInstitution(prev => prev ? { ...prev, slug: val } : null);
+                          checkSlugAvailability(val);
+                        }}
+                        placeholder="coaching-name"
+                        className="flex-1 px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all font-bold"
+                      />
+                    </div>
+                    {slugStatus === 'checking' && <p className="text-xs text-gray-400 animate-pulse ml-1">Checking availability...</p>}
+                    {slugStatus === 'available' && <p className="text-xs text-emerald-600 font-bold ml-1 flex items-center gap-1"><CheckCircle className="w-3 h-3" /> URL available!</p>}
+                    {slugStatus === 'taken' && <p className="text-xs text-rose-500 font-bold ml-1 flex items-center gap-1"><Info className="w-3 h-3" /> This URL is already taken.</p>}
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Meta Title (SEO)</label>
+                    <input 
+                      value={institution?.websiteConfig.metaTitle || ''}
+                      onChange={(e) => setInstitution(prev => prev ? { ...prev, websiteConfig: { ...prev.websiteConfig, metaTitle: e.target.value } } : null)}
+                      placeholder="e.g. Best Coaching Center in Dhaka | Sunny Academy"
+                      className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none font-medium"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-6">
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Meta Description (SEO)</label>
+                    <textarea 
+                      value={institution?.websiteConfig.metaDescription || ''}
+                      onChange={(e) => setInstitution(prev => prev ? { ...prev, websiteConfig: { ...prev.websiteConfig, metaDescription: e.target.value } } : null)}
+                      rows={4}
+                      placeholder="Briefly describe your institution for Google search results..."
+                      className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none font-medium resize-none"
+                    />
+                  </div>
                 </div>
               </div>
 
-              <div className="max-w-xl space-y-4">
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Your Website Address</label>
-                  <div className="flex items-center gap-2">
-                    <div className="px-4 py-3 bg-gray-100 border border-gray-200 rounded-xl text-sm text-gray-500 font-medium">
-                      {window.location.origin}/i/
-                    </div>
-                    <input 
-                      value={institution?.slug || ''}
-                      onChange={(e) => {
-                        const val = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '');
-                        setInstitution(prev => prev ? { ...prev, slug: val } : null);
-                        checkSlugAvailability(val);
-                      }}
-                      placeholder="coaching-name"
-                      className="flex-1 px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all font-bold"
-                    />
-                  </div>
-                  {slugStatus === 'checking' && <p className="text-xs text-gray-400 animate-pulse ml-1">Checking availability...</p>}
-                  {slugStatus === 'available' && <p className="text-xs text-emerald-600 font-bold ml-1 flex items-center gap-1"><CheckCircle className="w-3 h-3" /> URL available!</p>}
-                  {slugStatus === 'taken' && <p className="text-xs text-rose-500 font-bold ml-1 flex items-center gap-1"><Info className="w-3 h-3" /> This URL is already taken.</p>}
-                </div>
+              <div className="pt-6 border-t border-gray-50 flex justify-end">
                 <button 
                   onClick={async () => {
                     const instId = user?.institutionId || user?.uid;
-                    if (!instId || !institution?.slug) return;
+                    if (!instId || !institution) return;
                     setIsSaving(true);
                     try {
-                      await updateDoc(doc(db, 'institutions', instId), { slug: institution.slug });
-                      setToast({ message: 'URL Updated!', type: 'success' });
+                      await updateDoc(doc(db, 'institutions', instId), { 
+                        slug: institution.slug,
+                        websiteConfig: institution.websiteConfig
+                      });
+                      setToast({ message: 'Settings Saved!', type: 'success' });
                     } catch (error) {
-                      setToast({ message: 'Update failed!', type: 'error' });
+                      setToast({ message: 'Save failed!', type: 'error' });
                     } finally {
                       setIsSaving(false);
                     }
                   }}
-                  disabled={isSaving || slugStatus === 'taken' || slugStatus === 'checking'}
-                  className="px-6 py-2.5 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 disabled:opacity-50 transition-all text-sm"
+                  disabled={isSaving || slugStatus === 'taken'}
+                  className="px-8 py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 disabled:opacity-50 transition-all shadow-lg shadow-indigo-100"
                 >
-                  Save URL
+                  {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Save Site Settings'}
                 </button>
               </div>
             </div>
 
-            {/* Content Management */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm space-y-6">
+            {/* Landing Page Sections (CMS) */}
+            <div className="space-y-6">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center text-amber-600">
+                    <Layers className="w-5 h-5" />
+                  </div>
+                  <h3 className="text-xl font-bold text-gray-900">Landing Page Sections</h3>
+                </div>
+                <div className="flex items-center gap-2">
+                  <select 
+                    onChange={(e) => {
+                      if (!e.target.value || !institution) return;
+                      const type = e.target.value as any;
+                      const newSection: WebsiteSection = {
+                        id: `sec_${Date.now()}`,
+                        type,
+                        title: type.charAt(0).toUpperCase() + type.slice(1),
+                        active: true,
+                        order: institution.websiteConfig.sections.length
+                      };
+                      setInstitution({
+                        ...institution,
+                        websiteConfig: {
+                          ...institution.websiteConfig,
+                          sections: [...institution.websiteConfig.sections, newSection]
+                        }
+                      });
+                      e.target.value = '';
+                    }}
+                    className="px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm font-bold focus:ring-2 focus:ring-indigo-500/20 outline-none"
+                  >
+                    <option value="">+ Add New Section</option>
+                    <option value="custom_text">Custom Text/HTML</option>
+                    <option value="gallery">Image Gallery</option>
+                    <option value="news">News & Notices</option>
+                    <option value="events">Events Calendar</option>
+                    <option value="circulars">Job Board</option>
+                    <option value="results">Results Portal</option>
+                    <option value="stats">Statistics Counter</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                {institution?.websiteConfig.sections.sort((a, b) => a.order - b.order).map((section, idx) => (
+                  <div key={section.id} className={cn(
+                    "bg-white p-6 rounded-3xl border transition-all group",
+                    section.active ? "border-gray-100 shadow-sm" : "border-gray-100 opacity-60 bg-gray-50/50"
+                  )}>
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="flex items-center gap-4">
+                        <div className="flex flex-col gap-1">
+                          <button 
+                            disabled={idx === 0}
+                            onClick={() => {
+                              if (!institution) return;
+                              const sections = [...institution.websiteConfig.sections];
+                              const prevIdx = sections.findIndex(s => s.order === section.order - 1);
+                              if (prevIdx !== -1) {
+                                sections[idx].order--;
+                                sections[prevIdx].order++;
+                                setInstitution({ ...institution, websiteConfig: { ...institution.websiteConfig, sections } });
+                              }
+                            }}
+                            className="p-1 hover:bg-gray-100 rounded text-gray-400 disabled:opacity-20"
+                          >
+                            <Plus className="w-3 h-3 rotate-180" />
+                          </button>
+                          <button 
+                            disabled={idx === (institution?.websiteConfig.sections.length || 0) - 1}
+                            onClick={() => {
+                              if (!institution) return;
+                              const sections = [...institution.websiteConfig.sections];
+                              const nextIdx = sections.findIndex(s => s.order === section.order + 1);
+                              if (nextIdx !== -1) {
+                                sections[idx].order++;
+                                sections[nextIdx].order--;
+                                setInstitution({ ...institution, websiteConfig: { ...institution.websiteConfig, sections } });
+                              }
+                            }}
+                            className="p-1 hover:bg-gray-100 rounded text-gray-400 disabled:opacity-20"
+                          >
+                            <Plus className="w-3 h-3" />
+                          </button>
+                        </div>
+                        <div className={cn(
+                          "w-12 h-12 rounded-2xl flex items-center justify-center",
+                          section.type === 'hero' ? 'bg-indigo-100 text-indigo-600' :
+                          section.type === 'news' ? 'bg-amber-100 text-amber-600' :
+                          section.type === 'results' ? 'bg-emerald-100 text-emerald-600' :
+                          'bg-gray-100 text-gray-600'
+                        )}>
+                          {section.type === 'hero' ? <Building className="w-6 h-6" /> :
+                           section.type === 'news' ? <Megaphone className="w-6 h-6" /> :
+                           section.type === 'results' ? <CheckCircle className="w-6 h-6" /> :
+                           section.type === 'gallery' ? <Info className="w-6 h-6" /> :
+                           <Layers className="w-6 h-6" />}
+                        </div>
+                        <div>
+                          <input 
+                            value={section.title || ''}
+                            onChange={(e) => {
+                              const sections = institution.websiteConfig.sections.map(s => s.id === section.id ? { ...s, title: e.target.value } : s);
+                              setInstitution({ ...institution, websiteConfig: { ...institution.websiteConfig, sections } });
+                            }}
+                            className="font-bold text-gray-900 bg-transparent border-none p-0 focus:ring-0 w-full outline-none"
+                            placeholder="Section Title"
+                          />
+                          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{section.type.replace('_', ' ')}</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <button 
+                          onClick={() => {
+                            const sections = institution.websiteConfig.sections.map(s => s.id === section.id ? { ...s, active: !s.active } : s);
+                            setInstitution({ ...institution, websiteConfig: { ...institution.websiteConfig, sections } });
+                          }}
+                          className={cn(
+                            "px-3 py-1.5 rounded-lg text-xs font-bold transition-all border",
+                            section.active ? "bg-emerald-50 text-emerald-600 border-emerald-100" : "bg-gray-50 text-gray-400 border-gray-200"
+                          )}
+                        >
+                          {section.active ? 'Active' : 'Hidden'}
+                        </button>
+                        {section.type === 'custom_text' && (
+                          <button 
+                            onClick={() => {
+                              setEditingSection(section);
+                              setShowSectionModal(true);
+                            }}
+                            className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                        )}
+                        {section.type === 'results' && (
+                          <button 
+                            onClick={() => {
+                              setEditingSection(section);
+                              setShowSectionModal(true);
+                            }}
+                            className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg"
+                          >
+                            <Settings className="w-4 h-4" />
+                          </button>
+                        )}
+                        <button 
+                          onClick={() => {
+                            if (!window.confirm('Delete this section?')) return;
+                            const sections = institution.websiteConfig.sections.filter(s => s.id !== section.id);
+                            setInstitution({ ...institution, websiteConfig: { ...institution.websiteConfig, sections } });
+                          }}
+                          className="p-2 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {section.type === 'custom_text' && section.content && (
+                      <div className="mt-4 p-4 bg-gray-50 rounded-2xl text-sm text-gray-600 italic line-clamp-2">
+                        {section.content}
+                      </div>
+                    )}
+                  </div>
+                ))}
+
+                {institution?.websiteConfig.sections.length === 0 && (
+                  <div className="text-center py-20 bg-gray-50 rounded-[40px] border-2 border-dashed border-gray-200">
+                    <Layers className="w-16 h-16 text-gray-200 mx-auto mb-4" />
+                    <p className="text-gray-400 font-bold italic">No sections added to your landing page yet.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Existing Lists for News, Events etc. (Management Areas) */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-8 border-t border-gray-100">
+                <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm space-y-6">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center text-amber-600">
                       <Megaphone className="w-5 h-5" />
                     </div>
-                    <h4 className="font-bold text-gray-900">News & Notices</h4>
+                    <h4 className="font-bold text-gray-900">Manage News & Notices</h4>
                   </div>
                   <button onClick={() => { setEditingItem(null); setShowNoticeModal(true); }} className="p-2 bg-indigo-50 text-indigo-600 rounded-lg transition-transform hover:scale-110"><Plus className="w-4 h-4" /></button>
                 </div>
-                <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
                   {notices.map(n => (
                     <div key={n.id} className="p-4 bg-gray-50 rounded-2xl border border-gray-100 flex items-center justify-between group hover:bg-white hover:shadow-md transition-all">
                       <div className="min-w-0">
@@ -793,26 +1062,20 @@ export function Institution() {
                       </div>
                     </div>
                   ))}
-                  {notices.length === 0 && (
-                    <div className="text-center py-12 space-y-3">
-                      <Newspaper className="w-12 h-12 text-gray-200 mx-auto" />
-                      <p className="text-gray-400 text-sm italic">No notices published yet.</p>
-                    </div>
-                  )}
                 </div>
               </div>
 
-              <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm space-y-6">
+               <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm space-y-6">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center text-indigo-600">
                       <Calendar className="w-5 h-5" />
                     </div>
-                    <h4 className="font-bold text-gray-900">Events</h4>
+                    <h4 className="font-bold text-gray-900">Manage Events</h4>
                   </div>
                   <button onClick={() => { setEditingItem(null); setShowEventModal(true); }} className="p-2 bg-indigo-50 text-indigo-600 rounded-lg transition-transform hover:scale-110"><Plus className="w-4 h-4" /></button>
                 </div>
-                <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
                   {events.map(e => (
                     <div key={e.id} className="p-4 bg-gray-50 rounded-2xl border border-gray-100 flex items-center justify-between group hover:bg-white hover:shadow-md transition-all">
                       <div className="min-w-0">
@@ -825,52 +1088,8 @@ export function Institution() {
                       </div>
                     </div>
                   ))}
-                  {events.length === 0 && (
-                    <div className="text-center py-12 space-y-3">
-                      <Calendar className="w-12 h-12 text-gray-200 mx-auto" />
-                      <p className="text-gray-400 text-sm italic">No upcoming events.</p>
-                    </div>
-                  )}
                 </div>
               </div>
-            </div>
-
-            <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm space-y-6">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-emerald-100 rounded-2xl flex items-center justify-center text-emerald-600">
-                    <Briefcase className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <h3 className="text-xl font-bold text-gray-900">Job Circulars</h3>
-                    <p className="text-sm text-gray-500">Recruit teachers and staff directly through your landing page.</p>
-                  </div>
-                </div>
-                <button onClick={() => { setEditingItem(null); setShowCircularModal(true); }} className="px-6 py-2.5 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition-all text-sm flex items-center gap-2"><Plus className="w-4 h-4" /> Post New Circular</button>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {circulars.map(c => (
-                  <div key={c.id} className="p-6 bg-gray-50 rounded-2xl border border-gray-100 space-y-4 group relative hover:shadow-lg transition-all">
-                    <div className={cn("absolute top-6 right-6 px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-widest", c.active ? "bg-emerald-50 text-emerald-600" : "bg-gray-200 text-gray-500")}>
-                      {c.active ? 'Active' : 'Draft'}
-                    </div>
-                    <div>
-                      <h5 className="font-bold text-gray-900 pr-12 line-clamp-1">{c.title}</h5>
-                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Deadline: {c.deadline}</p>
-                    </div>
-                    <div className="flex items-center gap-2 pt-4 border-t border-gray-100">
-                      <button onClick={() => { setEditingItem(c); setShowCircularModal(true); }} className="flex-1 py-2 bg-white text-indigo-600 text-xs font-bold rounded-lg border border-gray-100 hover:bg-indigo-50 transition-all">Edit</button>
-                      <button onClick={() => handleDeleteItem('circulars', c.id)} className="p-2 bg-white text-rose-600 text-xs font-bold rounded-lg border border-rose-100 hover:bg-rose-50 transition-all"><Trash2 className="w-4 h-4" /></button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              {circulars.length === 0 && (
-                <div className="text-center py-12 space-y-3">
-                  <Briefcase className="w-12 h-12 text-gray-200 mx-auto" />
-                  <p className="text-gray-400 text-sm italic">No active circulars.</p>
-                </div>
-              )}
             </div>
           </motion.div>
         )}
@@ -1243,14 +1462,30 @@ export function Institution() {
             salaryRange: formData.get('salaryRange'),
             description: formData.get('description'),
             requirements: (formData.get('requirements') as string).split('\n').filter(r => r.trim()),
+            vacancies: formData.get('vacancies'),
+            education: formData.get('education'),
+            experience: formData.get('experience'),
+            jobType: formData.get('jobType'),
             active: formData.get('active') === 'on'
           });
         }} className="space-y-4">
-          <div className="space-y-1">
-            <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Job Title</label>
-            <input name="title" defaultValue={editingItem?.title} required className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500/20" />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Job Title</label>
+              <input name="title" defaultValue={editingItem?.title} required className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500/20" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Job Type</label>
+              <select name="jobType" defaultValue={editingItem?.jobType || 'Full Time'} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500/20">
+                <option>Full Time</option>
+                <option>Part Time</option>
+                <option>Contractual</option>
+                <option>Remote</option>
+              </select>
+            </div>
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-1">
               <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Deadline</label>
               <input name="deadline" type="date" defaultValue={editingItem?.deadline} required className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500/20" />
@@ -1259,7 +1494,23 @@ export function Institution() {
               <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Salary Range</label>
               <input name="salaryRange" defaultValue={editingItem?.salaryRange} placeholder="e.g. 15k - 20k" className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500/20" />
             </div>
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Vacancies</label>
+              <input name="vacancies" type="number" defaultValue={editingItem?.vacancies || 1} required className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500/20" />
+            </div>
           </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Min Education</label>
+              <input name="education" defaultValue={editingItem?.education} placeholder="e.g. Honours/Masters" required className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500/20" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Experience</label>
+              <input name="experience" defaultValue={editingItem?.experience} placeholder="e.g. 1-2 years or Fresher" required className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500/20" />
+            </div>
+          </div>
+
           <div className="space-y-1">
             <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Job Description</label>
             <textarea name="description" defaultValue={editingItem?.description} rows={3} required className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500/20 resize-none" />
@@ -1272,11 +1523,118 @@ export function Institution() {
             <input type="checkbox" name="active" defaultChecked={editingItem ? editingItem.active : true} className="w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500" />
             <label className="text-sm font-bold text-gray-700">Make this circular active</label>
           </div>
-          <button type="submit" disabled={isSaving} className="w-full py-3 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 disabled:opacity-50 transition-all">
-            {isSaving ? 'Saving...' : 'Save Circular'}
+          <button type="submit" disabled={isSaving} className="w-full py-4 bg-indigo-600 text-white font-bold rounded-2xl hover:bg-indigo-700 disabled:opacity-50 transition-all flex items-center justify-center gap-2 shadow-lg shadow-indigo-100">
+            {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
+            {editingItem ? 'Update Job Circular' : 'Post Job Circular'}
           </button>
         </form>
       </Modal>
+      <Modal 
+        isOpen={showSectionModal} 
+        onClose={() => setShowSectionModal(false)}
+        title={`Configure ${editingSection?.type.replace('_', ' ')} Section`}
+      >
+        <div className="space-y-6">
+          <div className="space-y-1">
+            <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Section Title</label>
+            <input 
+              value={editingSection?.title || ''} 
+              onChange={(e) => setEditingSection(prev => prev ? { ...prev, title: e.target.value } : null)}
+              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500/20" 
+            />
+          </div>
+
+          {editingSection?.type === 'custom_text' && (
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Section Content (HTML/Text)</label>
+              <textarea 
+                value={editingSection?.content || ''} 
+                onChange={(e) => setEditingSection(prev => prev ? { ...prev, content: e.target.value } : null)}
+                rows={10}
+                placeholder="Enter text, tips, or HTML content here..."
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500/20 resize-none font-mono" 
+              />
+            </div>
+          )}
+
+          {editingSection?.type === 'gallery' && (
+            <div className="space-y-4">
+              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1 block">Image Gallery</label>
+              <div className="grid grid-cols-3 gap-4">
+                {(editingSection.images || []).map((img, idx) => (
+                  <div key={idx} className="relative aspect-square rounded-xl overflow-hidden group">
+                    <img src={img} alt="" className="w-full h-full object-cover" />
+                    <button 
+                      onClick={() => {
+                        const images = editingSection.images?.filter((_, i) => i !== idx);
+                        setEditingSection({ ...editingSection, images });
+                      }}
+                      className="absolute top-1 right-1 p-1.5 bg-rose-600 text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  </div>
+                ))}
+                <label className="aspect-square rounded-xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center gap-2 hover:bg-gray-50 cursor-pointer transition-all">
+                  <Plus className="w-6 h-6 text-gray-400" />
+                  <span className="text-[10px] font-bold text-gray-400 uppercase">Add Photo</span>
+                  <input 
+                    type="file" 
+                    className="hidden" 
+                    accept="image/*"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      const base64 = await compressImage(file);
+                      const images = [...(editingSection.images || []), base64];
+                      setEditingSection({ ...editingSection, images });
+                    }} 
+                  />
+                </label>
+              </div>
+            </div>
+          )}
+
+          {editingSection?.type === 'results' && (
+            <div className="space-y-4">
+              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1 block">Quick Result Portal</label>
+              <div className="p-4 bg-indigo-50 rounded-2xl border border-indigo-100 italic text-xs text-indigo-700">
+                This section automatically lists your published exam results. No manual links needed.
+              </div>
+              <div className="space-y-2 max-h-[200px] overflow-y-auto">
+                {exams.filter(e => e.status === 'published').length === 0 ? (
+                  <p className="text-center py-4 text-gray-400 text-xs italic">No published exams found.</p>
+                ) : (
+                  exams.filter(e => e.status === 'published').map(e => (
+                    <div key={e.id} className="flex items-center gap-3 p-3 bg-white rounded-xl border border-gray-100">
+                      <div className="w-8 h-8 bg-emerald-100 rounded-lg flex items-center justify-center text-emerald-600">
+                        <CheckCircle className="w-4 h-4" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-bold text-gray-900 truncate">{e.title}</p>
+                        <p className="text-[10px] text-gray-500">{e.batchName} • {e.date}</p>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
+
+          <button 
+            onClick={() => {
+              if (!institution || !editingSection) return;
+              const sections = institution.websiteConfig.sections.map(s => s.id === editingSection.id ? editingSection : s);
+              setInstitution({ ...institution, websiteConfig: { ...institution.websiteConfig, sections } });
+              setShowSectionModal(false);
+            }} 
+            className="w-full py-4 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100"
+          >
+            Update Section
+          </button>
+        </div>
+      </Modal>
+
       <HiddenBioTemplate institution={institution} stats={stats} bioRef={bioRef} />
     </div>
   );

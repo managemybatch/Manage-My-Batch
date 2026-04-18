@@ -19,10 +19,20 @@ interface OfflineExam {
   batchName?: string;
   date?: string;
   totalMarks?: number;
+  hasSubSections?: boolean;
+  subSections?: {
+    name: string;
+    totalMarks: number;
+  }[];
   subjects?: {
     name: string;
     totalMarks: number;
     date: string;
+    hasSubSections?: boolean;
+    subSections?: {
+      name: string;
+      totalMarks: number;
+    }[];
   }[];
   status: 'pending' | 'completed';
   institutionName?: string;
@@ -75,6 +85,9 @@ export function OfflineExams() {
   const successStoryRef = useRef<HTMLDivElement>(null);
   const [selectedStudentForStory, setSelectedStudentForStory] = useState<any>(null);
   const [instData, setInstData] = useState<any>(null);
+  const [selectedStudentForResult, setSelectedStudentForResult] = useState<any>(null);
+  const markSheetRef = useRef<HTMLDivElement>(null);
+  const [isMarkSheetModalOpen, setIsMarkSheetModalOpen] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -136,7 +149,9 @@ export function OfflineExams() {
     batchId: '',
     date: new Date().toISOString().split('T')[0],
     totalMarks: 100,
-    subjects: [{ name: '', totalMarks: 100, date: new Date().toISOString().split('T')[0] }],
+    hasSubSections: false,
+    subSections: [{ name: '', totalMarks: 50 }],
+    subjects: [{ name: '', totalMarks: 100, date: new Date().toISOString().split('T')[0], hasSubSections: false, subSections: [{ name: '', totalMarks: 50 }] }],
     institutionName: '',
   });
 
@@ -232,7 +247,9 @@ export function OfflineExams() {
         batchId: batches[0]?.id || '',
         date: new Date().toISOString().split('T')[0],
         totalMarks: 100,
-        subjects: [{ name: '', totalMarks: 100, date: new Date().toISOString().split('T')[0] }],
+        hasSubSections: false,
+        subSections: [{ name: '', totalMarks: 50 }],
+        subjects: [{ name: '', totalMarks: 100, date: new Date().toISOString().split('T')[0], hasSubSections: false, subSections: [{ name: '', totalMarks: 50 }] }],
         institutionName: '',
       });
     } catch (error) {
@@ -277,7 +294,7 @@ export function OfflineExams() {
   const handleAddSubject = () => {
     setNewExam(prev => ({
       ...prev,
-      subjects: [...prev.subjects, { name: '', totalMarks: 100, date: new Date().toISOString().split('T')[0] }]
+      subjects: [...prev.subjects, { name: '', totalMarks: 100, date: new Date().toISOString().split('T')[0], hasSubSections: false, subSections: [{ name: '', totalMarks: 50 }] }]
     }));
   };
 
@@ -291,6 +308,14 @@ export function OfflineExams() {
   const handleSubjectChange = (index: number, field: string, value: any) => {
     const updatedSubjects = [...newExam.subjects];
     updatedSubjects[index] = { ...updatedSubjects[index], [field]: value };
+    
+    // Auto-update totalMarks if sub-sections changed
+    if (field === 'subSections' || field === 'hasSubSections') {
+      if (updatedSubjects[index].hasSubSections) {
+        updatedSubjects[index].totalMarks = updatedSubjects[index].subSections?.reduce((sum, s) => sum + s.totalMarks, 0) || 0;
+      }
+    }
+    
     setNewExam(prev => ({ ...prev, subjects: updatedSubjects }));
   };
 
@@ -321,11 +346,24 @@ export function OfflineExams() {
       let totalPossible = 0;
 
       if (selectedExam.type === 'single') {
-        totalObtained = marks['total'] || 0;
-        totalPossible = selectedExam.totalMarks || 100;
+        if (selectedExam.hasSubSections && selectedExam.subSections) {
+          selectedExam.subSections.forEach(ss => {
+            totalObtained += marks[ss.name] || 0;
+            totalPossible += ss.totalMarks;
+          });
+        } else {
+          totalObtained = marks['total'] || 0;
+          totalPossible = selectedExam.totalMarks || 100;
+        }
       } else {
         selectedExam.subjects?.forEach(s => {
-          totalObtained += marks[s.name] || 0;
+          if (s.hasSubSections && s.subSections) {
+            s.subSections.forEach(ss => {
+              totalObtained += marks[`${s.name}_${ss.name}`] || 0;
+            });
+          } else {
+            totalObtained += marks[s.name] || 0;
+          }
           totalPossible += s.totalMarks;
         });
       }
@@ -697,6 +735,148 @@ export function OfflineExams() {
             </div>
           </div>
 
+          <div className="flex items-center gap-2">
+            <input 
+              type="checkbox" 
+              id="newExamHasSubSections" 
+              checked={newExam.hasSubSections} 
+              onChange={e => setNewExam(prev => ({ ...prev, hasSubSections: e.target.checked }))}
+              className="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+            />
+            <label htmlFor="newExamHasSubSections" className="text-sm font-medium text-gray-700">
+              Enable Sub-sections (e.g., MCQ, CQ, Viva)
+            </label>
+          </div>
+
+          {newExam.hasSubSections && newExam.type === 'single' && (
+            <div className="space-y-3 bg-indigo-50/50 p-4 rounded-xl border border-indigo-100">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-bold text-indigo-700 uppercase tracking-widest">Sub-sections</span>
+                <button 
+                  type="button" 
+                  onClick={() => setNewExam(prev => ({ ...prev, subSections: [...prev.subSections, { name: '', totalMarks: 0 }] }))}
+                  className="text-xs font-bold text-indigo-600 hover:text-indigo-700 flex items-center gap-1"
+                >
+                  <Plus className="w-3 h-3" /> Add Part
+                </button>
+              </div>
+              {newExam.subSections.map((ss, idx) => (
+                <div key={idx} className="flex gap-2">
+                  <input 
+                    type="text" 
+                    placeholder="Part Name" 
+                    value={ss.name} 
+                    onChange={e => {
+                      const updated = [...newExam.subSections];
+                      updated[idx].name = e.target.value;
+                      setNewExam({...newExam, subSections: updated});
+                    }}
+                    className="flex-1 px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs"
+                    required
+                  />
+                  <input 
+                    type="number" 
+                    placeholder="Marks" 
+                    value={ss.totalMarks || ''} 
+                    onChange={e => {
+                      const updated = [...newExam.subSections];
+                      updated[idx].totalMarks = parseInt(e.target.value) || 0;
+                      const total = updated.reduce((sum, s) => sum + s.totalMarks, 0);
+                      setNewExam({...newExam, subSections: updated, totalMarks: total});
+                    }}
+                    className="w-20 px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs"
+                    required
+                  />
+                  <button 
+                    type="button" 
+                    onClick={() => {
+                      const updated = newExam.subSections.filter((_, i) => i !== idx);
+                      const total = updated.reduce((sum, s) => sum + s.totalMarks, 0);
+                      setNewExam({...newExam, subSections: updated, totalMarks: total});
+                    }}
+                    className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg"
+                  >
+                    <Plus className="w-4 h-4 rotate-45" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="flex items-center gap-2">
+            <input 
+              type="checkbox" 
+              id="hasSubSections" 
+              checked={newExam.hasSubSections} 
+              onChange={e => {
+                const checked = e.target.checked;
+                setNewExam(prev => ({
+                  ...prev, 
+                  hasSubSections: checked,
+                }));
+              }}
+              className="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+            />
+            <label htmlFor="hasSubSections" className="text-sm font-medium text-gray-700">
+              Enable Sub-sections (e.g., MCQ, CQ, Viva)
+            </label>
+          </div>
+
+          {newExam.hasSubSections && newExam.type === 'single' && (
+            <div className="space-y-3 bg-indigo-50/50 p-4 rounded-xl border border-indigo-100">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-bold text-indigo-700 uppercase tracking-widest">Sub-sections</span>
+                <button 
+                  type="button" 
+                  onClick={() => setNewExam(prev => ({ ...prev, subSections: [...prev.subSections, { name: '', totalMarks: 0 }] }))}
+                  className="text-xs font-bold text-indigo-600 hover:text-indigo-700 flex items-center gap-1"
+                >
+                  <Plus className="w-3 h-3" /> Add Part
+                </button>
+              </div>
+              {newExam.subSections.map((ss, idx) => (
+                <div key={idx} className="flex gap-2">
+                  <input 
+                    type="text" 
+                    placeholder="Part Name (e.g. MCQ)" 
+                    value={ss.name} 
+                    onChange={e => {
+                      const updated = [...newExam.subSections];
+                      updated[idx].name = e.target.value;
+                      setNewExam({...newExam, subSections: updated});
+                    }}
+                    className="flex-1 px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs"
+                    required
+                  />
+                  <input 
+                    type="number" 
+                    placeholder="Marks" 
+                    value={ss.totalMarks || ''} 
+                    onChange={e => {
+                      const updated = [...newExam.subSections];
+                      updated[idx].totalMarks = parseInt(e.target.value) || 0;
+                      const total = updated.reduce((sum, s) => sum + s.totalMarks, 0);
+                      setNewExam({...newExam, subSections: updated, totalMarks: total});
+                    }}
+                    className="w-20 px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs"
+                    required
+                  />
+                  <button 
+                    type="button" 
+                    onClick={() => {
+                      const updated = newExam.subSections.filter((_, i) => i !== idx);
+                      const total = updated.reduce((sum, s) => sum + s.totalMarks, 0);
+                      setNewExam({...newExam, subSections: updated, totalMarks: total});
+                    }}
+                    className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg"
+                  >
+                    <Plus className="w-4 h-4 rotate-45" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">{t('offlineExams.modal.examTitle')}</label>
@@ -778,8 +958,12 @@ export function OfflineExams() {
                         required
                         type="number"
                         value={subject.totalMarks}
+                        readOnly={subject.hasSubSections}
                         onChange={e => handleSubjectChange(index, 'totalMarks', parseInt(e.target.value))}
-                        className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                        className={cn(
+                          "w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20",
+                          subject.hasSubSections && "bg-gray-100 cursor-not-allowed"
+                        )}
                       />
                     </div>
                     <div className="col-span-3 space-y-1">
@@ -799,8 +983,77 @@ export function OfflineExams() {
                         className="p-2 text-gray-400 hover:text-rose-600 transition-colors"
                         disabled={newExam.subjects.length === 1}
                       >
-                        <MoreVertical className="w-4 h-4" />
+                        <Plus className="w-4 h-4 rotate-45" />
                       </button>
+                    </div>
+
+                    <div className="col-span-12 mt-2 pt-2 border-t border-gray-100">
+                      <div className="flex items-center gap-4">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input 
+                            type="checkbox" 
+                            checked={subject.hasSubSections} 
+                            onChange={e => handleSubjectChange(index, 'hasSubSections', e.target.checked)}
+                            className="w-3 h-3 rounded text-indigo-600 focus:ring-indigo-500"
+                          />
+                          <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Has Parts (MCQ/CQ)</span>
+                        </label>
+                        {subject.hasSubSections && (
+                          <button 
+                            type="button" 
+                            onClick={() => {
+                              const ss = [...(subject.subSections || []), { name: '', totalMarks: 0 }];
+                              handleSubjectChange(index, 'subSections', ss);
+                            }}
+                            className="text-[10px] font-bold text-indigo-600 hover:text-indigo-700 underline"
+                          >
+                            + Add Part
+                          </button>
+                        )}
+                      </div>
+                      
+                      {subject.hasSubSections && (
+                        <div className="mt-2 space-y-2 grid grid-cols-2 gap-2">
+                          {(subject.subSections || []).map((ss, ssIdx) => (
+                            <div key={ssIdx} className="flex gap-2 p-2 bg-white rounded border border-gray-200 shadow-sm relative group/part">
+                              <input 
+                                type="text" 
+                                placeholder="Part Name" 
+                                value={ss.name} 
+                                onChange={e => {
+                                  const updated = [...(subject.subSections || [])];
+                                  updated[ssIdx].name = e.target.value;
+                                  handleSubjectChange(index, 'subSections', updated);
+                                }}
+                                className="flex-1 px-2 py-1 text-[10px] border border-gray-100 rounded"
+                                required
+                              />
+                              <input 
+                                type="number" 
+                                placeholder="Marks" 
+                                value={ss.totalMarks || ''} 
+                                onChange={e => {
+                                  const updated = [...(subject.subSections || [])];
+                                  updated[ssIdx].totalMarks = parseInt(e.target.value) || 0;
+                                  handleSubjectChange(index, 'subSections', updated);
+                                }}
+                                className="w-12 px-2 py-1 text-[10px] border border-gray-100 rounded"
+                                required
+                              />
+                              <button 
+                                type="button" 
+                                onClick={() => {
+                                  const updated = (subject.subSections || []).filter((_, i) => i !== ssIdx);
+                                  handleSubjectChange(index, 'subSections', updated);
+                                }}
+                                className="p-1 text-rose-500 hover:bg-rose-50 rounded hidden group-hover/part:block absolute -right-1 -top-1 bg-white border border-rose-100"
+                              >
+                                <Plus className="w-3 h-3 rotate-45" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -808,7 +1061,12 @@ export function OfflineExams() {
             </div>
           )}
 
-          <button type="submit" className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200">
+          <button 
+            type="submit" 
+            disabled={isSaving}
+            className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          >
+            {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
             {t('offlineExams.modal.submitCreate')}
           </button>
         </form>
@@ -841,6 +1099,74 @@ export function OfflineExams() {
                 />
               </div>
             </div>
+
+            <div className="flex items-center gap-2">
+              <input 
+                type="checkbox" 
+                id="editExamHasSubSections" 
+                checked={editingExam.hasSubSections} 
+                onChange={e => setEditingExam(prev => prev ? ({ ...prev, hasSubSections: e.target.checked, subSections: prev.subSections || [{ name: '', totalMarks: 0 }] }) : null)}
+                className="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+              />
+              <label htmlFor="editExamHasSubSections" className="text-sm font-medium text-gray-700">
+                Enable Sub-sections (e.g., MCQ, CQ, Viva)
+              </label>
+            </div>
+
+            {editingExam.hasSubSections && editingExam.type === 'single' && (
+              <div className="space-y-3 bg-indigo-50/50 p-4 rounded-xl border border-indigo-100">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-bold text-indigo-700 uppercase tracking-widest">Sub-sections</span>
+                  <button 
+                    type="button" 
+                    onClick={() => setEditingExam(prev => prev ? ({ ...prev, subSections: [...(prev.subSections || []), { name: '', totalMarks: 0 }] }) : null)}
+                    className="text-xs font-bold text-indigo-600 hover:text-indigo-700 flex items-center gap-1"
+                  >
+                    <Plus className="w-3 h-3" /> Add Part
+                  </button>
+                </div>
+                {(editingExam.subSections || []).map((ss, idx) => (
+                  <div key={idx} className="flex gap-2">
+                    <input 
+                      type="text" 
+                      placeholder="Part Name" 
+                      value={ss.name} 
+                      onChange={e => {
+                        const updated = [...(editingExam.subSections || [])];
+                        updated[idx].name = e.target.value;
+                        setEditingExam({...editingExam, subSections: updated});
+                      }}
+                      className="flex-1 px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs"
+                      required
+                    />
+                    <input 
+                      type="number" 
+                      placeholder="Marks" 
+                      value={ss.totalMarks || ''} 
+                      onChange={e => {
+                        const updated = [...(editingExam.subSections || [])];
+                        updated[idx].totalMarks = parseInt(e.target.value) || 0;
+                        const total = updated.reduce((sum, s) => sum + s.totalMarks, 0);
+                        setEditingExam({...editingExam, subSections: updated, totalMarks: total});
+                      }}
+                      className="w-20 px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs"
+                      required
+                    />
+                    <button 
+                      type="button" 
+                      onClick={() => {
+                        const updated = (editingExam.subSections || []).filter((_, i) => i !== idx);
+                        const total = updated.reduce((sum, s) => sum + s.totalMarks, 0);
+                        setEditingExam({...editingExam, subSections: updated, totalMarks: total});
+                      }}
+                      className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg"
+                    >
+                      <Plus className="w-4 h-4 rotate-45" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -1460,9 +1786,10 @@ export function OfflineExams() {
                 <div className="flex gap-2">
                   <button 
                     onClick={handleSaveResults}
-                    className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-xs font-bold hover:bg-emerald-700 transition-all flex items-center gap-2 shadow-md shadow-emerald-100"
+                    disabled={isSaving}
+                    className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-xs font-bold hover:bg-emerald-700 transition-all flex items-center gap-2 shadow-md shadow-emerald-100 disabled:opacity-50"
                   >
-                    <Save className="w-4 h-4" />
+                    {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                     {t('offlineExams.manage.results.save')}
                   </button>
                   <button 
@@ -1476,89 +1803,261 @@ export function OfflineExams() {
                 </div>
               </div>
 
-              <div className="overflow-x-auto bg-white rounded-2xl border border-gray-100 shadow-sm">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="bg-gray-50 border-b border-gray-100">
-                      <th className="py-4 px-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">Rank</th>
-                      <th className="py-4 px-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">Roll</th>
-                      <th className="py-4 px-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">Student Name</th>
-                      {selectedExam?.type === 'single' ? (
-                        <th className="py-4 px-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">Marks (/{selectedExam.totalMarks})</th>
-                      ) : (
-                        selectedExam?.subjects?.map((s, i) => (
-                          <th key={i} className="py-4 px-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">{s.name} (/{s.totalMarks})</th>
-                        ))
-                      )}
-                      <th className="py-4 px-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">Total</th>
-                      <th className="py-4 px-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">Grade</th>
-                      <th className="py-4 px-6 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {getRankedStudents().map((student) => (
-                      <tr key={student.id} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
-                        <td className="py-4 px-6">
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                {/* Desktop Table */}
+                <div className="hidden lg:block overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-gray-50 border-b border-gray-100">
+                        <th className="py-4 px-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">Rank</th>
+                        <th className="py-4 px-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">Roll</th>
+                        <th className="py-4 px-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">Student Name</th>
+                        {selectedExam?.type === 'single' ? (
+                          selectedExam.hasSubSections ? (
+                            selectedExam.subSections?.map((ss, idx) => (
+                              <th key={idx} className="py-4 px-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">{ss.name} (/{ss.totalMarks})</th>
+                            ))
+                          ) : (
+                            <th className="py-4 px-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">Marks (/{selectedExam.totalMarks})</th>
+                          )
+                        ) : (
+                          selectedExam?.subjects?.map((s, i) => (
+                            s.hasSubSections ? (
+                              s.subSections?.map((ss, idx) => (
+                                <th key={`${i}-${idx}`} className="py-4 px-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">{s.name} - {ss.name} (/{ss.totalMarks})</th>
+                              ))
+                            ) : (
+                              <th key={i} className="py-4 px-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">{s.name} (/{s.totalMarks})</th>
+                            )
+                          ))
+                        )}
+                        <th className="py-4 px-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">Total</th>
+                        <th className="py-4 px-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">Grade</th>
+                        <th className="py-4 px-6 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {getRankedStudents().map((student) => (
+                        <tr key={student.id} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
+                          <td className="py-4 px-6">
+                            <span className={cn(
+                              "w-6 h-6 flex items-center justify-center rounded-full text-[10px] font-black",
+                              student.rank === 1 ? "bg-amber-100 text-amber-700" : 
+                              student.rank === 2 ? "bg-slate-100 text-slate-700" :
+                              student.rank === 3 ? "bg-orange-100 text-orange-700" : "bg-gray-100 text-gray-500"
+                            )}>
+                              {student.rank}
+                            </span>
+                          </td>
+                          <td className="py-4 px-6 text-sm font-mono text-indigo-600 font-bold">{student.rollNo}</td>
+                          <td className="py-4 px-6 text-sm font-bold text-gray-900">{student.name}</td>
+                          {selectedExam?.type === 'single' ? (
+                            selectedExam.hasSubSections ? (
+                              selectedExam.subSections?.map((ss, idx) => (
+                                <td key={idx} className="py-4 px-6">
+                                  <input 
+                                    type="number" 
+                                    value={studentMarks[student.id]?.[ss.name] || ''}
+                                    onChange={(e) => handleMarkChange(student.id, ss.name, e.target.value)}
+                                    className="w-20 px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-sm font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500/20" 
+                                    placeholder="0" 
+                                  />
+                                </td>
+                              ))
+                            ) : (
+                              <td className="py-4 px-6">
+                                <input 
+                                  type="number" 
+                                  value={studentMarks[student.id]?.['total'] || ''}
+                                  onChange={(e) => handleMarkChange(student.id, 'total', e.target.value)}
+                                  className="w-24 px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-sm font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500/20" 
+                                  placeholder="0" 
+                                />
+                              </td>
+                            )
+                          ) : (
+                            selectedExam?.subjects?.map((s, i) => (
+                              s.hasSubSections ? (
+                                s.subSections?.map((ss, idx) => (
+                                  <td key={`${i}-${idx}`} className="py-4 px-6">
+                                    <input 
+                                      type="number" 
+                                      value={studentMarks[student.id]?.[`${s.name}_${ss.name}`] || ''}
+                                      onChange={(e) => handleMarkChange(student.id, `${s.name}_${ss.name}`, e.target.value)}
+                                      className="w-20 px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-sm font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500/20" 
+                                      placeholder="0" 
+                                    />
+                                  </td>
+                                ))
+                              ) : (
+                                <td key={i} className="py-4 px-6">
+                                  <input 
+                                    type="number" 
+                                    value={studentMarks[student.id]?.[s.name] || ''}
+                                    onChange={(e) => handleMarkChange(student.id, s.name, e.target.value)}
+                                    className="w-24 px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-sm font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500/20" 
+                                    placeholder="0" 
+                                  />
+                                </td>
+                              )
+                            ))
+                          )}
+                          <td className="py-4 px-6 text-sm font-black text-indigo-600">{student.totalObtained}</td>
+                          <td className="py-4 px-6">
+                            <span className={cn(
+                              "px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-widest",
+                              student.grade === 'A+' ? "bg-emerald-100 text-emerald-700" :
+                              student.grade === 'F' ? "bg-rose-100 text-rose-700" : "bg-indigo-100 text-indigo-700"
+                            )}>
+                              {student.grade}
+                            </span>
+                          </td>
+                          <td className="py-4 px-6 text-center">
+                            <div className="flex items-center justify-center gap-2">
+                              <button
+                                onClick={() => {
+                                  setSelectedStudentForStory(student);
+                                  setIsSuccessStoryModalOpen(true);
+                                }}
+                                className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
+                                title="Generate Success Story Image"
+                              >
+                                <ImageIcon className="w-5 h-5" />
+                              </button>
+                              {selectedExam?.type === 'school' && (
+                                <button
+                                  onClick={() => {
+                                    setSelectedStudentForResult(student);
+                                    setIsMarkSheetModalOpen(true);
+                                  }}
+                                  className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
+                                  title="Download Marksheet"
+                                >
+                                  <Award className="w-5 h-5" />
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Mobile Results Cards */}
+                <div className="lg:hidden divide-y divide-gray-100">
+                  {getRankedStudents().map((student) => (
+                    <div key={student.id} className="p-4 space-y-4">
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center gap-3">
                           <span className={cn(
-                            "w-6 h-6 flex items-center justify-center rounded-full text-[10px] font-black",
+                            "w-8 h-8 flex items-center justify-center rounded-full text-xs font-black shrink-0",
                             student.rank === 1 ? "bg-amber-100 text-amber-700" : 
                             student.rank === 2 ? "bg-slate-100 text-slate-700" :
                             student.rank === 3 ? "bg-orange-100 text-orange-700" : "bg-gray-100 text-gray-500"
                           )}>
                             {student.rank}
                           </span>
-                        </td>
-                        <td className="py-4 px-6 text-sm font-mono text-indigo-600 font-bold">{student.rollNo}</td>
-                        <td className="py-4 px-6 text-sm font-bold text-gray-900">{student.name}</td>
-                        {selectedExam?.type === 'single' ? (
-                          <td className="py-4 px-6">
-                            <input 
-                              type="number" 
-                              value={studentMarks[student.id]?.['total'] || ''}
-                              onChange={(e) => handleMarkChange(student.id, 'total', e.target.value)}
-                              className="w-24 px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-sm font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500/20" 
-                              placeholder="0" 
-                            />
-                          </td>
-                        ) : (
-                          selectedExam?.subjects?.map((s, i) => (
-                            <td key={i} className="py-4 px-6">
-                              <input 
-                                type="number" 
-                                value={studentMarks[student.id]?.[s.name] || ''}
-                                onChange={(e) => handleMarkChange(student.id, s.name, e.target.value)}
-                                className="w-24 px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-sm font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500/20" 
-                                placeholder="0" 
-                              />
-                            </td>
-                          ))
-                        )}
-                        <td className="py-4 px-6 text-sm font-black text-indigo-600">{student.totalObtained}</td>
-                        <td className="py-4 px-6">
+                          <div>
+                            <p className="font-black text-gray-900 leading-tight">{student.name}</p>
+                            <p className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest mt-0.5">Roll: {student.rollNo}</p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-lg font-black text-indigo-600">{student.totalObtained}</p>
                           <span className={cn(
-                            "px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-widest",
+                            "px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest block mt-1",
                             student.grade === 'A+' ? "bg-emerald-100 text-emerald-700" :
                             student.grade === 'F' ? "bg-rose-100 text-rose-700" : "bg-indigo-100 text-indigo-700"
                           )}>
                             {student.grade}
                           </span>
-                        </td>
-                        <td className="py-4 px-6 text-center">
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        {selectedExam?.type === 'single' ? (
+                          selectedExam.hasSubSections ? (
+                            selectedExam.subSections?.map((ss, idx) => (
+                              <div key={idx} className="space-y-1">
+                                <label className="text-[10px] font-bold text-gray-400 uppercase">{ss.name} (/{ss.totalMarks})</label>
+                                <input 
+                                  type="number" 
+                                  value={studentMarks[student.id]?.[ss.name] || ''}
+                                  onChange={(e) => handleMarkChange(student.id, ss.name, e.target.value)}
+                                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold" 
+                                  placeholder="0" 
+                                />
+                              </div>
+                            ))
+                          ) : (
+                            <div className="col-span-2 space-y-1">
+                              <label className="text-[10px] font-bold text-gray-400 uppercase">Marks (/{selectedExam.totalMarks})</label>
+                              <input 
+                                type="number" 
+                                value={studentMarks[student.id]?.['total'] || ''}
+                                onChange={(e) => handleMarkChange(student.id, 'total', e.target.value)}
+                                className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold" 
+                                placeholder="0" 
+                              />
+                            </div>
+                          )
+                        ) : (
+                          selectedExam?.subjects?.map((s, i) => (
+                            s.hasSubSections ? (
+                              s.subSections?.map((ss, idx) => (
+                                <div key={`${i}-${idx}`} className="space-y-1">
+                                  <label className="text-[10px] font-bold text-gray-400 uppercase">{s.name} - {ss.name}</label>
+                                  <input 
+                                    type="number" 
+                                    value={studentMarks[student.id]?.[`${s.name}_${ss.name}`] || ''}
+                                    onChange={(e) => handleMarkChange(student.id, `${s.name}_${ss.name}`, e.target.value)}
+                                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold" 
+                                    placeholder="0" 
+                                  />
+                                </div>
+                              ))
+                            ) : (
+                              <div key={i} className="space-y-1">
+                                <label className="text-[10px] font-bold text-gray-400 uppercase">{s.name} (/{s.totalMarks})</label>
+                                <input 
+                                  type="number" 
+                                  value={studentMarks[student.id]?.[s.name] || ''}
+                                  onChange={(e) => handleMarkChange(student.id, s.name, e.target.value)}
+                                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold" 
+                                  placeholder="0" 
+                                />
+                              </div>
+                            )
+                          ))
+                        )}
+                      </div>
+
+                      <div className="flex gap-2 pt-2">
+                        <button
+                          onClick={() => {
+                            setSelectedStudentForStory(student);
+                            setIsSuccessStoryModalOpen(true);
+                          }}
+                          className="flex-1 py-2.5 bg-indigo-50 text-indigo-600 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2"
+                        >
+                          <ImageIcon className="w-3.5 h-3.5" /> Success Story
+                        </button>
+                        {selectedExam?.type === 'school' && (
                           <button
                             onClick={() => {
-                              setSelectedStudentForStory(student);
-                              setIsSuccessStoryModalOpen(true);
+                              setSelectedStudentForResult(student);
+                              setIsMarkSheetModalOpen(true);
                             }}
-                            className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
-                            title="Generate Success Story Image"
+                            className="flex-1 py-2.5 bg-emerald-50 text-emerald-600 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2"
                           >
-                            <ImageIcon className="w-5 h-5" />
+                            <Award className="w-3.5 h-3.5" /> Marksheet
                           </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
               
               {/* PDF Template for Results (Off-screen) */}
@@ -1671,6 +2170,138 @@ export function OfflineExams() {
         variant="info"
         confirmText={t('common.ok', { defaultValue: 'OK' })}
       />
+
+      {/* Individual Marksheet PDF Modal */}
+      <Modal 
+        isOpen={isMarkSheetModalOpen} 
+        onClose={() => setIsMarkSheetModalOpen(false)} 
+        title={`Marksheet: ${selectedStudentForResult?.name}`}
+        maxWidth="max-w-4xl"
+      >
+        <div className="space-y-6">
+          <div className="flex justify-end gap-2">
+            <button 
+              onClick={() => generatePDF(markSheetRef, `Marksheet_${selectedStudentForResult?.rollNo}_${selectedStudentForResult?.name}`)}
+              disabled={isGeneratingPDF}
+              className="px-6 py-2 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-700 transition-all flex items-center gap-2 disabled:opacity-50"
+            >
+              {isGeneratingPDF ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+              Download Marksheet
+            </button>
+          </div>
+
+          <div className="bg-gray-100 p-8 rounded-2xl overflow-auto flex justify-center">
+            <div ref={markSheetRef} className="bg-white p-12 w-[210mm] relative shadow-xl font-sans" style={{ minHeight: '297mm' }}>
+              <div className="border-[12px] border-double p-10 h-full relative z-10" style={{ borderColor: '#4f46e5', minHeight: '281mm' }}>
+                <div className="text-center mb-12">
+                   <div className="flex items-center justify-center gap-6 mb-8">
+                    {user?.photoURL && <img src={user.photoURL} className="border-4" referrerPolicy="no-referrer" style={{ width: '80px', height: '80px', borderRadius: '1rem', borderColor: '#4f46e5' }} />}
+                    <div className="text-left">
+                      <h1 className="text-4xl font-black uppercase tracking-tighter" style={{ color: '#4f46e5' }}>{selectedExam?.institutionName}</h1>
+                      <p className="font-bold uppercase tracking-[0.2em] text-[10px] mt-1" style={{ color: '#6b7280' }}>Progress Report Card</p>
+                    </div>
+                  </div>
+                  <h2 className="text-2xl font-black uppercase mb-2" style={{ color: '#111827' }}>Marksheet</h2>
+                  <p className="text-lg font-bold text-indigo-600 uppercase tracking-widest">{selectedExam?.title}</p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-8 mb-10 pb-8 border-b-2 border-dashed border-gray-100">
+                  <div className="space-y-4">
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1">Student Name</p>
+                      <p className="text-xl font-black text-gray-900">{selectedStudentForResult?.name}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1">Batch Group</p>
+                      <p className="text-lg font-bold text-gray-700">{selectedExam?.batchName}</p>
+                    </div>
+                  </div>
+                  <div className="space-y-4">
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1">Roll Number</p>
+                      <p className="text-xl font-black text-indigo-600 font-mono">{selectedStudentForResult?.rollNo}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1">Issue Date</p>
+                      <p className="text-lg font-bold text-gray-700">{new Date().toLocaleDateString()}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="overflow-hidden border-2 rounded-[2rem]" style={{ borderColor: '#eef2ff' }}>
+                  <table className="w-full border-collapse">
+                    <thead>
+                      <tr style={{ backgroundColor: '#4f46e5', color: '#ffffff' }}>
+                        <th className="py-5 px-8 text-left font-black uppercase tracking-widest text-[10px]">Subject Name</th>
+                        <th className="py-5 px-8 text-center font-black uppercase tracking-widest text-[10px]">Full Marks</th>
+                        <th className="py-5 px-8 text-center font-black uppercase tracking-widest text-[10px]">Marks Obtained</th>
+                        <th className="py-5 px-8 text-center font-black uppercase tracking-widest text-[10px]">Grade</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {selectedExam?.subjects?.map((s, idx) => {
+                        const marks = studentMarks[selectedStudentForResult?.id] || {};
+                        let obtained = 0;
+                        if (s.hasSubSections && s.subSections) {
+                          s.subSections.forEach(ss => {
+                            obtained += marks[`${s.name}_${ss.name}`] || 0;
+                          });
+                        } else {
+                          obtained = marks[s.name] || 0;
+                        }
+                        const grade = calculateGrade(obtained, s.totalMarks);
+                        
+                        return (
+                          <tr key={idx} className="border-b" style={{ borderColor: '#f8fafc', backgroundColor: idx % 2 === 0 ? '#ffffff' : '#f8fafc' }}>
+                            <td className="py-5 px-8">
+                              <p className="font-bold text-gray-900">{s.name}</p>
+                              {s.hasSubSections && s.subSections && (
+                                <div className="mt-1 flex gap-2">
+                                  {s.subSections.map((ss, ssIdx) => (
+                                    <span key={ssIdx} className="text-[9px] font-medium text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded leading-none">
+                                      {ss.name}: {marks[`${s.name}_${ss.name}`] || 0}/{ss.totalMarks}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </td>
+                            <td className="py-5 px-8 text-center font-bold text-gray-600">{s.totalMarks}</td>
+                            <td className="py-5 px-8 text-center font-black text-indigo-600">{obtained}</td>
+                            <td className="py-5 px-8 text-center">
+                              <span className="font-black text-indigo-700">{grade}</span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                      <tr className="bg-indigo-600 text-white">
+                        <td className="py-6 px-8 font-black uppercase tracking-[0.2em] text-xs">Final Result</td>
+                        <td className="py-6 px-8 text-center font-black text-lg">{selectedStudentForResult?.totalPossible}</td>
+                        <td className="py-6 px-8 text-center font-black text-lg">{selectedStudentForResult?.totalObtained}</td>
+                        <td className="py-6 px-8 text-center font-black text-lg">{selectedStudentForResult?.grade}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="mt-12 grid grid-cols-2 gap-20 px-10 pb-20">
+                    <div className="text-center">
+                      <div className="h-px w-full mb-2 bg-gray-200"></div>
+                      <p className="font-black uppercase text-[10px] tracking-widest text-gray-900">Guardian Sign</p>
+                    </div>
+                    <div className="text-center">
+                      <div className="h-px w-full mb-2 bg-gray-200"></div>
+                      <p className="font-black uppercase text-[10px] tracking-widest text-gray-900">Principal Sign</p>
+                    </div>
+                </div>
+
+                <div className="absolute bottom-8 left-0 right-0 text-center">
+                   <p className="text-[8px] font-black uppercase tracking-[0.4em] text-gray-300">Generated by Manage My Batch Management System</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </Modal>
 
       {/* Share Modal */}
       <Modal 

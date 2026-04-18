@@ -549,7 +549,13 @@ const resources = {
           applications: "Job Applications",
           requirements: "Requirements",
           apply: "Apply Now",
-          shareLink: "Share Circular Link"
+          shareLink: "Share Circular Link",
+          vacancies: "Number of People Needed",
+          salaryRange: "Salary Range",
+          deadline: "Deadline",
+          education: "Required Education Status",
+          experience: "Exp. Needed",
+          description: "Job Description"
         }
       },
       studentProfile: {
