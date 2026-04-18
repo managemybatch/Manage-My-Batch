@@ -24,7 +24,8 @@ import {
   Download,
   Image as ImageIcon,
   Sparkles,
-  Cake
+  Cake,
+  BoxIcon
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { motion } from 'motion/react';
@@ -309,7 +310,9 @@ export function Dashboard() {
       const link = document.createElement('a');
       link.download = `Birthday_Card_${selectedStudentForBirthday?.name}.png`;
       link.href = canvas.toDataURL('image/png');
+      document.body.appendChild(link);
       link.click();
+      document.body.removeChild(link);
     } catch (error) {
       console.error('Birthday Card Error:', error);
     } finally {
@@ -845,10 +848,19 @@ export function Dashboard() {
 
                 <div className="mt-16 flex items-center justify-between w-full border-t border-gray-100 pt-10">
                    <div className="flex items-center gap-4">
-                      <Sparkles className="w-8 h-8 text-amber-400" />
-                      <p className="text-lg font-bold text-gray-400 uppercase tracking-widest">A Proud Member of our Batch</p>
+                      <div className="text-right">
+                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest italic leading-none">Powered by</p>
+                        <p className="text-xl font-black text-indigo-600 tracking-tighter leading-none mt-1">Manage My Batch</p>
+                      </div>
+                      <BoxIcon className="w-8 h-8 text-indigo-600" />
                    </div>
-                   <p className="text-3xl font-black text-gray-900 italic tracking-tighter">Manage My Batch</p>
+                   <div className="flex items-center gap-4 text-right">
+                      <Sparkles className="w-8 h-8 text-amber-400" />
+                      <div>
+                        <p className="text-sm font-black text-gray-900 leading-tight uppercase">Special Day!</p>
+                        <p className="text-[10px] font-bold text-gray-400 font-mono italic">A Proud Student</p>
+                      </div>
+                   </div>
                 </div>
               </div>
             </div>

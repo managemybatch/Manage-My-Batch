@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, Search, Filter, FileText, MoreVertical, Calendar, CheckCircle2, Clock, Loader2, Download, Palette, Layout, Award, Save, Trash2, Edit2, Share2, Copy, ExternalLink, Image as ImageIcon, Sparkles, Star, Trophy } from 'lucide-react';
+import { Plus, Search, Filter, FileText, MoreVertical, Calendar, CheckCircle2, Clock, Loader2, Download, Palette, Layout, Award, Save, Trash2, Edit2, Share2, Copy, ExternalLink, Image as ImageIcon, Sparkles, Star, Trophy, BoxIcon } from 'lucide-react';
 import { motion } from 'motion/react';
 import { cn } from '../lib/utils';
 import { collection, onSnapshot, query, addDoc, serverTimestamp, deleteDoc, doc, orderBy, setDoc, where } from 'firebase/firestore';
@@ -98,7 +98,9 @@ export function OfflineExams() {
       const link = document.createElement('a');
       link.download = `${filename}.png`;
       link.href = canvas.toDataURL('image/png');
+      document.body.appendChild(link);
       link.click();
+      document.body.removeChild(link);
     } catch (error) {
       console.error('Image Generation Error:', error);
     } finally {
