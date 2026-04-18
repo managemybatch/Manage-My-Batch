@@ -137,6 +137,45 @@ const resources = {
           weeklyDays: "Weekly Days"
         }
       },
+      marketing: {
+        title: "Marketing Tools",
+        subtitle: "Grow your coaching center with high-quality branded visuals.",
+        qrPoster: {
+          title: "Smart QR Poster",
+          desc: "Generate a beautiful poster for your front desk to manage admissions and fee inquiries via QR code.",
+          generate: "Generate Poster",
+          scanToEnroll: "Scan to Enroll",
+          scanForFees: "Scan for Fee Status"
+        },
+        leaderboard: {
+          title: "Leaderboard Posters",
+          desc: "Celebrate your top performers and share them on social media.",
+          generate: "Generate Leaderboard"
+        },
+        social: {
+          shareReady: "Ready to Share",
+          download: "Download PNG",
+          facebookAutoPost: "Direct Posting Note: Facebook requires institutional app verification. Use 'Ready to Share' images for the best organic reach.",
+          credit: "Proudly managed by Manage My Batch"
+        },
+        successStory: {
+          title: "Success Story Generator",
+          desc: "Highlight a student's achievement in a beautiful, branded square graphic.",
+          generate: "Create Success Story",
+          selectStudent: "Select Student",
+          selectExam: "Select Exam (Optional)"
+        },
+        birthday: {
+          title: "Birthday Card Designer",
+          desc: "Generate branded birthday wishes for your students to share on WhatsApp status.",
+          generate: "Design Birthday Card"
+        },
+        badges: {
+          title: "Achievement Badges",
+          desc: "Unlock and share digital badges for attendance, behavior, or high scores.",
+          generate: "Unlock New Badge"
+        }
+      },
       fees: {
         title: "Fee Management",
         subtitle: "Track payments, manage dues, and financial records.",
@@ -327,6 +366,7 @@ const resources = {
         teachers: "Teachers",
         settings: "Settings",
         messages: "Messages",
+        marketing: "Marketing",
         logout: "Logout"
       },
       login: {
@@ -737,6 +777,45 @@ bn: {
           weeklyDays: "সাপ্তাহিক দিন"
         }
       },
+      marketing: {
+        title: "মার্কেটিং টুলস",
+        subtitle: "উন্নত মানের ব্র্যান্ডেড ভিজ্যুয়াল দিয়ে আপনার কোচিং সেন্টার বড় করুন।",
+        qrPoster: {
+          title: "স্মার্ট কিউআর পোস্টার",
+          desc: "কিউআর কোডের মাধ্যমে ভর্তি এবং ফি সংক্রান্ত তথ্য পরিচালনা করতে একটি সুন্দর পোস্টার তৈরি করুন।",
+          generate: "পোস্টার তৈরি করুন",
+          scanToEnroll: "ভর্তির জন্য স্ক্যান করুন",
+          scanForFees: "ফি তথ্যের জন্য স্ক্যান করুন"
+        },
+        leaderboard: {
+          title: "লিডারবোর্ড পোস্টার",
+          desc: "সেরা পারফর্মারদের সেলিব্রেট করুন এবং সোশ্যাল মিডিয়ায় শেয়ার করুন।",
+          generate: "লিডারবোর্ড তৈরি করুন"
+        },
+        social: {
+          shareReady: "শেয়ার করার জন্য প্রস্তুত",
+          download: "PNG ডাউনলোড করুন",
+          facebookAutoPost: "সরাসরি পোস্টিং নোট: ফেসবুকের জন্য প্রাতিষ্ঠানিক অ্যাপ ভেরিফিকেশন প্রয়োজন। সেরা অর্গানিক রিচের জন্য 'শেয়ার করার জন্য প্রস্তুত' ইমেজগুলো ব্যবহার করুন।",
+          credit: "Manage My Batch দ্বারা পরিচালিত"
+        },
+        successStory: {
+          title: "সাফল্যের গল্প জেনারেটর",
+          desc: "একটি সুন্দর ব্রান্ডেড গ্রাফিক্সে ছাত্রের কৃতিত্ব তুলে ধরুন।",
+          generate: "সাফল্যের গল্প তৈরি করুন",
+          selectStudent: "ছাত্র নির্বাচন করুন",
+          selectExam: "পরীক্ষা নির্বাচন করুন (ঐচ্ছিক)"
+        },
+        birthday: {
+          title: "জন্মদিনের কার্ড ডিজাইনার",
+          desc: "ছাত্রদের জন্য ব্রান্ডেড জন্মদিনের শুভেচ্ছা তৈরি করুন যা তারা হোয়াটসঅ্যাপে শেয়ার করবে।",
+          generate: "জন্মদিনের কার্ড ডিজাইন"
+        },
+        badges: {
+          title: "সাফল্যের ব্যাজ",
+          desc: "উপস্থিতি, আচরণ বা উচ্চ স্কোরের জন্য ডিজিটাল ব্যাজ আনলক এবং শেয়ার করুন।",
+          generate: "নতুন ব্যাজ আনলক করুন"
+        }
+      },
       fees: {
         title: "ফি ব্যবস্থাপনা",
         subtitle: "পেমেন্ট ট্র্যাক করুন, বকেয়া পরিচালনা করুন এবং আর্থিক রেকর্ড রাখুন।",
@@ -927,6 +1006,7 @@ bn: {
         teachers: "শিক্ষক",
         settings: "সেটিংস",
         messages: "মেসেজ",
+        marketing: "মার্কেটিং",
         logout: "লগআউট"
       },
       login: {

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, Search, Filter, FileText, MoreVertical, Calendar, CheckCircle2, Clock, Loader2, Download, Palette, Layout, Award, Save, Trash2, Edit2, Share2, Copy, ExternalLink } from 'lucide-react';
+import { Plus, Search, Filter, FileText, MoreVertical, Calendar, CheckCircle2, Clock, Loader2, Download, Palette, Layout, Award, Save, Trash2, Edit2, Share2, Copy, ExternalLink, Image as ImageIcon, Sparkles, Star, Trophy } from 'lucide-react';
 import { motion } from 'motion/react';
 import { cn } from '../lib/utils';
 import { collection, onSnapshot, query, addDoc, serverTimestamp, deleteDoc, doc, orderBy, setDoc, where } from 'firebase/firestore';
@@ -70,6 +70,41 @@ export function OfflineExams() {
   const [isSaving, setIsSaving] = useState(false);
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
+
+  const [isSuccessStoryModalOpen, setIsSuccessStoryModalOpen] = useState(false);
+  const successStoryRef = useRef<HTMLDivElement>(null);
+  const [selectedStudentForStory, setSelectedStudentForStory] = useState<any>(null);
+  const [instData, setInstData] = useState<any>(null);
+
+  useEffect(() => {
+    if (!user) return;
+    const instId = user.institutionId || user.uid;
+    const unsubInst = onSnapshot(doc(db, 'institutions', instId), (doc) => {
+      if (doc.exists()) setInstData(doc.data());
+    });
+    return () => unsubInst();
+  }, [user]);
+
+  const handleDownloadImage = async (ref: React.RefObject<HTMLDivElement | null>, filename: string) => {
+    if (!ref.current) return;
+    setIsGeneratingPDF(true);
+    try {
+      const canvas = await html2canvas(ref.current, {
+        scale: 3,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: null,
+      });
+      const link = document.createElement('a');
+      link.download = `${filename}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    } catch (error) {
+      console.error('Image Generation Error:', error);
+    } finally {
+      setIsGeneratingPDF(false);
+    }
+  };
 
   const handleSaveResults = async () => {
     if (!selectedExam) return;
@@ -1455,6 +1490,7 @@ export function OfflineExams() {
                       )}
                       <th className="py-4 px-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">Total</th>
                       <th className="py-4 px-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">Grade</th>
+                      <th className="py-4 px-6 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1504,6 +1540,18 @@ export function OfflineExams() {
                           )}>
                             {student.grade}
                           </span>
+                        </td>
+                        <td className="py-4 px-6 text-center">
+                          <button
+                            onClick={() => {
+                              setSelectedStudentForStory(student);
+                              setIsSuccessStoryModalOpen(true);
+                            }}
+                            className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
+                            title="Generate Success Story Image"
+                          >
+                            <ImageIcon className="w-5 h-5" />
+                          </button>
                         </td>
                       </tr>
                     ))}
@@ -1669,6 +1717,93 @@ export function OfflineExams() {
           >
             বন্ধ করুন
           </button>
+        </div>
+      </Modal>
+      <Modal isOpen={isSuccessStoryModalOpen} onClose={() => setIsSuccessStoryModalOpen(false)} title="Success Story Image Generator" maxWidth="max-w-4xl">
+        <div className="flex flex-col lg:flex-row gap-8 py-4">
+          <div className="lg:w-1/3 space-y-6">
+            <div className="p-4 bg-indigo-50 rounded-2xl border border-indigo-100">
+               <p className="text-sm text-indigo-700 leading-relaxed font-medium">
+                Tip: Share this on WhatsApp Status or Facebook. Branded images build high trust with other parents!
+               </p>
+            </div>
+            <button 
+              onClick={() => handleDownloadImage(successStoryRef, `Success_Story_${selectedStudentForStory?.name}`)}
+              disabled={isGeneratingPDF}
+              className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-indigo-700 disabled:opacity-50"
+            >
+              {isGeneratingPDF ? <Loader2 className="w-5 h-5 animate-spin" /> : <Download className="w-5 h-5" />}
+              {t('marketing.social.download')}
+            </button>
+          </div>
+
+          <div className="lg:w-2/3 flex justify-center bg-gray-50 p-8 rounded-3xl border-2 border-dashed border-gray-200 overflow-hidden">
+            <div 
+              ref={successStoryRef}
+              className="w-[1080px] h-[1080px] bg-white relative overflow-hidden flex flex-col items-center justify-center p-12 text-center"
+              style={{ backgroundColor: instData?.primaryColor || '#4f46e5' }}
+            >
+              {/* Decorative elements */}
+              <div className="absolute top-0 right-0 w-96 h-96 bg-white/10 rounded-full -mr-32 -mt-32 blur-3xl" />
+              <div className="absolute bottom-0 left-0 w-96 h-96 bg-white/10 rounded-full -ml-32 -mb-32 blur-3xl" />
+              
+              <div className="bg-white/95 backdrop-blur-md rounded-[60px] p-16 flex flex-col items-center w-full h-full shadow-2xl relative z-10 border border-white/20">
+                <div className="flex items-center justify-between w-full mb-12">
+                   {instData?.logoUrl && <img src={instData.logoUrl} className="h-16 object-contain" referrerPolicy="no-referrer" />}
+                   <div className="text-right">
+                     <h2 className="text-lg font-black text-gray-900 leading-none uppercase tracking-tight">{instData?.name}</h2>
+                     <p className="text-xs text-indigo-600 font-bold tracking-widest uppercase mt-1">Excellence in Education</p>
+                   </div>
+                </div>
+
+                <div className="relative mb-12">
+                   <div className="absolute -inset-4 bg-indigo-500/20 rounded-full blur-xl animate-pulse" />
+                   <img 
+                    src={selectedStudentForStory?.photoUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${selectedStudentForStory?.name}`} 
+                    className="w-64 h-64 rounded-full object-cover border-8 border-white shadow-2xl relative z-10"
+                    referrerPolicy="no-referrer"
+                   />
+                   <div className="absolute -bottom-4 -right-4 w-20 h-20 bg-amber-400 rounded-full flex items-center justify-center text-white shadow-xl z-20 border-4 border-white">
+                      <Trophy className="w-10 h-10" />
+                   </div>
+                </div>
+
+                <div className="space-y-4 mb-12">
+                   <h1 className="text-6xl font-black text-gray-900 tracking-tighter uppercase italic italic-style-heading">SUCCESS STORY</h1>
+                   <div className="h-1.5 w-32 bg-indigo-600 mx-auto rounded-full" />
+                </div>
+
+                <div className="space-y-4 flex-1 flex flex-col justify-center">
+                   <p className="text-4xl font-black text-indigo-600 uppercase tracking-[0.1em]">{selectedStudentForStory?.name}</p>
+                   <p className="text-2xl text-gray-500 font-bold uppercase tracking-widest">{selectedExam?.title}</p>
+                   
+                   <div className="flex items-center gap-12 mt-8">
+                      <div className="text-center">
+                         <p className="text-5xl font-black text-gray-900 tracking-tighter italic">
+                           {getRankedStudents().find(s => s.id === selectedStudentForStory?.id)?.percentage.toFixed(1)}%
+                         </p>
+                         <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">Score</p>
+                      </div>
+                      <div className="w-px h-16 bg-gray-200" />
+                      <div className="text-center">
+                         <p className="text-5xl font-black text-gray-900 tracking-tighter italic">
+                           #{getRankedStudents().find(s => s.id === selectedStudentForStory?.id)?.rank}
+                         </p>
+                         <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">Class Rank</p>
+                      </div>
+                   </div>
+                </div>
+
+                <div className="mt-12 flex items-center justify-between w-full border-t border-gray-100 pt-8">
+                   <div className="flex items-center gap-3">
+                      <Sparkles className="w-6 h-6 text-indigo-400" />
+                      <p className="text-sm font-bold text-gray-400">Join the Batch of Success today!</p>
+                   </div>
+                   <p className="text-xl font-black text-gray-900 italic tracking-tighter">Manage My Batch</p>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </Modal>
     </div>

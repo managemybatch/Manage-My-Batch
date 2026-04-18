@@ -13,6 +13,7 @@ import { Messages } from './pages/Messages';
 import { Settings } from './pages/Settings';
 import { Institution } from './pages/Institution';
 import { Teachers } from './pages/Teachers';
+import { Marketing } from './pages/Marketing';
 import { SuperAdminDashboard } from './pages/super-admin/SuperAdminDashboard';
 import { ManageInstitutions } from './pages/super-admin/ManageInstitutions';
 import { SuperNotifications } from './pages/super-admin/SuperNotifications';
@@ -120,6 +121,7 @@ function AppRoutes() {
       <Route path="/messages" element={<PrivateRoute><Messages /></PrivateRoute>} />
       <Route path="/institution" element={<PrivateRoute><Institution /></PrivateRoute>} />
       <Route path="/teachers" element={<PrivateRoute><Teachers /></PrivateRoute>} />
+      <Route path="/marketing" element={<PrivateRoute><Marketing /></PrivateRoute>} />
       <Route path="/settings" element={<PrivateRoute><Settings /></PrivateRoute>} />
       <Route path="/help" element={<PrivateRoute><Help /></PrivateRoute>} />
       <Route path="/support" element={<PrivateRoute><SupportChat /></PrivateRoute>} />

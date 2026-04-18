@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Users, 
   CreditCard, 
@@ -19,7 +19,12 @@ import {
   Info,
   AlertTriangle,
   CheckCircle2,
-  XCircle
+  XCircle,
+  Gift,
+  Download,
+  Image as ImageIcon,
+  Sparkles,
+  Cake
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { motion } from 'motion/react';
@@ -29,6 +34,7 @@ import { db, handleFirestoreError, OperationType } from '../firebase';
 import { useAuth } from '../lib/auth';
 import { useTranslation, Trans } from 'react-i18next';
 import { SubscriptionModal } from '../components/SubscriptionModal';
+import { Modal } from '../components/Modal';
 import { 
   GRADES, 
   SUBSCRIPTION_PLANS, 
@@ -36,10 +42,17 @@ import {
 } from '../constants';
 import { AnimatePresence } from 'motion/react';
 
+import html2canvas from 'html2canvas';
+
 export function Dashboard() {
   const { user } = useAuth();
   const { t } = useTranslation();
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
+  const [isBirthdayModalOpen, setIsBirthdayModalOpen] = useState(false);
+  const birthdayRef = useRef<HTMLDivElement>(null);
+  const [selectedStudentForBirthday, setSelectedStudentForBirthday] = useState<any>(null);
+  const [instData, setInstData] = useState<any>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
   const [systemNotifications, setSystemNotifications] = useState<any[]>([]);
   const [expiryNotification, setExpiryNotification] = useState<any | null>(null);
   const [smsBalance, setSmsBalance] = useState(0);
@@ -49,6 +62,12 @@ export function Dashboard() {
 
     // Listen for system notifications
     const q = query(collection(db, 'super_notifications'), limit(10));
+    const instId = user.institutionId || user.uid;
+
+    const unsubInst = onSnapshot(doc(db, 'institutions', instId), (doc) => {
+      if (doc.exists()) setInstData(doc.data());
+    });
+
     const unsubscribe = onSnapshot(q, (snap) => {
       const notifs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       
@@ -67,7 +86,6 @@ export function Dashboard() {
     });
 
     // Listen for SMS tokens
-    const instId = user.institutionId || user.uid;
     const unsubCredits = onSnapshot(doc(db, 'credits', instId), (doc) => {
       if (doc.exists()) {
         setSmsBalance(doc.data().balance || 0);
@@ -77,6 +95,7 @@ export function Dashboard() {
     return () => {
       unsubscribe();
       unsubCredits();
+      unsubInst();
     };
   }, [user]);
 
@@ -265,6 +284,39 @@ export function Dashboard() {
     setStudentsWithDues(withDues);
   }, [students, fees]);
 
+  const getTodayBirthdays = () => {
+    const today = new Date();
+    const currentMonth = today.getMonth() + 1;
+    const currentDate = today.getDate();
+
+    return students.filter(s => {
+      if (!s.dob) return false;
+      const dob = new Date(s.dob);
+      return (dob.getMonth() + 1) === currentMonth && dob.getDate() === currentDate;
+    });
+  };
+
+  const handleDownloadBirthdayCard = async () => {
+    if (!birthdayRef.current) return;
+    setIsGenerating(true);
+    try {
+      const canvas = await html2canvas(birthdayRef.current, {
+        scale: 3,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: null,
+      });
+      const link = document.createElement('a');
+      link.download = `Birthday_Card_${selectedStudentForBirthday?.name}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    } catch (error) {
+      console.error('Birthday Card Error:', error);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   const filteredExams = recentExams.filter(exam => 
     exam.title.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -303,6 +355,53 @@ export function Dashboard() {
           />
         </div>
       </div>
+
+      {/* Birthday Banner */}
+      {getTodayBirthdays().length > 0 && (
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-3xl p-6 md:p-8 text-white relative overflow-hidden shadow-xl shadow-indigo-100"
+        >
+          <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -mr-32 -mt-32" />
+          <div className="absolute bottom-0 left-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -ml-32 -mb-32" />
+          
+          <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
+            <div className="flex items-center gap-6">
+              <div className="w-20 h-20 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center text-white relative">
+                 <Cake className="w-10 h-10" />
+                 <div className="absolute -top-2 -right-2 w-8 h-8 bg-amber-400 rounded-full flex items-center justify-center text-xs font-black shadow-lg">
+                    {getTodayBirthdays().length}
+                 </div>
+              </div>
+              <div>
+                <h2 className="text-2xl font-black">{t('dashboard.birthdayTitle', { defaultValue: "Happy Birthday!" })}</h2>
+                <p className="text-indigo-100 font-medium">
+                  {getTodayBirthdays().length === 1 
+                    ? `${getTodayBirthdays()[0].name} has a birthday today!` 
+                    : `${getTodayBirthdays().length} students have birthdays today!`}
+                </p>
+              </div>
+            </div>
+            
+            <div className="flex flex-wrap items-center gap-3">
+               {getTodayBirthdays().map(student => (
+                 <button
+                   key={student.id}
+                   onClick={() => {
+                     setSelectedStudentForBirthday(student);
+                     setIsBirthdayModalOpen(true);
+                   }}
+                   className="px-4 py-2 bg-white text-indigo-600 rounded-xl font-bold text-xs hover:bg-indigo-50 transition-all flex items-center gap-2 shadow-sm"
+                 >
+                   <Gift className="w-3.5 h-3.5" />
+                   Generate Card for {student.name.split(' ')[0]}
+                 </button>
+               ))}
+            </div>
+          </div>
+        </motion.div>
+      )}
 
       {/* Due List Red Notice */}
       {studentsWithDues.length > 0 && (
@@ -689,6 +788,73 @@ export function Dashboard() {
         isOpen={isUpgradeModalOpen} 
         onClose={() => setIsUpgradeModalOpen(false)} 
       />
+
+      <Modal isOpen={isBirthdayModalOpen} onClose={() => setIsBirthdayModalOpen(false)} title="Birthday Card Generator" maxWidth="max-w-4xl">
+        <div className="flex flex-col lg:flex-row gap-8 py-4">
+          <div className="lg:w-1/3 space-y-6">
+            <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100">
+               <p className="text-sm text-amber-700 leading-relaxed font-medium">
+                 Tip: Send this card to the parents on WhatsApp. They will likely share it on their status, giving your coaching center free exposure!
+               </p>
+            </div>
+            <button 
+              onClick={handleDownloadBirthdayCard}
+              disabled={isGenerating}
+              className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-indigo-700 disabled:opacity-50"
+            >
+              {isGenerating ? <Loader2 className="w-5 h-5 animate-spin" /> : <Download className="w-5 h-5" />}
+              {t('marketing.social.download')}
+            </button>
+          </div>
+
+          <div className="lg:w-2/3 flex justify-center bg-gray-50 p-8 rounded-3xl border-2 border-dashed border-gray-200 overflow-hidden">
+            <div 
+              ref={birthdayRef}
+              className="w-[1080px] h-[1080px] bg-white relative overflow-hidden flex flex-col items-center justify-center p-12 text-center"
+              style={{ backgroundColor: instData?.primaryColor || '#4f46e5' }}
+            >
+              <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'radial-gradient(circle at 10px 10px, white 2px, transparent 0)', backgroundSize: '40px 40px' }} />
+              
+              <div className="bg-white/95 backdrop-blur-md rounded-[80px] p-20 flex flex-col items-center w-full h-full shadow-2xl relative z-10 border border-white/30">
+                <div className="flex items-center justify-between w-full mb-16">
+                   {instData?.logoUrl && <img src={instData.logoUrl} className="h-20 object-contain" referrerPolicy="no-referrer" />}
+                   <div className="text-right">
+                     <h2 className="text-2xl font-black text-gray-900 leading-none uppercase tracking-tight">{instData?.name}</h2>
+                     <p className="text-sm text-gray-500 font-bold uppercase tracking-widest mt-1">Nurturing Excellence</p>
+                   </div>
+                </div>
+
+                <div className="relative mb-16">
+                   <div className="absolute -inset-8 bg-amber-400/30 rounded-full blur-2xl animate-pulse" />
+                   <img 
+                    src={selectedStudentForBirthday?.photoUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${selectedStudentForBirthday?.name}`} 
+                    className="w-72 h-72 rounded-full object-cover border-[10px] border-white shadow-2xl relative z-10"
+                    referrerPolicy="no-referrer"
+                   />
+                   <div className="absolute -bottom-6 -right-6 w-24 h-24 bg-rose-500 rounded-full flex items-center justify-center text-white shadow-xl z-20 border-4 border-white">
+                      <Gift className="w-12 h-12" />
+                   </div>
+                </div>
+
+                <div className="space-y-6 flex-1 flex flex-col justify-center">
+                   <h1 className="text-7xl font-black text-gray-900 tracking-tighter uppercase leading-none italic">HAPPY BIRTHDAY</h1>
+                   <div className="h-2 w-48 bg-amber-400 mx-auto rounded-full" />
+                   <p className="text-5xl font-black text-indigo-600 uppercase tracking-tight mt-4">{selectedStudentForBirthday?.name}</p>
+                   <p className="text-2xl text-gray-400 font-bold uppercase tracking-widest mt-2">{t('Wishing you a year full of success and joy!')}</p>
+                </div>
+
+                <div className="mt-16 flex items-center justify-between w-full border-t border-gray-100 pt-10">
+                   <div className="flex items-center gap-4">
+                      <Sparkles className="w-8 h-8 text-amber-400" />
+                      <p className="text-lg font-bold text-gray-400 uppercase tracking-widest">A Proud Member of our Batch</p>
+                   </div>
+                   <p className="text-3xl font-black text-gray-900 italic tracking-tighter">Manage My Batch</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

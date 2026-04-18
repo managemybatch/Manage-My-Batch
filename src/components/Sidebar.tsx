@@ -39,6 +39,7 @@ export function Sidebar() {
     { icon: CreditCard, label: t('nav.fees'), path: '/fees' },
     { icon: School, label: t('nav.institution'), path: '/institution' },
     { icon: Briefcase, label: t('nav.teachers'), path: '/teachers' },
+    { icon: Zap, label: t('nav.marketing'), path: '/marketing' },
     { icon: Settings, label: t('nav.settings'), path: '/settings' },
     { icon: HelpCircle, label: t('Help'), path: '/help' },
   ];
