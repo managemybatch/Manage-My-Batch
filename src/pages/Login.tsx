@@ -185,10 +185,15 @@ export function Login() {
                 </Link>
               </p>
               <div className="pt-4 border-t border-gray-100">
-                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Staff Access</p>
-                <p className="text-xs text-gray-500">
-                  Are you a staff member or teacher? Use your assigned email and password to login above.
-                </p>
+                <div className="bg-indigo-50 p-4 rounded-2xl flex items-start gap-3 text-left">
+                  <ShieldCheck className="w-5 h-5 text-indigo-600 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-xs font-bold text-indigo-900 uppercase tracking-widest leading-none">Staff & Teacher Access</p>
+                    <p className="text-[10px] text-indigo-700/70 mt-1 font-medium leading-relaxed">
+                      Are you a staff member or teacher? Use your institution-assigned email and password in the form above to log in.
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

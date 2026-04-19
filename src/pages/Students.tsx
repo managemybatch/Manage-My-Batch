@@ -40,7 +40,7 @@ interface Student {
   monthlyFee: number;
   subjectGroup?: string;
   feeType?: string;
-  status: 'active' | 'inactive';
+  status: 'active' | 'inactive' | 'dropped';
   createdAt: any;
 }
 
@@ -575,7 +575,11 @@ export function Students() {
     const batchId = searchParams.get('batch');
     const matchesBatch = batchId ? s.batchId === batchId : true;
     const matchesGrade = selectedGrade ? s.grade === selectedGrade : true;
-    const matchesStatus = activeTab === 'inactive' ? s.status === 'inactive' : s.status === 'active';
+    
+    const matchesStatus = 
+      activeTab === 'inactive' ? s.status === 'inactive' : 
+      activeTab === 'dropped' ? s.status === 'dropped' :
+      s.status === 'active';
     
     return matchesSearch && matchesBatch && matchesGrade && matchesStatus;
   });
@@ -802,6 +806,23 @@ export function Students() {
               activeTab === 'inactive' ? "bg-white text-rose-600" : "bg-rose-100 text-rose-600"
             )}>
               {students.filter(s => s.status === 'inactive').length}
+            </span>
+          )}
+        </button>
+        <button
+          onClick={() => setActiveTab('dropped')}
+          className={cn(
+            "px-6 py-2.5 text-sm font-bold rounded-xl transition-all flex items-center gap-2",
+            activeTab === 'dropped' ? "bg-amber-600 text-white shadow-lg shadow-amber-100" : "text-gray-500 hover:bg-gray-50"
+          )}
+        >
+          <XCircle className="w-4 h-4" /> {t('students.dropped', { defaultValue: 'Dropped/Gap' })}
+          {students.filter(s => s.status === 'dropped').length > 0 && (
+            <span className={cn(
+              "px-2 py-0.5 rounded-full text-[10px] font-black",
+              activeTab === 'dropped' ? "bg-white text-amber-600" : "bg-amber-100 text-amber-600"
+            )}>
+              {students.filter(s => s.status === 'dropped').length}
             </span>
           )}
         </button>

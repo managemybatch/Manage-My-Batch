@@ -536,7 +536,7 @@ export function Marketing() {
                       <div className="flex items-center justify-between mb-8">
                          {instData?.logoUrl && <img src={instData.logoUrl} className="h-16 object-contain" referrerPolicy="no-referrer" />}
                          <div className="text-right">
-                           <h2 className="text-xl font-black text-gray-900 tracking-tight leading-none uppercase">{instData?.name}</h2>
+                           <h2 className="text-xl font-black text-gray-900 tracking-tight leading-none uppercase line-clamp-1">{instData?.name}</h2>
                            <p className="text-xs text-gray-400 font-bold uppercase tracking-widest mt-1">Top Performer Hall of Fame</p>
                          </div>
                       </div>
@@ -701,8 +701,8 @@ export function Marketing() {
                         </div>
                       </div>
 
-                      <h1 className="text-7xl font-black text-gray-900 tracking-tighter mb-4 relative z-10 uppercase leading-none">
-                        {students.find(s => s.id === selectedStudentId)?.name}
+                      <h1 className="text-7xl font-black text-gray-900 tracking-tighter mb-4 relative z-10 uppercase leading-none line-clamp-1">
+                        {students.find(s => s.id === selectedStudentId)?.name || 'Student Name'}
                       </h1>
                       
                       <div className="h-2 w-32 bg-emerald-600 rounded-full mb-10" />
@@ -715,7 +715,7 @@ export function Marketing() {
                         <div className="h-px w-full bg-gray-100" />
                         <div className="flex items-center justify-between w-full text-left">
                           <div>
-                            <p className="text-3xl font-black text-gray-900 uppercase tracking-tighter leading-none">{instData?.name}</p>
+                            <p className="text-3xl font-black text-gray-900 uppercase tracking-tighter leading-none line-clamp-1">{instData?.name}</p>
                             <p className="text-sm font-bold text-gray-400 mt-2">{instData?.address}</p>
                           </div>
                           <div className="flex items-center gap-4">
@@ -822,7 +822,7 @@ export function Marketing() {
                         </div>
                       </div>
 
-                      <h2 className="text-6xl font-black text-gray-900 mb-6 uppercase tracking-tight">
+                      <h2 className="text-6xl font-black text-gray-900 mb-6 uppercase tracking-tight line-clamp-1">
                         {students.find(s => s.id === selectedStudentId)?.name}
                       </h2>
                       
@@ -836,7 +836,7 @@ export function Marketing() {
                           <div className="flex items-center gap-4">
                             {instData?.logoUrl && <img src={instData.logoUrl} className="h-16 object-contain" referrerPolicy="no-referrer" />}
                             <div className="text-left">
-                              <p className="text-2xl font-black text-gray-900 uppercase tracking-tighter leading-none">{instData?.name}</p>
+                              <p className="text-2xl font-black text-gray-900 uppercase tracking-tighter leading-none line-clamp-1">{instData?.name}</p>
                               <p className="text-sm font-bold text-pink-500 uppercase tracking-widest mt-1">Birthday Wishes</p>
                             </div>
                           </div>
@@ -973,7 +973,7 @@ export function Marketing() {
                         </div>
                       </div>
 
-                      <h3 className="text-5xl font-black text-gray-900 mb-4 uppercase tracking-tight">
+                      <h3 className="text-5xl font-black text-gray-900 mb-4 uppercase tracking-tight line-clamp-1">
                         {students.find(s => s.id === selectedStudentId)?.name}
                       </h3>
                       <p className="text-2xl text-gray-400 font-bold uppercase tracking-widest mb-12">Excellence in Performance</p>
@@ -984,7 +984,7 @@ export function Marketing() {
                           <div className="flex items-center gap-4">
                             {instData?.logoUrl && <img src={instData.logoUrl} className="h-16 object-contain" referrerPolicy="no-referrer" />}
                             <div>
-                                <p className="text-3xl font-black text-gray-900 uppercase tracking-tighter leading-none">{instData?.name}</p>
+                                <p className="text-3xl font-black text-gray-900 uppercase tracking-tighter leading-none line-clamp-1">{instData?.name}</p>
                                 <p className="text-sm font-bold text-gray-400 mt-2">{instData?.address}</p>
                             </div>
                           </div>

@@ -342,13 +342,6 @@ export function Institution() {
       slug: formData.get('slug') as string,
       principalName: formData.get('principalName') as string,
       principalTitle: formData.get('principalTitle') as string,
-      smsConfig: {
-        apiUrl: formData.get('smsApiUrl') as string,
-        apiKey: formData.get('smsApiKey') as string,
-        senderId: formData.get('smsSenderId') as string,
-        messageParam: formData.get('smsMessageParam') as string,
-        numberParam: formData.get('smsNumberParam') as string,
-      },
       logoURL: institution.logoURL || '',
       principalPhotoURL: institution.principalPhotoURL || '',
       photoURL: institution.photoURL || '',
@@ -692,42 +685,6 @@ export function Institution() {
                 <div className="space-y-2">
                   <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">{t('institution.profile.info.vision')}</label>
                   <textarea name="vision" defaultValue={institution?.vision} rows={3} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all resize-none" />
-                </div>
-
-                {/* SMS Gateway Settings */}
-                <div className="pt-8 border-t border-gray-100 space-y-6">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-600">
-                      <Palette className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <h4 className="font-bold text-gray-900">SMS Gateway Configuration</h4>
-                      <p className="text-xs text-gray-500">Integrate your own SMS API to send automated alerts.</p>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2 md:col-span-2">
-                      <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">API Endpoint URL</label>
-                      <input name="smsApiUrl" defaultValue={institution?.smsConfig?.apiUrl} placeholder="https://api.smsprovider.com/send" className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all" />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">API Key / Token</label>
-                      <input name="smsApiKey" defaultValue={institution?.smsConfig?.apiKey} type="password" placeholder="Enter API Key" className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all" />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Sender ID / Masking</label>
-                      <input name="smsSenderId" defaultValue={institution?.smsConfig?.senderId} placeholder="e.g. COACHING" className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all" />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Message Parameter Name</label>
-                      <input name="smsMessageParam" defaultValue={institution?.smsConfig?.messageParam || 'message'} placeholder="e.g. text or msg" className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all" />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Number Parameter Name</label>
-                      <input name="smsNumberParam" defaultValue={institution?.smsConfig?.numberParam || 'to'} placeholder="e.g. mobile or phone" className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all" />
-                    </div>
-                  </div>
                 </div>
 
                 <div className="flex justify-end">

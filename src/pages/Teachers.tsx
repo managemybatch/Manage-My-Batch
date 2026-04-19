@@ -313,16 +313,22 @@ export function Teachers() {
     if (isSaving) return;
     setIsSaving(true);
     
-    const form = e.currentTarget;
-    const formData = new FormData(form);
-    const name = formData.get('name') as string;
-    const email = formData.get('email') as string;
-    const phone = formData.get('phone') as string;
-    const subject = formData.get('subject') as string;
-    const salary = Number(formData.get('salary'));
-    
     try {
+      const form = e.currentTarget;
+      const formData = new FormData(form);
+      const name = formData.get('name') as string;
+      const email = formData.get('email') as string;
+      const phone = formData.get('phone') as string;
+      const subject = formData.get('subject') as string;
+      const salary = Number(formData.get('salary'));
+      
+      if (!name || !email || !phone) {
+        throw new Error("Name, Email, and Phone are required.");
+      }
+
+      if (!user) throw new Error("No authenticated user found.");
       const instId = user.institutionId || user.uid;
+
       if (editingTeacher) {
         await updateDoc(doc(db, 'teachers', editingTeacher.id), {
           name,
@@ -330,6 +336,7 @@ export function Teachers() {
           phone,
           subject,
           salary,
+          updatedAt: serverTimestamp()
         });
         setEditingTeacher(null);
       } else {
@@ -349,8 +356,9 @@ export function Teachers() {
       if (form) form.reset();
       setToast({ message: editingTeacher ? 'Teacher updated successfully!' : 'Teacher added successfully!', type: 'success' });
     } catch (error: any) {
+      console.error('Teacher save error:', error);
       handleFirestoreError(error, OperationType.WRITE, 'teachers');
-      setToast({ message: error.message || 'Failed to add teacher.', type: 'error' });
+      setToast({ message: error.message || 'Failed to save teacher.', type: 'error' });
     } finally {
       setIsSaving(false);
     }

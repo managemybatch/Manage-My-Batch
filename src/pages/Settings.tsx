@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { User, Bell, Shield, Globe, Palette, LogOut, Mail, Phone, MapPin, Building, Loader2, CheckCircle, Moon, Sun, Monitor, UserPlus, Trash2, ShieldAlert, XCircle, AlertCircle } from 'lucide-react';
+import { User, Bell, Shield, Globe, Palette, LogOut, Mail, Phone, MapPin, Building, Loader2, CheckCircle, Moon, Sun, Monitor, UserPlus, Trash2, ShieldAlert, XCircle, AlertCircle, MessageSquare } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import { useTheme } from '../lib/theme';
 import { cn } from '../lib/utils';
 import { useTranslation } from 'react-i18next';
-import { collection, query, where, onSnapshot, doc, deleteDoc, setDoc, getDocs, writeBatch } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, deleteDoc, setDoc, getDocs, writeBatch, getDoc } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { initializeApp, deleteApp } from 'firebase/app';
 import { getAuth, createUserWithEmailAndPassword, signOut, signInWithEmailAndPassword } from 'firebase/auth';
@@ -13,7 +13,7 @@ import { Modal } from '../components/Modal';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { motion, AnimatePresence } from 'motion/react';
 
-type SettingsTab = 'profile' | 'notifications' | 'security' | 'language' | 'appearance' | 'staff';
+type SettingsTab = 'profile' | 'notifications' | 'sms' | 'security' | 'language' | 'appearance' | 'staff';
 
 export function Settings() {
   const { user, logout, loading } = useAuth();
@@ -30,6 +30,14 @@ export function Settings() {
     phone: user?.phone || '',
     institution: user?.institution || '',
     photoURL: user?.photoURL || '',
+  });
+  const [institution, setInstitution] = useState<any>(null);
+  const [smsConfig, setSmsConfig] = useState({
+    apiUrl: '',
+    apiKey: '',
+    senderId: '',
+    messageParam: 'message',
+    numberParam: 'to'
   });
   const [newStaff, setNewStaff] = useState({
     name: '',
@@ -98,11 +106,45 @@ export function Settings() {
   }, [user]);
 
   useEffect(() => {
-    if (toast) {
-      const timer = setTimeout(() => setToast(null), 5000);
-      return () => clearTimeout(timer);
+    if (!user) return;
+    
+    const instId = user.institutionId || user.uid;
+    const unsub = onSnapshot(doc(db, 'institutions', instId), (doc) => {
+      if (doc.exists()) {
+        const data = doc.data();
+        setInstitution(data);
+        if (data.smsConfig) {
+          setSmsConfig({
+            apiUrl: data.smsConfig.apiUrl || '',
+            apiKey: data.smsConfig.apiKey || '',
+            senderId: data.smsConfig.senderId || '',
+            messageParam: data.smsConfig.messageParam || 'message',
+            numberParam: data.smsConfig.numberParam || 'to'
+          });
+        }
+      }
+    });
+
+    return () => unsub();
+  }, [user]);
+
+  const handleSaveSmsConfig = async () => {
+    if (!user) return;
+    setIsSaving(true);
+    try {
+      const instId = user.institutionId || user.uid;
+      await setDoc(doc(db, 'institutions', instId), {
+        smsConfig,
+        updatedAt: new Date().toISOString(),
+      }, { merge: true });
+      setToast({ message: 'SMS Configuration updated successfully!', type: 'success' });
+    } catch (error) {
+      console.error('Error updating SMS config:', error);
+      setToast({ message: 'Failed to update SMS configuration.', type: 'error' });
+    } finally {
+      setIsSaving(false);
     }
-  }, [toast]);
+  };
 
   const handleAddStaff = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -336,6 +378,7 @@ export function Settings() {
           {[
             { id: 'profile', icon: User, label: t('settings.tabs.profile') },
             { id: 'notifications', icon: Bell, label: t('settings.tabs.notifications') },
+            { id: 'sms', icon: MessageSquare, label: 'SMS API Settings', adminOnly: true },
             { id: 'security', icon: Shield, label: t('settings.tabs.security') },
             { id: 'language', icon: Globe, label: t('settings.tabs.language') },
             { id: 'appearance', icon: Palette, label: t('settings.tabs.appearance') },
@@ -365,6 +408,90 @@ export function Settings() {
         </div>
 
         <div className="md:col-span-2 space-y-6">
+          {activeTab === 'sms' && user?.role === 'admin' && (
+            <div className="bg-white dark:bg-gray-900 p-8 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm transition-colors duration-300">
+              <div className="flex items-center gap-3 mb-8">
+                <div className="p-3 bg-indigo-50 dark:bg-indigo-900/20 rounded-xl">
+                  <MessageSquare className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900 dark:text-white font-[Inter]">SMS Gateway Configuration</h3>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Configure your SMS API to send automated alerts and messages.</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-6">
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider ml-1">API Endpoint URL</label>
+                  <input 
+                    type="text" 
+                    value={smsConfig.apiUrl}
+                    onChange={e => setSmsConfig(prev => ({ ...prev, apiUrl: e.target.value }))}
+                    placeholder="https://api.smsprovider.com/send"
+                    className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-mono"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider ml-1">API Key / Token</label>
+                    <input 
+                      type="password" 
+                      value={smsConfig.apiKey}
+                      onChange={e => setSmsConfig(prev => ({ ...prev, apiKey: e.target.value }))}
+                      placeholder="Enter API Key"
+                      className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-mono"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider ml-1">Sender ID</label>
+                    <input 
+                      type="text" 
+                      value={smsConfig.senderId}
+                      onChange={e => setSmsConfig(prev => ({ ...prev, senderId: e.target.value }))}
+                      placeholder="e.g. COACHING"
+                      className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all uppercase font-bold"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider ml-1">Message Parameter Name</label>
+                    <input 
+                      type="text" 
+                      value={smsConfig.messageParam}
+                      onChange={e => setSmsConfig(prev => ({ ...prev, messageParam: e.target.value }))}
+                      placeholder="e.g. message or msg"
+                      className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-mono"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider ml-1">Number Parameter Name</label>
+                    <input 
+                      type="text" 
+                      value={smsConfig.numberParam}
+                      onChange={e => setSmsConfig(prev => ({ ...prev, numberParam: e.target.value }))}
+                      placeholder="e.g. to or mobile"
+                      className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-mono"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-8 pt-8 border-t border-gray-100 dark:border-gray-800 flex justify-end gap-3">
+                <button 
+                  onClick={handleSaveSmsConfig}
+                  disabled={isSaving}
+                  className="px-6 py-2.5 text-sm font-bold text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 disabled:opacity-50 flex items-center gap-2"
+                >
+                  {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
+                  {t('settings.profile.save')}
+                </button>
+              </div>
+            </div>
+          )}
+
           {activeTab === 'profile' && (
             <div className="bg-white dark:bg-gray-900 p-8 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm transition-colors duration-300">
               <div className="flex items-center gap-6 mb-8">
