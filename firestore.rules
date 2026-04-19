@@ -420,7 +420,17 @@ service cloud.firestore {
     }
 
     match /teachers/{teacherId} {
-      allow read: if isTeacher();
+      allow read: if true; // Publicly readable for profiles
+      allow create, update, delete: if isTeacher();
+    }
+
+    match /notices/{noticeId} {
+      allow read: if true;
+      allow create, update, delete: if isTeacher();
+    }
+
+    match /events/{eventId} {
+      allow read: if true;
       allow create, update, delete: if isTeacher();
     }
 

@@ -662,29 +662,20 @@ export function Institution() {
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Goal</label>
-                    <input name="goal" defaultValue={institution?.goal} placeholder="e.g. Provide quality education" className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all" />
+                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Goal (What you want to achieve)</label>
+                    <input name="goal" defaultValue={institution?.goal} placeholder="e.g. 100% GPA-5 success rate" className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all" />
+                    <p className="text-[10px] text-gray-400 italic px-1">Short-term targets for the current year.</p>
                   </div>
                   <div className="space-y-2">
-                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Target</label>
-                    <input name="target" defaultValue={institution?.target} placeholder="e.g. 1000+ Students" className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all" />
+                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Target (Numerical metrics)</label>
+                    <input name="target" defaultValue={institution?.target} placeholder="e.g. 500+ Active Students" className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all" />
+                    <p className="text-[10px] text-gray-400 italic px-1">Specific benchmarks or enrollment numbers.</p>
                   </div>
-                </div>
-                <div className="space-y-2 hidden">
-                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Custom Link (Slug)</label>
-                  <input name="slug" defaultValue={institution?.slug} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all" />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">{t('institution.profile.info.address')}</label>
-                  <textarea name="address" defaultValue={institution?.address} rows={2} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all resize-none" />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">{t('institution.profile.info.description')}</label>
-                  <textarea name="description" defaultValue={institution?.description} rows={4} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all resize-none" />
                 </div>
                 <div className="space-y-2">
                   <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">{t('institution.profile.info.vision')}</label>
-                  <textarea name="vision" defaultValue={institution?.vision} rows={3} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all resize-none" />
+                  <textarea name="vision" defaultValue={institution?.vision} rows={3} placeholder="Your long-term dream for the institute's future..." className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all resize-none" />
+                  <p className="text-[10px] text-gray-400 italic px-1">The core philosophy and long-term vision of your institution.</p>
                 </div>
 
                 <div className="flex justify-end">
@@ -954,7 +945,30 @@ export function Institution() {
                     <option value="circulars">Job Board</option>
                     <option value="results">Results Portal</option>
                     <option value="stats">Statistics Counter</option>
+                    <option value="hero">Hero Section (Banner)</option>
+                    <option value="about">About & Vision</option>
                   </select>
+                  <button 
+                    onClick={async () => {
+                      const instId = user?.institutionId || user?.uid;
+                      if (!instId || !institution) return;
+                      setIsSaving(true);
+                      try {
+                        await updateDoc(doc(db, 'institutions', instId), { 
+                          websiteConfig: institution.websiteConfig 
+                        });
+                        setToast({ message: 'Sections Saved!', type: 'success' });
+                      } catch (e) {
+                        setToast({ message: 'Failed to save sections', type: 'error' });
+                      } finally {
+                        setIsSaving(false);
+                      }
+                    }}
+                    className="px-4 py-2 bg-indigo-600 text-white text-sm font-bold rounded-xl hover:bg-indigo-700 transition-all flex items-center gap-2"
+                  >
+                    {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Layers className="w-4 h-4" />}
+                    Save Order
+                  </button>
                 </div>
               </div>
 

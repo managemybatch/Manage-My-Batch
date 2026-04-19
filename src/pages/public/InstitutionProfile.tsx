@@ -403,6 +403,52 @@ export function InstitutionProfile() {
           </section>
         );
 
+      case 'testimonials':
+        return (section.testimonials || []).length > 0 && (
+          <section key={section.id} className="bg-indigo-50/50 p-8 rounded-3xl border border-indigo-100 space-y-8">
+            <div className="text-center space-y-2">
+              <h2 className="text-3xl font-black text-indigo-900">{section.title || 'Success Stories'}</h2>
+              <p className="text-indigo-600 font-medium">What our students and parents say about us</p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {(section.testimonials || []).map((t: any, idx: number) => (
+                <div key={idx} className="bg-white p-6 rounded-2xl border border-indigo-100 shadow-sm space-y-4">
+                  <div className="flex text-amber-400">
+                    {[...Array(5)].map((_, i) => <Star key={i} className="w-4 h-4 fill-current" />)}
+                  </div>
+                  <p className="text-gray-600 italic text-sm leading-relaxed">"{t.content}"</p>
+                  <div className="flex items-center gap-3 pt-2">
+                    <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600 font-bold uppercase">
+                      {t.author.charAt(0)}
+                    </div>
+                    <div>
+                      <p className="font-bold text-gray-900 text-sm">{t.author}</p>
+                      <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest">{t.role || 'Student'}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        );
+
+      case 'faq':
+        return (section.faqs || []).length > 0 && (
+          <section key={section.id} className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm space-y-6">
+            <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+              <HelpCircle className="w-6 h-6 text-indigo-600" /> {section.title || 'Frequently Asked Questions'}
+            </h2>
+            <div className="space-y-4">
+              {(section.faqs || []).map((faq: any, idx: number) => (
+                <div key={idx} className="p-4 bg-gray-50 rounded-2xl border border-gray-100 space-y-2">
+                  <h4 className="font-bold text-gray-900">{faq.question}</h4>
+                  <p className="text-sm text-gray-600 leading-relaxed">{faq.answer}</p>
+                </div>
+              ))}
+            </div>
+          </section>
+        );
+
       default:
         return null;
     }
