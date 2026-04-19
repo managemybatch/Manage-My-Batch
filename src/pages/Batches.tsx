@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Search, Filter, Layers, MoreVertical, Users, Loader2, ChevronDown, ChevronUp, X, Clock, Calendar, CreditCard, BookOpen, MessageSquare, Trash2 } from 'lucide-react';
+import { Plus, Search, Filter, Layers, MoreVertical, Users, Loader2, ChevronDown, ChevronUp, X, Clock, Calendar, CreditCard, BookOpen, MessageSquare, Trash2, XCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { collection, onSnapshot, query, addDoc, serverTimestamp, deleteDoc, doc, orderBy, updateDoc, where } from 'firebase/firestore';
@@ -57,6 +57,7 @@ export function Batches() {
   const [batches, setBatches] = useState<Batch[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedGrade, setSelectedGrade] = useState('');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
@@ -251,10 +252,12 @@ export function Batches() {
     }
   };
 
-  const filteredBatches = batches.filter(b => 
-    b.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    b.grade.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredBatches = batches.filter(b => {
+    const matchesSearch = b.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         b.grade.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesGrade = selectedGrade ? b.grade === selectedGrade : true;
+    return matchesSearch && matchesGrade;
+  });
 
   return (
     <div className="space-y-8">
@@ -285,8 +288,25 @@ export function Batches() {
           />
         </div>
         <div className="flex items-center gap-2 w-full md:w-auto">
-          <button className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50 transition-all">
-            <Filter className="w-4 h-4" /> {t('batches.filter')}
+          <select 
+            value={selectedGrade}
+            onChange={(e) => setSelectedGrade(e.target.value)}
+            className="flex-1 md:w-48 px-4 py-2.5 text-sm font-bold text-gray-600 border border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all font-medium"
+          >
+            <option value="">{t('batches.allGrades', { defaultValue: 'All Classes' })}</option>
+            {GRADES.map(g => (
+              <option key={g} value={g}>{t(`common.grades.${g}`)}</option>
+            ))}
+          </select>
+          <button 
+            onClick={() => {
+              setSearchTerm('');
+              setSelectedGrade('');
+            }}
+            className="p-2.5 text-gray-400 hover:text-rose-600 bg-gray-50 hover:bg-rose-50 border border-gray-200 rounded-xl transition-all shadow-sm"
+            title={t('common.clearFilters', { defaultValue: 'Clear Filters' })}
+          >
+            <XCircle className="w-5 h-5 transition-transform hover:scale-110" />
           </button>
         </div>
       </div>

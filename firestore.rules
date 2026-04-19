@@ -397,7 +397,7 @@ service cloud.firestore {
       allow read: if true; // Publicly readable for results
       allow create: if isTeacher() && isValidOfflineExam(request.resource.data);
       allow update: if isTeacher() && isValidOfflineExam(request.resource.data);
-      allow delete: if isAdmin();
+      allow delete: if isTeacher();
     }
 
     match /attendance_submissions/{submissionId} {

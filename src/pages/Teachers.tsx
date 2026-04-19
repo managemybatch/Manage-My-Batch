@@ -320,7 +320,6 @@ export function Teachers() {
     const phone = formData.get('phone') as string;
     const subject = formData.get('subject') as string;
     const salary = Number(formData.get('salary'));
-    const password = formData.get('password') as string;
     
     try {
       const instId = user.institutionId || user.uid;
@@ -334,28 +333,8 @@ export function Teachers() {
         });
         setEditingTeacher(null);
       } else {
-        // 1. Create Auth account for the teacher
-        if (!password) {
-          setToast({ message: "Password is required for new staff accounts.", type: 'error' });
-          setIsSaving(false);
-          return;
-        }
-        
-        const uid = await createStaffAccount(email, password);
-        
-        // 2. Create User Profile in Firestore
-        await setDoc(doc(db, 'users', uid), {
-          id: uid,
-          email,
-          displayName: name,
-          role: 'teacher',
-          institutionId: instId,
-          createdAt: serverTimestamp()
-        });
-
-        // 3. Add to Teachers collection
-        await setDoc(doc(db, 'teachers', uid), {
-          uid, // Link to the auth user
+        // Just add to Teachers collection, no Auth account
+        await addDoc(collection(db, 'teachers'), {
           name,
           email,
           phone,
@@ -615,9 +594,6 @@ export function Teachers() {
                   <div className="space-y-3">
                     <input name="name" required defaultValue={editingTeacher?.name} placeholder="Full Name" className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm dark:text-white outline-none focus:ring-2 focus:ring-indigo-500/20" />
                     <input name="email" type="email" required defaultValue={editingTeacher?.email} placeholder="Email Address" className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm dark:text-white outline-none focus:ring-2 focus:ring-indigo-500/20" />
-                    {!editingTeacher && (
-                      <input name="password" type="password" required placeholder="Login Password" className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm dark:text-white outline-none focus:ring-2 focus:ring-indigo-500/20" />
-                    )}
                     <input name="phone" required defaultValue={editingTeacher?.phone} placeholder="Phone Number" className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm dark:text-white outline-none focus:ring-2 focus:ring-indigo-500/20" />
                     <input name="subject" required defaultValue={editingTeacher?.subject} placeholder="Subject (e.g. Physics)" className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm dark:text-white outline-none focus:ring-2 focus:ring-indigo-500/20" />
                     <div className="relative">

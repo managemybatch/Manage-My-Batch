@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Filter, MoreVertical, Mail, Phone, Download, Loader2, Layers, User, MessageSquare, Contact, FileText, CheckCircle2, XCircle, Users, HelpCircle, FileDown } from 'lucide-react';
+import { Plus, Search, Filter, MoreVertical, Mail, Phone, Download, Loader2, Layers, User, MessageSquare, Contact, FileText, CheckCircle2, XCircle, Users, HelpCircle, FileDown, ShieldCheck, CreditCard as IDCardIcon } from 'lucide-react';
 import { Table, TableRow, TableCell } from '../components/Table';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import { cn, formatWhatsAppPhone, formatDate } from '../lib/utils';
-import { collection, onSnapshot, query, addDoc, serverTimestamp, deleteDoc, doc, getDoc, writeBatch, where, orderBy, increment } from 'firebase/firestore';
+import { collection, onSnapshot, query, addDoc, updateDoc, serverTimestamp, deleteDoc, doc, getDoc, writeBatch, where, orderBy, increment } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { useAuth } from '../lib/auth';
 import html2canvas from 'html2canvas';
@@ -15,6 +15,7 @@ import { SubscriptionModal } from '../components/SubscriptionModal';
 
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { StudentProfile } from '../components/StudentProfile';
+import { IDCardDesigner } from '../components/IDCardDesigner';
 
 interface Student {
   id: string;
@@ -58,10 +59,12 @@ export function Students() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [students, setStudents] = useState<Student[]>([]);
   const [applications, setApplications] = useState<any[]>([]);
-  const [activeTab, setActiveTab] = useState<'students' | 'applications'>('students');
+  const [activeTab, setActiveTab] = useState<'students' | 'applications' | 'id-cards' | 'inactive'>('students');
+  const [institution, setInstitution] = useState<any>(null);
   const [batches, setBatches] = useState<Batch[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedGrade, setSelectedGrade] = useState('');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -316,6 +319,15 @@ export function Students() {
     };
   }, [user, searchParams]);
 
+  useEffect(() => {
+    if (!user) return;
+    const instId = user.institutionId || user.uid;
+    const unsubInst = onSnapshot(doc(db, 'institutions', instId), (docSnapshot) => {
+      if (docSnapshot.exists()) setInstitution({ id: docSnapshot.id, ...docSnapshot.data() });
+    });
+    return () => unsubInst();
+  }, [user]);
+
   const handleAddStudent = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || isSaving) return;
@@ -562,8 +574,10 @@ export function Students() {
     
     const batchId = searchParams.get('batch');
     const matchesBatch = batchId ? s.batchId === batchId : true;
+    const matchesGrade = selectedGrade ? s.grade === selectedGrade : true;
+    const matchesStatus = activeTab === 'inactive' ? s.status === 'inactive' : s.status === 'active';
     
-    return matchesSearch && matchesBatch;
+    return matchesSearch && matchesBatch && matchesGrade && matchesStatus;
   });
 
   const filteredApplications = applications.filter(app => {
@@ -688,12 +702,11 @@ export function Students() {
               <Plus className="w-4 h-4" /> {t('students.addStudent')}
             </button>
             <button 
-              onClick={downloadBatchIDCards}
-              disabled={isSaving || filteredStudents.length === 0}
-              className="lg:hidden p-2.5 bg-emerald-50 text-emerald-600 rounded-xl border border-emerald-100 flex items-center justify-center shadow-sm"
-              title={t('students.downloadID')}
+              onClick={() => setActiveTab('id-cards')}
+              className="lg:hidden p-2.5 bg-indigo-50 text-indigo-600 rounded-xl border border-indigo-100 flex items-center justify-center shadow-sm"
+              title={t('students.idCards', { defaultValue: 'ID Cards' })}
             >
-              {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+              <IDCardIcon className="w-4 h-4" />
             </button>
           </div>
         </div>
@@ -722,10 +735,10 @@ export function Students() {
             <Download className="w-4 h-4 rotate-180" /> {t('common.import', { defaultValue: 'Import' })}
           </button>
           <button 
-            onClick={downloadBatchIDCards}
-            className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-all shadow-sm"
+            onClick={() => setActiveTab('id-cards')}
+            className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-indigo-600 bg-indigo-50 border border-indigo-100 rounded-xl hover:bg-indigo-100 transition-all shadow-sm"
           >
-            <Contact className="w-4 h-4" /> ID Cards
+            <IDCardIcon className="w-4 h-4" /> {t('students.idCards', { defaultValue: 'ID Cards' })}
           </button>
           <button className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-all shadow-sm">
             <Download className="w-4 h-4" /> {t('students.export')}
@@ -766,6 +779,32 @@ export function Students() {
             </span>
           )}
         </button>
+        <button
+          onClick={() => setActiveTab('id-cards')}
+          className={cn(
+            "px-6 py-2.5 text-sm font-bold rounded-xl transition-all flex items-center gap-2",
+            activeTab === 'id-cards' ? "bg-indigo-600 text-white shadow-lg shadow-indigo-100" : "text-gray-500 hover:bg-gray-50"
+          )}
+        >
+          <IDCardIcon className="w-4 h-4" /> {t('students.idCards', { defaultValue: 'ID Cards' })}
+        </button>
+        <button
+          onClick={() => setActiveTab('inactive')}
+          className={cn(
+            "px-6 py-2.5 text-sm font-bold rounded-xl transition-all flex items-center gap-2",
+            activeTab === 'inactive' ? "bg-rose-600 text-white shadow-lg shadow-rose-100" : "text-gray-500 hover:bg-gray-50"
+          )}
+        >
+          <XCircle className="w-4 h-4" /> {t('students.inactive', { defaultValue: 'Inactive' })}
+          {students.filter(s => s.status === 'inactive').length > 0 && (
+            <span className={cn(
+              "px-2 py-0.5 rounded-full text-[10px] font-black",
+              activeTab === 'inactive' ? "bg-white text-rose-600" : "bg-rose-100 text-rose-600"
+            )}>
+              {students.filter(s => s.status === 'inactive').length}
+            </span>
+          )}
+        </button>
       </div>
 
       <div className="flex flex-col md:flex-row gap-4 items-center justify-between bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
@@ -779,14 +818,38 @@ export function Students() {
             className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
           />
         </div>
-        <div className="flex items-center gap-2 w-full md:w-auto">
-          <button className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50 transition-all">
-            <Filter className="w-4 h-4" /> {t('students.filter')}
-          </button>
-          <select className="flex-1 md:flex-none px-4 py-2.5 text-sm font-medium text-gray-600 border border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all">
-            <option>{t('students.allGrades')}</option>
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+          <select 
+            value={searchParams.get('batch') || ''}
+            onChange={(e) => {
+              const val = e.target.value;
+              if (val) setSearchParams({ batch: val });
+              else setSearchParams({});
+            }}
+            className="flex-1 md:w-48 px-4 py-2.5 text-sm font-bold text-gray-600 border border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all font-medium"
+          >
+            <option value="">{t('students.allBatches', { defaultValue: 'All Batches' })}</option>
+            {batches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+          </select>
+          <select 
+            value={selectedGrade}
+            onChange={(e) => setSelectedGrade(e.target.value)}
+            className="flex-1 md:w-40 px-4 py-2.5 text-sm font-bold text-gray-600 border border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all font-medium"
+          >
+            <option value="">{t('students.allGrades')}</option>
             {GRADES.map(g => <option key={g} value={g}>{t(`common.grades.${g}`)}</option>)}
           </select>
+          <button 
+            onClick={() => {
+              setSearchTerm('');
+              setSelectedGrade('');
+              setSearchParams({});
+            }}
+            className="p-2.5 text-gray-400 hover:text-rose-600 bg-gray-50 hover:bg-rose-50 border border-gray-200 rounded-xl transition-all shadow-sm"
+            title={t('common.clearFilters', { defaultValue: 'Clear Filters' })}
+          >
+            <XCircle className="w-5 h-5 transition-transform hover:scale-110" />
+          </button>
         </div>
       </div>
 
@@ -841,7 +904,9 @@ export function Students() {
         <div className="flex items-center justify-center py-20">
           <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
         </div>
-      ) : activeTab === 'students' ? (
+      ) : activeTab === 'id-cards' ? (
+        <IDCardDesigner students={students} institution={institution} />
+      ) : (activeTab === 'students' || activeTab === 'inactive') ? (
         <Table headers={[
           t('students.table.student'),
           t('students.table.whatsapp'),
@@ -921,7 +986,7 @@ export function Students() {
               <TableCell>
                 <span className={cn(
                   "px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider",
-                  student.status === 'active' ? "bg-emerald-50 text-emerald-600" : "bg-gray-100 text-gray-500"
+                  student.status === 'active' ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600"
                 )}>
                   {student.status}
                 </span>
@@ -958,6 +1023,39 @@ export function Students() {
                           onClick={() => setActiveMenu(null)}
                         />
                         <div className="absolute right-0 mt-2 w-48 bg-white rounded-2xl shadow-xl border border-gray-100 py-2 z-20 overflow-hidden">
+                          {student.status === 'inactive' ? (
+                            <button
+                              onClick={async () => {
+                                try {
+                                  await updateDoc(doc(db, 'students', student.id), { status: 'active' });
+                                  alert('Student reactivated successfully!');
+                                  setActiveMenu(null);
+                                } catch (error) {
+                                  handleFirestoreError(error, OperationType.UPDATE, `students/${student.id}`);
+                                }
+                              }}
+                              className="w-full px-4 py-2 text-left text-sm font-bold text-emerald-600 hover:bg-emerald-50 flex items-center gap-2 transition-colors"
+                            >
+                              <CheckCircle2 className="w-4 h-4" /> {t('students.reactivate', { defaultValue: 'Reactivate' })}
+                            </button>
+                          ) : (
+                            <button
+                              onClick={async () => {
+                                if (confirm('Are you sure you want to mark this student as inactive?')) {
+                                  try {
+                                    await updateDoc(doc(db, 'students', student.id), { status: 'inactive' });
+                                    alert('Student marked as inactive');
+                                    setActiveMenu(null);
+                                  } catch (error) {
+                                    handleFirestoreError(error, OperationType.UPDATE, `students/${student.id}`);
+                                  }
+                                }
+                              }}
+                              className="w-full px-4 py-2 text-left text-sm font-bold text-rose-600 hover:bg-rose-50 flex items-center gap-2 transition-colors"
+                            >
+                              <XCircle className="w-4 h-4" /> {t('students.deactivate', { defaultValue: 'Deactivate' })}
+                            </button>
+                          )}
                           <button
                             onClick={() => {
                               setEditingStudent(student);
@@ -976,7 +1074,7 @@ export function Students() {
                             }}
                             className="w-full px-4 py-2 text-left text-sm font-bold text-rose-600 hover:bg-rose-50 flex items-center gap-2 transition-colors"
                           >
-                            <MoreVertical className="w-4 h-4" /> {t('common.delete', { defaultValue: 'Delete' })}
+                            <XCircle className="w-4 h-4" /> {t('common.delete', { defaultValue: 'Delete' })}
                           </button>
                         </div>
                       </>

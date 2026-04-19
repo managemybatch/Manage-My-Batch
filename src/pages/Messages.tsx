@@ -27,6 +27,7 @@ import { useAuth } from '../lib/auth';
 import { Modal } from '../components/Modal';
 import { Table } from '../components/Table';
 import { cn } from '../lib/utils';
+import { sendSMS } from '../lib/sms';
 import { SubscriptionModal } from '../components/SubscriptionModal';
 import { SUBSCRIPTION_PLANS } from '../constants';
 
@@ -75,11 +76,25 @@ export function Messages() {
   const [students, setStudents] = useState<any[]>([]);
   const [teachers, setTeachers] = useState<any[]>([]);
   const [applicants, setApplicants] = useState<any[]>([]);
+  const [instData, setInstData] = useState<any>(null);
 
   useEffect(() => {
     if (!user) return;
 
     const instId = user.institutionId || user.uid;
+
+    const fetchInstData = async () => {
+      try {
+        const docRef = doc(db, 'institutions', instId);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          setInstData(docSnap.data());
+        }
+      } catch (error) {
+        console.error("Error fetching institution:", error);
+      }
+    };
+    fetchInstData();
 
     const fetchCredits = async () => {
       try {
@@ -232,6 +247,36 @@ export function Messages() {
     setSending(true);
     try {
       const instId = user.institutionId || user.uid;
+      
+      // Try sending via Custom Gateway if available
+      let sendStatus: 'delivered' | 'failed' = 'delivered';
+      let sendError = '';
+
+      if (instData?.smsConfig?.apiUrl) {
+        // Need to find recipient phone number. 
+        // This is complex for batch, but for individual/teacher it's easy.
+        // For simplicity, let's look up phone if individual.
+        let phone = '';
+        if (recipientType === 'individual') {
+          const student = students.find(s => s.id === recipientId);
+          phone = student?.guardianPhone;
+        } else if (recipientType === 'teacher') {
+          const teacher = teachers.find(t => t.id === recipientId);
+          phone = teacher?.phone;
+        } else if (recipientType === 'applicant') {
+          const applicant = applicants.find(a => a.id === recipientId);
+          phone = applicant?.phone;
+        }
+
+        if (phone) {
+          const result = await sendSMS(instData.smsConfig, phone, content);
+          if (!result.success) {
+            sendStatus = 'failed';
+            sendError = result.error || 'Gateway Error';
+          }
+        }
+      }
+
       const messageData = {
         senderId: user.uid,
         senderName: user.displayName,
@@ -240,18 +285,24 @@ export function Messages() {
         recipientId: recipientId,
         recipientName: recipientName,
         content,
-        status: 'delivered',
+        status: sendStatus,
+        error: sendError,
         creditsUsed: 1,
         createdAt: serverTimestamp()
       };
 
       await addDoc(collection(db, 'messages'), messageData);
 
-      await updateDoc(doc(db, 'credits', instId), {
-        balance: increment(-1),
-        totalSent: increment(1),
-        lastUpdated: serverTimestamp()
-      });
+      if (sendStatus === 'delivered') {
+        await updateDoc(doc(db, 'credits', instId), {
+          balance: increment(-1),
+          totalSent: increment(1),
+          lastUpdated: serverTimestamp()
+        });
+        alert('Message sent successfully!');
+      } else {
+        alert(`Message failed: ${sendError}`);
+      }
 
       setContent('');
       setRecipientId('');

@@ -24,6 +24,7 @@ interface Student {
   name: string;
   rollNo: string;
   batchId: string;
+  status?: 'active' | 'inactive';
 }
 
 interface Batch {
@@ -117,11 +118,13 @@ export function Attendance() {
         where('batchId', '==', batch.id)
       );
       const snapshot = await getDocs(q);
-      const studentData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Student[];
-      setStudents(studentData);
+      const studentData = snapshot.docs
+        .map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        })) as Student[];
+      
+      setStudents(studentData.filter(s => s.status !== 'inactive'));
 
       // Fetch today's attendance
       const attQ = query(

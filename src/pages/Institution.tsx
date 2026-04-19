@@ -4,7 +4,7 @@ import {
   MapPin, Phone, Mail, Globe, Info, CheckCircle, 
   ExternalLink, Loader2, Plus, Trash2, UserPlus, 
   MessageSquare, Calendar, Newspaper, Megaphone, Send, Edit2,
-  Settings, TrendingUp
+  Settings, TrendingUp, Palette
 } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import { useTranslation } from 'react-i18next';
@@ -40,9 +40,17 @@ interface InstitutionData {
   slug?: string;
   photoURL?: string;
   logoURL?: string;
+  primaryColor?: string;
   principalName?: string;
   principalTitle?: string;
   principalPhotoURL?: string;
+  smsConfig?: {
+    apiUrl: string;
+    apiKey: string;
+    senderId: string;
+    messageParam: string;
+    numberParam: string;
+  };
   websiteConfig: {
     metaTitle: string;
     metaDescription: string;
@@ -137,6 +145,7 @@ export function Institution() {
               { id: 'sec_results', type: 'results', title: 'Exam Results', active: true, order: 4 },
             ]
           },
+          primaryColor: data.primaryColor || '#4f46e5',
           admissionForm: data.admissionForm || {
             active: false,
             title: 'Admission Form',
@@ -225,7 +234,7 @@ export function Institution() {
           getDocs(query(collection(db, 'students'), where('institutionId', '==', instId))),
           getDocs(query(collection(db, 'batches'), where('institutionId', '==', instId))),
           getDocs(query(collection(db, 'teachers'), where('institutionId', '==', instId))),
-          getDocs(query(collection(db, 'offlineExams'), where('institutionId', '==', instId), orderBy('date', 'desc')))
+          getDocs(query(collection(db, 'offline_exams'), where('institutionId', '==', instId), orderBy('date', 'desc')))
         ]);
 
         setStats({
@@ -333,6 +342,13 @@ export function Institution() {
       slug: formData.get('slug') as string,
       principalName: formData.get('principalName') as string,
       principalTitle: formData.get('principalTitle') as string,
+      smsConfig: {
+        apiUrl: formData.get('smsApiUrl') as string,
+        apiKey: formData.get('smsApiKey') as string,
+        senderId: formData.get('smsSenderId') as string,
+        messageParam: formData.get('smsMessageParam') as string,
+        numberParam: formData.get('smsNumberParam') as string,
+      },
       logoURL: institution.logoURL || '',
       principalPhotoURL: institution.principalPhotoURL || '',
       photoURL: institution.photoURL || '',
@@ -677,6 +693,43 @@ export function Institution() {
                   <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">{t('institution.profile.info.vision')}</label>
                   <textarea name="vision" defaultValue={institution?.vision} rows={3} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all resize-none" />
                 </div>
+
+                {/* SMS Gateway Settings */}
+                <div className="pt-8 border-t border-gray-100 space-y-6">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-600">
+                      <Palette className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-gray-900">SMS Gateway Configuration</h4>
+                      <p className="text-xs text-gray-500">Integrate your own SMS API to send automated alerts.</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2 md:col-span-2">
+                      <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">API Endpoint URL</label>
+                      <input name="smsApiUrl" defaultValue={institution?.smsConfig?.apiUrl} placeholder="https://api.smsprovider.com/send" className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all" />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">API Key / Token</label>
+                      <input name="smsApiKey" defaultValue={institution?.smsConfig?.apiKey} type="password" placeholder="Enter API Key" className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all" />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Sender ID / Masking</label>
+                      <input name="smsSenderId" defaultValue={institution?.smsConfig?.senderId} placeholder="e.g. COACHING" className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all" />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Message Parameter Name</label>
+                      <input name="smsMessageParam" defaultValue={institution?.smsConfig?.messageParam || 'message'} placeholder="e.g. text or msg" className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all" />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Number Parameter Name</label>
+                      <input name="smsNumberParam" defaultValue={institution?.smsConfig?.numberParam || 'to'} placeholder="e.g. mobile or phone" className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all" />
+                    </div>
+                  </div>
+                </div>
+
                 <div className="flex justify-end">
                   <button 
                     type="submit" 
@@ -833,6 +886,50 @@ export function Institution() {
                 </div>
               </div>
 
+              <div className="pt-8 border-t border-gray-100">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center text-indigo-600">
+                    <Palette className="w-5 h-5" />
+                  </div>
+                  <h3 className="text-xl font-bold text-gray-900">Brand Identity & Colors</h3>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <div className="space-y-4">
+                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Primary Brand Color</label>
+                    <div className="flex flex-wrap gap-3">
+                      {[
+                        '#4f46e5', // Brand Indigo
+                        '#059669', // Emerald
+                        '#2563eb', // Blue
+                        '#7c3aed', // Violet
+                        '#db2777', // Pink
+                        '#ea580c', // Orange
+                        '#111827', // Dark
+                      ].map(color => (
+                        <button
+                          key={color}
+                          onClick={() => setInstitution(prev => prev ? { ...prev, primaryColor: color } : null)}
+                          className={cn(
+                            "w-12 h-12 rounded-2xl transition-all border-4",
+                            institution?.primaryColor === color ? "border-indigo-200 scale-110 shadow-lg" : "border-transparent hover:scale-105"
+                          )}
+                          style={{ backgroundColor: color }}
+                        />
+                      ))}
+                      <div className="relative">
+                        <input 
+                          type="color" 
+                          value={institution?.primaryColor || '#4f46e5'}
+                          onChange={(e) => setInstitution(prev => prev ? { ...prev, primaryColor: e.target.value } : null)}
+                          className="w-12 h-12 rounded-2xl cursor-pointer bg-white border border-gray-200 p-1"
+                        />
+                      </div>
+                    </div>
+                    <p className="text-xs text-gray-400 italic">This color will be used for buttons, links, and accents in your public profile.</p>
+                  </div>
+                </div>
+              </div>
+
               <div className="pt-6 border-t border-gray-50 flex justify-end">
                 <button 
                   onClick={async () => {
@@ -842,7 +939,8 @@ export function Institution() {
                     try {
                       await updateDoc(doc(db, 'institutions', instId), { 
                         slug: institution.slug,
-                        websiteConfig: institution.websiteConfig
+                        websiteConfig: institution.websiteConfig,
+                        primaryColor: institution.primaryColor
                       });
                       setToast({ message: 'Settings Saved!', type: 'success' });
                     } catch (error) {
@@ -985,26 +1083,36 @@ export function Institution() {
                         >
                           {section.active ? 'Active' : 'Hidden'}
                         </button>
-                        {section.type === 'custom_text' && (
+                        {(section.type === 'custom_text' || section.type === 'gallery' || section.type === 'results' || section.type === 'about' || section.type === 'mission_vision' || section.type === 'hero' || section.type === 'stats') ? (
                           <button 
                             onClick={() => {
                               setEditingSection(section);
                               setShowSectionModal(true);
                             }}
-                            className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg"
+                            className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg flex items-center gap-2 font-bold text-xs border border-indigo-100"
+                            title="Edit Section Settings"
                           >
-                            <Edit2 className="w-4 h-4" />
+                            <Settings className="w-4 h-4" /> Edit
                           </button>
-                        )}
-                        {section.type === 'results' && (
+                        ) : (
                           <button 
                             onClick={() => {
-                              setEditingSection(section);
-                              setShowSectionModal(true);
+                              // Scroll to the relevant management section below
+                              const el = document.getElementById(`manage-${section.type}`);
+                              if (el) {
+                                el.scrollIntoView({ behavior: 'smooth' });
+                                el.classList.add('ring-4', 'ring-indigo-500/20', 'ring-offset-2');
+                                setTimeout(() => el.classList.remove('ring-4', 'ring-indigo-500/20', 'ring-offset-2'), 2000);
+                              } else {
+                                if (section.type === 'news') setShowNoticeModal(true);
+                                else if (section.type === 'events') setShowEventModal(true);
+                                else if (section.type === 'circulars') setShowCircularModal(true);
+                              }
                             }}
-                            className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg"
+                            className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg flex items-center gap-2 font-bold text-xs border border-amber-100"
+                            title="Manage Content"
                           >
-                            <Settings className="w-4 h-4" />
+                            <Edit2 className="w-4 h-4" /> Manage
                           </button>
                         )}
                         <button 
@@ -1013,7 +1121,7 @@ export function Institution() {
                             const sections = institution.websiteConfig.sections.filter(s => s.id !== section.id);
                             setInstitution({ ...institution, websiteConfig: { ...institution.websiteConfig, sections } });
                           }}
-                          className="p-2 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg"
+                          className="p-2 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg border border-transparent hover:border-rose-100"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -1039,7 +1147,7 @@ export function Institution() {
 
             {/* Existing Lists for News, Events etc. (Management Areas) */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-8 border-t border-gray-100">
-                <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm space-y-6">
+                <div id="manage-news" className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm space-y-6 transition-all">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center text-amber-600">
@@ -1065,7 +1173,7 @@ export function Institution() {
                 </div>
               </div>
 
-               <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm space-y-6">
+               <div id="manage-events" className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm space-y-6 transition-all">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center text-indigo-600">
@@ -1088,6 +1196,33 @@ export function Institution() {
                       </div>
                     </div>
                   ))}
+                </div>
+              </div>
+
+              <div id="manage-circulars" className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm space-y-6 transition-all">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center text-emerald-600">
+                      <Briefcase className="w-5 h-5" />
+                    </div>
+                    <h4 className="font-bold text-gray-900">Manage Circulars</h4>
+                  </div>
+                  <button onClick={() => { setEditingItem(null); setShowCircularModal(true); }} className="p-2 bg-indigo-50 text-indigo-600 rounded-lg transition-transform hover:scale-110"><Plus className="w-4 h-4" /></button>
+                </div>
+                <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                  {circulars.map(c => (
+                    <div key={c.id} className="p-4 bg-gray-50 rounded-2xl border border-gray-100 flex items-center justify-between group hover:bg-white hover:shadow-md transition-all">
+                      <div className="min-w-0">
+                        <p className="font-bold text-gray-900 truncate">{c.title}</p>
+                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{c.category}</p>
+                      </div>
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button onClick={() => { setEditingItem(c); setShowCircularModal(true); }} className="p-2 text-gray-400 hover:text-indigo-600"><Edit2 className="w-4 h-4" /></button>
+                        <button onClick={() => handleDeleteItem('circulars', c.id)} className="p-2 text-gray-400 hover:text-rose-600"><Trash2 className="w-4 h-4" /></button>
+                      </div>
+                    </div>
+                  ))}
+                  {circulars.length === 0 && <p className="text-center py-6 text-gray-400 text-xs italic font-medium">No circulars added yet.</p>}
                 </div>
               </div>
             </div>
@@ -1617,6 +1752,16 @@ export function Institution() {
                     </div>
                   ))
                 )}
+              </div>
+            </div>
+          )}
+
+          {editingSection?.type === 'about' && (
+            <div className="space-y-4">
+              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1 block">About Institution Text</label>
+              <p className="text-[10px] text-gray-400 italic mb-2">Note: This section pulls the description from your main profile. You can change it in the Profile tab.</p>
+              <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100 text-gray-500 text-xs leading-relaxed">
+                {institution?.description || 'No description provided.'}
               </div>
             </div>
           )}

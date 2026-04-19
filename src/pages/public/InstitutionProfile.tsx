@@ -71,7 +71,7 @@ export function InstitutionProfile() {
           getDocs(query(collection(db, 'notices'), where('institutionId', '==', instId), where('active', '==', true), orderBy('createdAt', 'desc'), limit(5))),
           getDocs(query(collection(db, 'events'), where('institutionId', '==', instId), where('active', '==', true), orderBy('createdAt', 'desc'), limit(5))),
           getDocs(query(collection(db, 'circulars'), where('institutionId', '==', instId), where('active', '==', true), orderBy('createdAt', 'desc'), limit(5))),
-          getDocs(query(collection(db, 'offlineExams'), where('institutionId', '==', instId), where('status', '==', 'published'), orderBy('date', 'desc'), limit(6)))
+          getDocs(query(collection(db, 'offline_exams'), where('institutionId', '==', instId), where('status', '==', 'published'), orderBy('date', 'desc'), limit(6)))
         ]);
 
         setStats({
@@ -174,7 +174,7 @@ export function InstitutionProfile() {
     switch (section.type) {
       case 'hero':
         return (
-          <div key={section.id} className="bg-indigo-600 text-white pt-20 pb-40 px-6">
+          <div key={section.id} className="bg-brand text-white pt-20 pb-40 px-6">
             <div className="max-w-5xl mx-auto flex flex-col md:flex-row items-center gap-8">
               <div className="w-32 h-32 bg-white/20 rounded-3xl flex items-center justify-center text-5xl font-black ring-8 ring-white/10 overflow-hidden">
                 {institution.logoURL ? (
@@ -191,7 +191,7 @@ export function InstitutionProfile() {
                   </span>
                 </div>
                 <h1 className="text-4xl md:text-5xl font-black tracking-tight">{institution.name}</h1>
-                <p className="text-indigo-100 flex items-center justify-center md:justify-start gap-2">
+                <p className="text-white/80 flex items-center justify-center md:justify-start gap-2">
                   <MapPin className="w-4 h-4" /> {institution.address || 'Address not provided'}
                 </p>
               </div>
@@ -232,7 +232,7 @@ export function InstitutionProfile() {
         return (
           <section key={section.id} className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm space-y-4">
             <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-              <GraduationCap className="w-6 h-6 text-indigo-600" /> {section.title || 'About Institution'}
+              <GraduationCap className="w-6 h-6 text-brand" /> {section.title || 'About Institution'}
             </h2>
             <p className="text-gray-600 leading-relaxed whitespace-pre-wrap">
               {institution.description || 'No description provided.'}
@@ -313,7 +313,7 @@ export function InstitutionProfile() {
                 <button 
                   key={exam.id}
                   onClick={() => navigate(`/public/exam/${exam.id}`)}
-                  className="p-5 bg-gradient-to-br from-indigo-600 to-indigo-800 text-white rounded-[24px] text-left hover:shadow-xl hover:-translate-y-1 transition-all space-y-4 group"
+                  className="p-5 bg-brand text-white rounded-[24px] text-left hover:shadow-xl hover:-translate-y-1 transition-all space-y-4 group opacity-90 hover:opacity-100"
                 >
                   <div className="flex items-center justify-between">
                     <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
@@ -323,7 +323,7 @@ export function InstitutionProfile() {
                   </div>
                   <div>
                     <h4 className="font-bold text-lg leading-tight line-clamp-2">{exam.title}</h4>
-                    <p className="text-xs text-indigo-100 font-medium tracking-wide mt-2">{exam.batchName} • {exam.date}</p>
+                    <p className="text-xs text-white/80 font-medium tracking-wide mt-2">{exam.batchName} • {exam.date}</p>
                   </div>
                 </button>
               ))}
@@ -373,12 +373,12 @@ export function InstitutionProfile() {
         return events.length > 0 && (
           <section key={section.id} className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm space-y-6">
             <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-              <Calendar className="w-6 h-6 text-indigo-600" /> {section.title || 'Timeline & Events'}
+              <Calendar className="w-6 h-6 text-brand" /> {section.title || 'Timeline & Events'}
             </h2>
             <div className="space-y-6">
               {events.map(event => (
                 <div key={event.id} className="flex gap-4 group">
-                  <div className="w-16 h-16 bg-indigo-50 rounded-2xl flex flex-col items-center justify-center shrink-0 border border-indigo-100 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                  <div className="w-16 h-16 bg-gray-50 rounded-2xl flex flex-col items-center justify-center shrink-0 border border-gray-100 group-hover:bg-brand group-hover:text-white transition-colors">
                     <span className="text-[10px] font-black uppercase tracking-widest leading-none mb-1">
                       {new Date(event.date).toLocaleDateString('en-US', { month: 'short' })}
                     </span>
@@ -387,12 +387,12 @@ export function InstitutionProfile() {
                     </span>
                   </div>
                   <div className="min-w-0 flex-1 pt-1">
-                    <h5 className="font-bold text-gray-900 text-lg group-hover:text-indigo-600 transition-colors">{event.title}</h5>
+                    <h5 className="font-bold text-gray-900 text-lg group-hover:text-brand transition-colors">{event.title}</h5>
                     <div className="flex flex-wrap items-center gap-4 mt-2">
                       <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-1">
                         <Clock className="w-3 h-3" /> {event.time || 'All Day'}
                       </p>
-                      <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest flex items-center gap-1">
+                      <p className="text-[10px] font-black text-brand uppercase tracking-widest flex items-center gap-1">
                         <MapPin className="w-3 h-3" /> {event.location || 'Institution Premises'}
                       </p>
                     </div>
@@ -416,10 +416,54 @@ export function InstitutionProfile() {
     { id: 'sec_results', type: 'results', active: true, order: 4 },
   ];
 
+  const primaryColor = institution?.primaryColor || '#4f46e5';
+
   return (
-    <div className="min-h-screen bg-gray-50 pb-20">
-      {/* Dynamic Sections */}
-      {sections.map(section => renderSection(section))}
+    <div className="min-h-screen bg-gray-100/50 py-4 sm:py-10 px-0 sm:px-6 lg:px-8">
+      <div className="max-w-6xl mx-auto bg-white sm:rounded-[2.5rem] shadow-2xl shadow-gray-200/50 overflow-hidden border border-gray-100 flex flex-col min-h-[90vh]" style={{ '--brand-primary': primaryColor } as React.CSSProperties}>
+        <style>{`
+          .bg-brand { background-color: var(--brand-primary) !important; }
+          .text-brand { color: var(--brand-primary) !important; }
+          .border-brand { border-color: var(--brand-primary) !important; }
+          .ring-brand { --tw-ring-color: var(--brand-primary) !important; }
+          .from-brand { --tw-gradient-from: var(--brand-primary) var(--tw-gradient-from-position); --tw-gradient-to: rgb(0 0 0 / 0) var(--tw-gradient-to-position); --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
+        `}</style>
+
+        {/* Floating Navigation */}
+        <nav className="bg-white/80 backdrop-blur-md sticky top-0 z-50 px-8 py-5 border-b border-gray-50 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 bg-brand rounded-2xl flex items-center justify-center text-white shadow-lg shadow-brand/20 overflow-hidden uppercase">
+              {institution.logoURL ? (
+                <img src={institution.logoURL} alt="Logo" className="w-full h-full object-contain p-1.5" />
+              ) : institution.name.charAt(0)}
+            </div>
+            <div>
+              <span className="font-black text-2xl tracking-tighter text-gray-900 block leading-none">{institution.name}</span>
+              <span className="text-[10px] font-black text-brand uppercase tracking-[0.2em] mt-1 block">OFFICIAL PROFILE</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-4">
+            <button 
+              onClick={downloadBio}
+              disabled={downloading}
+              className="hidden sm:flex items-center gap-2 px-6 py-2.5 bg-gray-900 text-white rounded-xl text-sm font-bold hover:bg-gray-800 transition-all disabled:opacity-50"
+            >
+              {downloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+              {downloading ? 'Preparing...' : 'Download Bio'}
+            </button>
+          </div>
+        </nav>
+        
+        {/* Dynamic Sections */}
+        <div className="space-y-12 flex-grow">
+        {sections.filter((s: any) => s.active).map(section => (
+          <div key={section.id} className={cn(
+            section.type === 'hero' ? "" : "max-w-5xl mx-auto px-6"
+          )}>
+            {renderSection(section)}
+          </div>
+        ))}
+      </div>
 
       {/* Persistent Footer and Contact Card */}
       <div className="max-w-5xl mx-auto px-6 mt-12 grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -434,7 +478,7 @@ export function InstitutionProfile() {
                   )}
                   <div className="space-y-2">
                     <p className="text-2xl font-black text-gray-900">{institution.principalName}</p>
-                    <p className="text-indigo-600 font-bold text-xs uppercase tracking-widest">{institution.principalTitle || 'Principal'}</p>
+                    <p className="text-brand font-bold text-xs uppercase tracking-widest">{institution.principalTitle || 'Principal'}</p>
                     <p className="text-gray-500 italic leading-relaxed text-lg pt-4 line-clamp-4">
                       "Welcome to our institution. We are committed to providing the highest quality education and fostering a nurturing environment for all our students."
                     </p>
@@ -497,21 +541,22 @@ export function InstitutionProfile() {
         </div>
       </div>
 
-      <div className="max-w-5xl mx-auto px-6 mt-20 pt-12 border-t border-gray-100">
-        <div className="flex flex-col items-center gap-4">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center overflow-hidden">
-               <TrendingUp className="w-5 h-5 text-white" />
+        <div className="px-6 py-12 border-t border-gray-100 mt-auto bg-gray-50/50">
+          <div className="flex flex-col items-center gap-4">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center overflow-hidden">
+                <TrendingUp className="w-5 h-5 text-white" />
+              </div>
+              <span className="font-black text-gray-900 tracking-tighter text-xl">Manage My Batch</span>
             </div>
-            <span className="font-black text-gray-900 tracking-tighter text-xl">Manage My Batch</span>
-          </div>
-          <p className="text-center text-gray-400 text-xs font-medium max-w-sm">
-            Everything you need to manage your coaching center efficiently.
-          </p>
-          <div className="flex items-center gap-6 mt-4">
-            <p className="text-[10px] font-black text-gray-300 uppercase tracking-[0.2em] italic">Secure</p>
-            <p className="text-[10px] font-black text-gray-300 uppercase tracking-[0.2em] italic">Reliable</p>
-            <p className="text-[10px] font-black text-gray-300 uppercase tracking-[0.2em] italic">Professional</p>
+            <p className="text-center text-gray-400 text-xs font-medium max-w-sm">
+              Everything you need to manage your coaching center efficiently.
+            </p>
+            <div className="flex items-center gap-6 mt-4">
+              <p className="text-[10px] font-black text-gray-300 uppercase tracking-[0.2em] italic">Secure</p>
+              <p className="text-[10px] font-black text-gray-300 uppercase tracking-[0.2em] italic">Reliable</p>
+              <p className="text-[10px] font-black text-gray-300 uppercase tracking-[0.2em] italic">Professional</p>
+            </div>
           </div>
         </div>
       </div>
@@ -528,8 +573,8 @@ function HiddenBioTemplate({ institution, stats, bioRef }: { institution: any, s
         className="w-[800px] p-12"
         style={{ fontFamily: '"Inter", sans-serif', minHeight: '1000px', backgroundColor: '#ffffff', color: '#111827' }}
       >
-        <div className="flex items-center gap-8 border-b-4 pb-8" style={{ borderColor: '#4f46e5', marginBottom: '48px' }}>
-          <div className="w-32 h-32 rounded-3xl flex items-center justify-center text-4xl font-black shrink-0 overflow-hidden" style={{ backgroundColor: '#eef2ff', color: '#4f46e5' }}>
+        <div className="flex items-center gap-8 border-b-4 pb-8" style={{ borderColor: institution?.primaryColor || '#4f46e5', marginBottom: '48px' }}>
+          <div className="w-32 h-32 rounded-3xl flex items-center justify-center text-4xl font-black shrink-0 overflow-hidden" style={{ backgroundColor: '#f3f4f6', color: institution?.primaryColor || '#4f46e5' }}>
             {institution.logoURL ? (
               <img src={institution.logoURL} alt="Logo" className="w-full h-full object-contain p-4" crossOrigin="anonymous" referrerPolicy="no-referrer" />
             ) : (
@@ -541,7 +586,7 @@ function HiddenBioTemplate({ institution, stats, bioRef }: { institution: any, s
             <p className="font-bold flex items-center gap-2" style={{ color: '#6b7280', margin: 0 }}>
               <MapPin className="w-4 h-4" style={{ stroke: '#6b7280' }} /> {institution.address || 'Address not provided'}
             </p>
-            <p className="font-bold uppercase tracking-widest text-xs" style={{ color: '#4f46e5', margin: 0 }}>Established: {institution.established || 'N/A'}</p>
+            <p className="font-bold uppercase tracking-widest text-xs" style={{ color: institution?.primaryColor || '#4f46e5', margin: 0 }}>Established: {institution.established || 'N/A'}</p>
           </div>
         </div>
 

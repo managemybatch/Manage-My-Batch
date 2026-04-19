@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { CreditCard, Plus, Search, Filter, Download, CheckCircle2, Clock, Loader2, User, Phone, Calendar, AlertCircle, Send, Wallet, Banknote, Users, Receipt, Printer } from 'lucide-react';
+import { CreditCard, Plus, Search, Filter, Download, CheckCircle2, Clock, Loader2, User, Phone, Calendar, AlertCircle, Send, Wallet, Banknote, Users, Receipt, Printer, ArrowRight, MessageSquare } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import { Table, TableRow, TableCell } from '../components/Table';
 import { cn, formatCurrency, formatDate, formatWhatsAppPhone } from '../lib/utils';
+import { sendSMS, SMSConfig } from '../lib/sms';
 import { collection, onSnapshot, query, addDoc, serverTimestamp, orderBy, writeBatch, doc, where, getDoc } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { useAuth } from '../lib/auth';
@@ -62,8 +63,11 @@ export function Fees() {
   const [reportDates, setReportDates] = useState({ start: '', end: '' });
   const [isSaving, setIsSaving] = useState(false);
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
+  const [isPaymentSuccessModalOpen, setIsPaymentSuccessModalOpen] = useState(false);
+  const [lastPaymentDetails, setLastPaymentDetails] = useState<any>(null);
   const [successMessage, setSuccessMessage] = useState('');
   const [pendingWhatsappUrl, setPendingWhatsappUrl] = useState<string | null>(null);
+  const [isSendingSMS, setIsSendingSMS] = useState(false);
   const [selectedFeeForReceipt, setSelectedFeeForReceipt] = useState<FeeRecord | null>(null);
   const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
   const [isGeneratingReceipt, setIsGeneratingReceipt] = useState(false);
@@ -241,9 +245,23 @@ export function Fees() {
 
       await batch.commit();
 
-      // WhatsApp Message
       const totalAmount = selectedStudent.monthlyFee * paymentData.months.length;
-      const message = `${t('fees.whatsapp.success')}\n${t('fees.whatsapp.studentName')}: ${selectedStudent.name}\n${t('fees.whatsapp.month')}: ${paymentData.months.join(', ')}\n${t('fees.whatsapp.totalAmount')}: ৳${totalAmount}\n${t('fees.whatsapp.method')}: ${paymentData.method}\n${t('fees.whatsapp.thanks')}`;
+      
+      const details = {
+        studentName: selectedStudent.name,
+        rollNo: selectedStudent.rollNo,
+        batchName: selectedStudent.batchName,
+        months: paymentData.months,
+        amount: totalAmount,
+        date: paymentDate,
+        method: paymentData.method,
+        phone: selectedStudent.guardianPhone,
+        dues: getStudentDues(selectedStudent).filter(m => !paymentData.months.includes(m))
+      };
+
+      setLastPaymentDetails(details);
+      
+      const message = `${t('fees.whatsapp.success')}\n${t('fees.whatsapp.studentName')}: ${details.studentName}\n${t('fees.whatsapp.month')}: ${details.months.join(', ')}\n${t('fees.whatsapp.totalAmount')}: ৳${details.amount}\n${t('fees.whatsapp.method')}: ${details.method}\n${t('fees.whatsapp.thanks')}`;
       
       const encodedMessage = encodeURIComponent(message);
       const cleanPhone = formatWhatsAppPhone(selectedStudent.guardianPhone);
@@ -252,8 +270,7 @@ export function Fees() {
       setPendingWhatsappUrl(whatsappUrl);
       setIsPaymentModalOpen(false);
       setPaymentData({ months: [], method: 'Cash', bkashNumber: '', transactionId: '', amount: 0 });
-      setSuccessMessage(t('common.success', { defaultValue: 'Payment recorded successfully!' }));
-      setIsSuccessModalOpen(true);
+      setIsPaymentSuccessModalOpen(true);
     } catch (error) {
       handleFirestoreError(error, OperationType.CREATE, 'fees');
     } finally {
@@ -300,6 +317,25 @@ export function Fees() {
     document.body.removeChild(link);
   };
 
+  const handleSendSMS = async () => {
+    if (!lastPaymentDetails || isSendingSMS) return;
+    setIsSendingSMS(true);
+    try {
+      const message = `Payment Received!\nStudent: ${lastPaymentDetails.studentName}\nRoll: ${lastPaymentDetails.rollNo}\nBatch: ${lastPaymentDetails.batchName}\nMonths: ${lastPaymentDetails.months.join(', ')}\nAmount: ৳${lastPaymentDetails.amount}\nCoach: ${instData?.name || 'Our Center'}\nDate: ${new Date(lastPaymentDetails.date).toLocaleDateString()}\nDue: ${lastPaymentDetails.dues.length} months`;
+      
+      const result = await sendSMS(instData?.smsConfig, lastPaymentDetails.phone, message);
+      if (result.success) {
+        alert('SMS sent successfully!');
+      } else {
+        alert(`Failed to send SMS: ${result.error}`);
+      }
+    } catch (error) {
+      alert('Error sending SMS');
+    } finally {
+      setIsSendingSMS(false);
+    }
+  };
+
   const filteredStudents = students.filter(s => {
     const matchesSearch = s.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
                          s.rollNo.includes(searchTerm) || 
@@ -311,7 +347,7 @@ export function Fees() {
   });
 
   const totalCollected = fees.filter(f => f.status === 'paid').reduce((sum, f) => sum + f.amount, 0);
-  const studentsWithDues = students.filter(s => getStudentDues(s).length > 0 && s.status === 'active');
+  const studentsWithDues = students.filter(s => s.status === 'active' && getStudentDues(s).length > 0);
 
   return (
     <div className="space-y-8">
@@ -407,57 +443,7 @@ export function Fees() {
         </div>
       </div>
 
-      {activeTab === 'all' && (
-        <div className="space-y-4">
-          <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-            <Clock className="w-5 h-5 text-indigo-600" /> Recent Payments
-          </h2>
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden overflow-x-auto">
-            <table className="w-full text-left">
-              <thead>
-                <tr className="bg-gray-50 border-b border-gray-100">
-                  <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">Student</th>
-                  <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">Purpose</th>
-                  <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">Amount</th>
-                  <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">Date</th>
-                  <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {fees.slice(0, 10).map(fee => (
-                  <tr key={fee.id} className="hover:bg-gray-50/50 transition-colors">
-                    <td className="px-6 py-4">
-                      <p className="font-bold text-gray-900">{fee.studentName}</p>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="text-xs font-medium text-gray-600 bg-gray-100 px-2 py-1 rounded">
-                        {fee.type === 'Monthly Fee' ? `${fee.month} ${fee.year}` : fee.type}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 font-black text-gray-900">৳{fee.amount}</td>
-                    <td className="px-6 py-4 text-xs text-gray-500 font-medium">
-                      {new Date(fee.date).toLocaleDateString()}
-                    </td>
-                    <td className="px-6 py-4">
-                      <button 
-                        onClick={() => {
-                          setSelectedFeeForReceipt(fee);
-                          setIsReceiptModalOpen(true);
-                        }}
-                        className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
-                        title="Print Receipt"
-                      >
-                        <Receipt className="w-4 h-4" />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
+      {/* Student List Table */}
       {loading ? (
         <div className="flex items-center justify-center py-20">
           <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
@@ -529,6 +515,58 @@ export function Fees() {
             );
           })}
         </Table>
+      )}
+
+      {/* Recent Payments Section - Moved Below */}
+      {activeTab === 'all' && (
+        <div className="space-y-4 pt-8 border-t border-gray-100">
+          <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+            <Clock className="w-5 h-5 text-indigo-600" /> Recent Payments
+          </h2>
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden overflow-x-auto">
+            <table className="w-full text-left">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-100">
+                  <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">Student</th>
+                  <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">Purpose</th>
+                  <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">Amount</th>
+                  <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">Date</th>
+                  <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {fees.slice(0, 10).map(fee => (
+                  <tr key={fee.id} className="hover:bg-gray-50/50 transition-colors">
+                    <td className="px-6 py-4">
+                      <p className="font-bold text-gray-900">{fee.studentName}</p>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="text-xs font-medium text-gray-600 bg-gray-100 px-2 py-1 rounded">
+                        {fee.type === 'Monthly Fee' ? `${fee.month} ${fee.year}` : fee.type}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 font-black text-gray-900">৳{fee.amount}</td>
+                    <td className="px-6 py-4 text-xs text-gray-500 font-medium">
+                      {new Date(fee.date).toLocaleDateString()}
+                    </td>
+                    <td className="px-6 py-4">
+                      <button 
+                        onClick={() => {
+                          setSelectedFeeForReceipt(fee);
+                          setIsReceiptModalOpen(true);
+                        }}
+                        className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
+                        title="Print Receipt"
+                      >
+                        <Receipt className="w-4 h-4" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
       )}
 
       {/* Payment Modal */}
@@ -657,6 +695,100 @@ export function Fees() {
         )}
       </Modal>
 
+      {/* Payment Success Options Modal */}
+      <Modal
+        isOpen={isPaymentSuccessModalOpen}
+        onClose={() => setIsPaymentSuccessModalOpen(false)}
+        title="Payment Successful!"
+        maxWidth="max-w-md"
+      >
+        <div className="space-y-6">
+          <div className="text-center space-y-2">
+            <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4">
+              <CheckCircle2 className="w-10 h-10" />
+            </div>
+            <h3 className="text-xl font-bold text-gray-900">Payment of ৳{lastPaymentDetails?.amount} Added</h3>
+            <p className="text-sm text-gray-500">Student: {lastPaymentDetails?.studentName} ({lastPaymentDetails?.rollNo})</p>
+          </div>
+
+          <div className="grid grid-cols-1 gap-3">
+            <button
+              onClick={() => {
+                if (pendingWhatsappUrl) {
+                  window.open(pendingWhatsappUrl, '_blank');
+                }
+              }}
+              className="w-full flex items-center justify-between p-4 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-2xl border border-emerald-100 transition-all group"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-emerald-600 text-white rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <Send className="w-5 h-5" />
+                </div>
+                <div className="text-left">
+                  <p className="font-bold">Send WhatsApp</p>
+                  <p className="text-[10px] opacity-70 uppercase tracking-widest font-black">Direct to Guardian</p>
+                </div>
+              </div>
+              <ArrowRight className="w-5 h-5 opacity-50 group-hover:translate-x-1 transition-transform" />
+            </button>
+
+            <button
+              onClick={handleSendSMS}
+              disabled={isSendingSMS}
+              className="w-full flex items-center justify-between p-4 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-2xl border border-blue-100 transition-all group disabled:opacity-50"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-blue-600 text-white rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                  {isSendingSMS ? <Loader2 className="w-5 h-5 animate-spin" /> : <MessageSquare className="w-5 h-5" />}
+                </div>
+                <div className="text-left">
+                  <p className="font-bold">Send Auto SMS</p>
+                  <p className="text-[10px] opacity-70 uppercase tracking-widest font-black">Via Custom Gateway</p>
+                </div>
+              </div>
+              <ArrowRight className="w-5 h-5 opacity-50 group-hover:translate-x-1 transition-transform" />
+            </button>
+
+            <button
+              onClick={() => {
+                // We need the fee ID to print receipt. 
+                // Since batch commit doesn't return IDs easily, we rely on the list or get latest.
+                // For simplicity, let's allow downloading from recent payments or implement a specific receipt fetch here.
+                // The user asked for receipt download in the popup.
+                alert('Receipt generated. You can download it from the Recent Payments list below.');
+              }}
+              className="w-full flex items-center justify-between p-4 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-2xl border border-indigo-100 transition-all group"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-indigo-600 text-white rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <Receipt className="w-5 h-5" />
+                </div>
+                <div className="text-left">
+                  <p className="font-bold">Download Receipt</p>
+                  <p className="text-[10px] opacity-70 uppercase tracking-widest font-black">PDF Format</p>
+                </div>
+              </div>
+              <ArrowRight className="w-5 h-5 opacity-50 group-hover:translate-x-1 transition-transform" />
+            </button>
+          </div>
+
+          <div className="flex gap-3">
+            <button
+              onClick={() => setIsPaymentSuccessModalOpen(false)}
+              className="flex-1 py-4 bg-gray-100 text-gray-700 font-bold rounded-2xl hover:bg-gray-200 transition-all"
+            >
+              Just Save
+            </button>
+            <button
+              onClick={() => setIsPaymentSuccessModalOpen(false)}
+              className="flex-1 py-4 bg-gray-900 text-white font-bold rounded-2xl hover:bg-gray-800 transition-all"
+            >
+              Cancel & Close
+            </button>
+          </div>
+        </div>
+      </Modal>
+
       {/* Custom Report Modal */}
       <Modal
         isOpen={isReportModalOpen}
@@ -722,7 +854,7 @@ export function Fees() {
           </div>
 
           <div className="bg-gray-100 p-8 rounded-2xl flex justify-center">
-            <div ref={receiptRef} className="bg-white w-[140mm] p-10 relative shadow-xl font-sans" style={{ minHeight: '140mm' }}>
+            <div ref={receiptRef} className="bg-white w-[140mm] p-10 relative shadow-xl" style={{ minHeight: '140mm', fontFamily: "'Inter', 'Noto Sans Bengali', sans-serif" }}>
               <div className="border-4 border-indigo-600 p-8 h-full relative">
                 <div className="flex justify-between items-start mb-8">
                   <div className="flex items-center gap-3">

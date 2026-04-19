@@ -234,6 +234,7 @@ export function OfflineExams() {
     try {
       await addDoc(collection(db, 'offline_exams'), {
         ...newExam,
+        institutionName: instData?.name || newExam.institutionName,
         institutionId: instId,
         batchName: selectedBatch?.name || '',
         status: 'pending',
@@ -282,6 +283,8 @@ export function OfflineExams() {
     setIsSaving(true);
     try {
       await deleteDoc(doc(db, 'offline_exams', examToDelete));
+      setSuccessMessage(t('offlineExams.deleteModal.success', { defaultValue: 'Exam deleted successfully!' }));
+      setIsSuccessModalOpen(true);
       setIsDeleteModalOpen(false);
       setExamToDelete(null);
     } catch (error) {
@@ -722,17 +725,6 @@ export function OfflineExams() {
                 <option value="school">{t('offlineExams.modal.types.school')}</option>
               </select>
             </div>
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">{t('offlineExams.modal.institution')}</label>
-              <input
-                required
-                type="text"
-                placeholder="e.g. Manage My Batch Academy"
-                value={newExam.institutionName}
-                onChange={e => setNewExam({...newExam, institutionName: e.target.value})}
-                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
-              />
-            </div>
           </div>
 
           <div className="flex items-center gap-2">
@@ -765,80 +757,6 @@ export function OfflineExams() {
                   <input 
                     type="text" 
                     placeholder="Part Name" 
-                    value={ss.name} 
-                    onChange={e => {
-                      const updated = [...newExam.subSections];
-                      updated[idx].name = e.target.value;
-                      setNewExam({...newExam, subSections: updated});
-                    }}
-                    className="flex-1 px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs"
-                    required
-                  />
-                  <input 
-                    type="number" 
-                    placeholder="Marks" 
-                    value={ss.totalMarks || ''} 
-                    onChange={e => {
-                      const updated = [...newExam.subSections];
-                      updated[idx].totalMarks = parseInt(e.target.value) || 0;
-                      const total = updated.reduce((sum, s) => sum + s.totalMarks, 0);
-                      setNewExam({...newExam, subSections: updated, totalMarks: total});
-                    }}
-                    className="w-20 px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs"
-                    required
-                  />
-                  <button 
-                    type="button" 
-                    onClick={() => {
-                      const updated = newExam.subSections.filter((_, i) => i !== idx);
-                      const total = updated.reduce((sum, s) => sum + s.totalMarks, 0);
-                      setNewExam({...newExam, subSections: updated, totalMarks: total});
-                    }}
-                    className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg"
-                  >
-                    <Plus className="w-4 h-4 rotate-45" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-
-          <div className="flex items-center gap-2">
-            <input 
-              type="checkbox" 
-              id="hasSubSections" 
-              checked={newExam.hasSubSections} 
-              onChange={e => {
-                const checked = e.target.checked;
-                setNewExam(prev => ({
-                  ...prev, 
-                  hasSubSections: checked,
-                }));
-              }}
-              className="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-            />
-            <label htmlFor="hasSubSections" className="text-sm font-medium text-gray-700">
-              Enable Sub-sections (e.g., MCQ, CQ, Viva)
-            </label>
-          </div>
-
-          {newExam.hasSubSections && newExam.type === 'single' && (
-            <div className="space-y-3 bg-indigo-50/50 p-4 rounded-xl border border-indigo-100">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-bold text-indigo-700 uppercase tracking-widest">Sub-sections</span>
-                <button 
-                  type="button" 
-                  onClick={() => setNewExam(prev => ({ ...prev, subSections: [...prev.subSections, { name: '', totalMarks: 0 }] }))}
-                  className="text-xs font-bold text-indigo-600 hover:text-indigo-700 flex items-center gap-1"
-                >
-                  <Plus className="w-3 h-3" /> Add Part
-                </button>
-              </div>
-              {newExam.subSections.map((ss, idx) => (
-                <div key={idx} className="flex gap-2">
-                  <input 
-                    type="text" 
-                    placeholder="Part Name (e.g. MCQ)" 
                     value={ss.name} 
                     onChange={e => {
                       const updated = [...newExam.subSections];
@@ -1087,17 +1005,7 @@ export function OfflineExams() {
                   <option value="school">{t('offlineExams.modal.types.school')}</option>
                 </select>
               </div>
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">{t('offlineExams.modal.institution')}</label>
-                <input
-                  required
-                  type="text"
-                  placeholder="e.g. Manage My Batch Academy"
-                  value={editingExam.institutionName}
-                  onChange={e => setEditingExam({...editingExam, institutionName: e.target.value})}
-                  className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
-                />
-              </div>
+              {/* Institution Name removed as it is pulled from profile */}
             </div>
 
             <div className="flex items-center gap-2">
@@ -1301,13 +1209,13 @@ export function OfflineExams() {
 
       <Modal isOpen={isManageModalOpen} onClose={() => setIsManageModalOpen(false)} title={`${t('offlineExams.card.manage')}: ${selectedExam?.title}`} maxWidth="max-w-4xl">
         <div className="space-y-6">
-          <div className="flex items-center gap-2 p-1 bg-gray-100 rounded-xl">
+          <div className="flex items-center gap-2 p-1 bg-gray-100 rounded-xl overflow-x-auto no-scrollbar">
             {['overview', 'seat-plan', 'admit-cards', 'results'].map((tab) => (
               <button
                 key={tab}
                 onClick={() => setManageTab(tab as any)}
                 className={cn(
-                  "flex-1 py-2 text-xs font-bold uppercase tracking-wider rounded-lg transition-all",
+                  "min-w-fit flex-1 py-2 px-4 text-[10px] md:text-xs font-bold uppercase tracking-wider rounded-lg transition-all whitespace-nowrap",
                   manageTab === tab ? "bg-white text-indigo-600 shadow-sm" : "text-gray-500 hover:text-gray-700"
                 )}
               >
@@ -1381,7 +1289,7 @@ export function OfflineExams() {
 
               {/* PDF Template for Schedule (Off-screen) */}
               <div className="fixed left-[-9999px] top-0 pointer-events-none">
-                <div ref={scheduleRef} className="p-8 w-[210mm] min-h-[297mm] relative font-sans" style={{ backgroundColor: '#ffffff' }}>
+                <div ref={scheduleRef} className="p-8 w-[210mm] min-h-[297mm] relative" style={{ backgroundColor: '#ffffff', fontFamily: "'Inter', 'Noto Sans Bengali', sans-serif" }}>
                   {/* Background Pattern */}
                   <div className="absolute inset-0 pointer-events-none" style={{ backgroundImage: 'radial-gradient(#4f46e5 1px, rgba(255, 255, 255, 0) 0)', backgroundSize: '32px 32px', opacity: 0.02 }}></div>
                   
@@ -1924,18 +1832,16 @@ export function OfflineExams() {
                               >
                                 <ImageIcon className="w-5 h-5" />
                               </button>
-                              {selectedExam?.type === 'school' && (
-                                <button
-                                  onClick={() => {
-                                    setSelectedStudentForResult(student);
-                                    setIsMarkSheetModalOpen(true);
-                                  }}
-                                  className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
-                                  title="Download Marksheet"
-                                >
-                                  <Award className="w-5 h-5" />
-                                </button>
-                              )}
+                              <button
+                                onClick={() => {
+                                  setSelectedStudentForResult(student);
+                                  setIsMarkSheetModalOpen(true);
+                                }}
+                                className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
+                                title="Download Marksheet"
+                              >
+                                <Award className="w-5 h-5" />
+                              </button>
                             </div>
                           </td>
                         </tr>
@@ -2191,7 +2097,7 @@ export function OfflineExams() {
           </div>
 
           <div className="bg-gray-100 p-8 rounded-2xl overflow-auto flex justify-center">
-            <div ref={markSheetRef} className="bg-white p-12 w-[210mm] relative shadow-xl font-sans" style={{ minHeight: '297mm' }}>
+            <div ref={markSheetRef} className="bg-white p-12 w-[210mm] relative shadow-xl" style={{ minHeight: '297mm', fontFamily: "'Inter', 'Noto Sans Bengali', sans-serif" }}>
               <div className="border-[12px] border-double p-10 h-full relative z-10" style={{ borderColor: '#4f46e5', minHeight: '281mm' }}>
                 <div className="text-center mb-12">
                    <div className="flex items-center justify-center gap-6 mb-8">

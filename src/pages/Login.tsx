@@ -184,6 +184,12 @@ export function Login() {
                   বিনা মূল্যে শুরু করুন
                 </Link>
               </p>
+              <div className="pt-4 border-t border-gray-100">
+                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Staff Access</p>
+                <p className="text-xs text-gray-500">
+                  Are you a staff member or teacher? Use your assigned email and password to login above.
+                </p>
+              </div>
             </div>
           </div>
         </div>

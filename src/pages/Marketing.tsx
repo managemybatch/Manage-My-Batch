@@ -394,13 +394,14 @@ export function Marketing() {
           </div>
 
           <div className="lg:w-2/3 flex justify-center bg-gray-50 p-8 rounded-[40px] border-2 border-dashed border-gray-200 overflow-hidden min-h-[600px] items-center">
-            <div className="relative origin-center scale-[0.4] md:scale-[0.5] lg:scale-[0.6] xl:scale-[0.7] flex-shrink-0">
-              <div className="bg-white p-3 shadow-2xl rounded-[40px]">
-                <div 
-                  ref={qrRef}
-                  className="w-[1080px] h-[1080px] bg-white relative overflow-hidden flex flex-col items-center p-12"
-                  style={{ backgroundColor: posterColor }}
-                >
+            <div className="relative w-[324px] h-[324px] md:w-[432px] md:h-[432px] lg:w-[648px] lg:h-[648px] flex items-center justify-center">
+              <div className="absolute origin-center scale-[0.3] md:scale-[0.4] lg:scale-[0.6] flex-shrink-0">
+                <div className="bg-white p-3 shadow-2xl rounded-[40px]">
+                  <div 
+                    ref={qrRef}
+                    className="w-[1080px] h-[1080px] bg-white relative overflow-hidden flex flex-col items-center p-12"
+                    style={{ backgroundColor: posterColor }}
+                  >
                   <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle at 10px 10px, white 1px, transparent 0)', backgroundSize: '40px 40px' }} />
                   
                   <div className="w-full h-full bg-white/95 backdrop-blur rounded-[60px] p-8 flex flex-col items-center justify-between relative z-10 shadow-xl border border-white/20">
@@ -461,6 +462,7 @@ export function Marketing() {
             </div>
           </div>
         </div>
+      </div>
       </Modal>
 
       {/* Leaderboard Modal */}
@@ -518,13 +520,14 @@ export function Marketing() {
 
           <div className="lg:w-2/3 flex justify-center bg-gray-50 p-8 rounded-[40px] border-2 border-dashed border-gray-200 overflow-hidden min-h-[600px] items-center">
             {selectedExamId ? (
-              <div className="relative origin-center scale-[0.4] md:scale-[0.5] lg:scale-[0.6] flex-shrink-0">
-                <div className="bg-white p-3 shadow-2xl rounded-[40px]">
-                  <div 
-                    ref={leaderboardRef}
-                    className="w-[1080px] h-[1080px] bg-white relative overflow-hidden flex flex-col p-8"
-                    style={{ backgroundColor: posterColor }}
-                  >
+              <div className="relative w-[324px] h-[324px] md:w-[432px] md:h-[432px] lg:w-[648px] lg:h-[648px] flex items-center justify-center">
+                <div className="absolute origin-center scale-[0.3] md:scale-[0.4] lg:scale-[0.6] flex-shrink-0">
+                  <div className="bg-white p-3 shadow-2xl rounded-[40px]">
+                    <div 
+                      ref={leaderboardRef}
+                      className="w-[1080px] h-[1080px] bg-white relative overflow-hidden flex flex-col p-8"
+                      style={{ backgroundColor: posterColor }}
+                    >
                     {/* Visual Elements */}
                     <div className="absolute top-0 right-0 w-80 h-80 bg-white/20 rounded-full blur-3xl -mr-40 -mt-40 animate-pulse" />
                     <div className="absolute bottom-0 left-0 w-80 h-80 bg-white/20 rounded-full blur-3xl -ml-40 -mb-40 animate-pulse" />
@@ -611,6 +614,7 @@ export function Marketing() {
                   </div>
                 </div>
               </div>
+            </div>
             ) : (
               <div className="flex flex-col items-center justify-center text-center py-20 px-8">
                 <ImageIcon className="w-20 h-20 text-gray-100 mb-6" />
@@ -787,12 +791,13 @@ export function Marketing() {
 
           <div className="lg:w-2/3 flex justify-center bg-gray-50 p-8 rounded-[40px] border-2 border-dashed border-gray-200 overflow-hidden min-h-[600px] items-center text-center">
             {selectedStudentId ? (
-              <div className="relative origin-center scale-[0.35] md:scale-[0.45] lg:scale-[0.55] flex-shrink-0">
-                <div className="bg-white p-3 shadow-2xl rounded-[40px]">
-                  <div 
-                    ref={birthdayCardRef}
-                    className="w-[1080px] h-[1080px] bg-white relative overflow-hidden flex flex-col p-12 items-center justify-center text-center"
-                  >
+              <div className="relative w-[324px] h-[324px] md:w-[432px] md:h-[432px] lg:w-[648px] lg:h-[648px] flex items-center justify-center">
+                <div className="absolute origin-center scale-[0.3] md:scale-[0.4] lg:scale-[0.6] flex-shrink-0">
+                  <div className="bg-white p-3 shadow-2xl rounded-[40px]">
+                    <div 
+                      ref={birthdayCardRef}
+                      className="w-[1080px] h-[1080px] bg-white relative overflow-hidden flex flex-col items-center p-12 text-center"
+                    >
                     <div className="absolute inset-0 bg-pink-500" />
                     <div className="absolute inset-0 opacity-10 pointer-events-none" style={{ backgroundImage: 'radial-gradient(circle at 20px 20px, white 2px, transparent 0)', backgroundSize: '60px 60px' }} />
                     
@@ -850,6 +855,7 @@ export function Marketing() {
                   </div>
                 </div>
               </div>
+            </div>
             ) : (
               <div className="flex flex-col items-center justify-center text-center py-20">
                 <ImageIcon className="w-16 h-16 text-gray-200 mb-4" />
@@ -924,12 +930,13 @@ export function Marketing() {
 
           <div className="lg:w-2/3 flex justify-center bg-gray-50 p-8 rounded-[40px] border-2 border-dashed border-gray-200 overflow-hidden min-h-[600px] items-center text-center">
             {selectedStudentId ? (
-              <div className="relative origin-center scale-[0.4] md:scale-[0.5] lg:scale-[0.6] flex-shrink-0">
-                <div className="bg-white p-3 shadow-2xl rounded-[40px]">
-                  <div 
-                    ref={badgeRef}
-                    className="w-[1080px] h-[1080px] bg-white relative overflow-hidden flex flex-col p-12 items-center justify-center text-center"
-                  >
+              <div className="relative w-[324px] h-[324px] md:w-[432px] md:h-[432px] lg:w-[648px] lg:h-[648px] flex items-center justify-center">
+                <div className="absolute origin-center scale-[0.3] md:scale-[0.4] lg:scale-[0.6] flex-shrink-0">
+                  <div className="bg-white p-3 shadow-2xl rounded-[40px]">
+                    <div 
+                      ref={badgeRef}
+                      className="w-[1080px] h-[1080px] bg-white relative overflow-hidden flex flex-col p-12 items-center justify-center text-center"
+                    >
                     <div className="absolute inset-0 bg-blue-600" />
                     <div className="absolute inset-4 bg-white rounded-[40px] shadow-2xl flex flex-col items-center p-16 animate-in fade-in zoom-in duration-500">
                       <div className="absolute top-0 right-0 w-80 h-80 bg-blue-50 rounded-full -mr-40 -mt-40" />
@@ -996,6 +1003,7 @@ export function Marketing() {
                   </div>
                 </div>
               </div>
+            </div>
             ) : (
               <div className="flex flex-col items-center justify-center text-center py-20 px-8">
                 <ImageIcon className="w-20 h-20 text-gray-200 mb-6" />
