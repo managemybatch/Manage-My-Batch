@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { db, handleFirestoreError, OperationType } from '../../firebase';
 import { doc, getDoc, collection, query, where, getDocs, limit, orderBy } from 'firebase/firestore';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Building, MapPin, Phone, Mail, Globe, Users, Briefcase, Layers, CheckCircle, Loader2, GraduationCap, Calendar, Download, Megaphone, Newspaper, ArrowRight, Clock, Info, FileText, TrendingUp } from 'lucide-react';
+import { Building, MapPin, Phone, Mail, Globe, Users, Briefcase, Layers, CheckCircle, Loader2, GraduationCap, Calendar, Download, Megaphone, Newspaper, ArrowRight, Clock, Info, FileText, TrendingUp, Star, HelpCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../../lib/utils';
 import html2canvas from 'html2canvas';
@@ -64,25 +64,29 @@ export function InstitutionProfile() {
         }
         
         // Fetch stats & Content
-        const [studentsSnap, teachersSnap, batchesSnap, noticesSnap, eventsSnap, circularsSnap, examsSnap] = await Promise.all([
+        const results = await Promise.allSettled([
           getDocs(query(collection(db, 'students'), where('institutionId', '==', instId))),
           getDocs(query(collection(db, 'teachers'), where('institutionId', '==', instId))),
           getDocs(query(collection(db, 'batches'), where('institutionId', '==', instId))),
           getDocs(query(collection(db, 'notices'), where('institutionId', '==', instId), where('active', '==', true), orderBy('createdAt', 'desc'), limit(5))),
-          getDocs(query(collection(db, 'events'), where('institutionId', '==', instId), where('active', '==', true), orderBy('createdAt', 'desc'), limit(5))),
+          getDocs(query(collection(db, 'events'), where('institutionId', '==', instId), where('active', '==', true), orderBy('date', 'asc'), limit(5))),
           getDocs(query(collection(db, 'circulars'), where('institutionId', '==', instId), where('active', '==', true), orderBy('createdAt', 'desc'), limit(5))),
           getDocs(query(collection(db, 'offline_exams'), where('institutionId', '==', instId), where('status', '==', 'published'), orderBy('date', 'desc'), limit(6)))
         ]);
 
-        setStats({
-          students: studentsSnap.size,
-          teachers: teachersSnap.size,
-          batches: batchesSnap.size
-        });
-        setNotices(noticesSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-        setEvents(eventsSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-        setCirculars(circularsSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-        setExams(examsSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+        const [studentsSnap, teachersSnap, batchesSnap, noticesSnap, eventsSnap, circularsSnap, examsSnap] = results.map(r => r.status === 'fulfilled' ? r.value : null);
+
+        if (studentsSnap && teachersSnap && batchesSnap) {
+          setStats({
+            students: studentsSnap.size,
+            teachers: teachersSnap.size,
+            batches: batchesSnap.size
+          });
+        }
+        if (noticesSnap) setNotices(noticesSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+        if (eventsSnap) setEvents(eventsSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+        if (circularsSnap) setCirculars(circularsSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+        if (examsSnap) setExams(examsSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       } catch (err) {
         handleFirestoreError(err, OperationType.GET, 'institutions');
       } finally {

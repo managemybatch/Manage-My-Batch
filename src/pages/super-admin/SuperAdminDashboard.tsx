@@ -53,19 +53,16 @@ export function SuperAdminDashboard() {
 
   const fetchData = async () => {
     try {
-      // Fetch all users with role 'admin'
-      const instQuery = query(collection(db, 'users'), where('role', '==', 'admin'));
-      const instSnapshot = await getDocs(instQuery);
+      const [instSnapshot, studentsSnapshot, creditsSnapshot, notifSnapshot] = await Promise.all([
+        getDocs(query(collection(db, 'users'), where('role', '==', 'admin'))),
+        getDocs(collection(db, 'students')),
+        getDocs(collection(db, 'credits')),
+        getDocs(query(collection(db, 'super_notifications'), orderBy('createdAt', 'desc'), limit(3)))
+      ]);
+
       const institutions = instSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      
       const activeSubs = institutions.filter((inst: any) => inst.subscriptionPlan && inst.subscriptionPlan !== 'free').length;
-
-      // Fetch total credits
-      const creditsSnapshot = await getDocs(collection(db, 'credits'));
       const totalTokens = creditsSnapshot.docs.reduce((acc, doc) => acc + (doc.data().balance || 0), 0);
-
-      // Fetch all students for global count
-      const studentsSnapshot = await getDocs(collection(db, 'students'));
       const totalStudents = studentsSnapshot.size;
 
       setStats({
@@ -89,8 +86,6 @@ export function SuperAdminDashboard() {
       setRecentInstitutions(institutions.slice(0, 5));
 
       // Recent notifications
-      const notifQuery = query(collection(db, 'super_notifications'), orderBy('createdAt', 'desc'), limit(3));
-      const notifSnapshot = await getDocs(notifQuery);
       const recentNotif = notifSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setRecentNotifications(recentNotif);
 

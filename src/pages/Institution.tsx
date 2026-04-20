@@ -19,10 +19,13 @@ import html2canvas from 'html2canvas';
 
 interface WebsiteSection {
   id: string;
-  type: 'hero' | 'stats' | 'about' | 'gallery' | 'news' | 'events' | 'circulars' | 'results' | 'custom_text';
+  type: 'hero' | 'stats' | 'about' | 'gallery' | 'news' | 'events' | 'circulars' | 'results' | 'custom_text' | 'testimonials' | 'faq';
   title?: string;
   content?: string;
+  subtitle?: string;
   images?: string[];
+  testimonials?: { author: string; role: string; content: string }[];
+  faqs?: { question: string; answer: string }[];
   active: boolean;
   order: number;
 }
@@ -938,15 +941,17 @@ export function Institution() {
                     className="px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm font-bold focus:ring-2 focus:ring-indigo-500/20 outline-none"
                   >
                     <option value="">+ Add New Section</option>
+                    <option value="hero">Hero Section (Banner)</option>
+                    <option value="stats">Statistics Counter</option>
+                    <option value="about">About & Vision</option>
                     <option value="custom_text">Custom Text/HTML</option>
                     <option value="gallery">Image Gallery</option>
+                    <option value="testimonials">Testimonials</option>
+                    <option value="faq">FAQ Section</option>
                     <option value="news">News & Notices</option>
                     <option value="events">Events Calendar</option>
                     <option value="circulars">Job Board</option>
                     <option value="results">Results Portal</option>
-                    <option value="stats">Statistics Counter</option>
-                    <option value="hero">Hero Section (Banner)</option>
-                    <option value="about">About & Vision</option>
                   </select>
                   <button 
                     onClick={async () => {
@@ -1054,7 +1059,7 @@ export function Institution() {
                         >
                           {section.active ? 'Active' : 'Hidden'}
                         </button>
-                        {(section.type === 'custom_text' || section.type === 'gallery' || section.type === 'results' || section.type === 'about' || section.type === 'mission_vision' || section.type === 'hero' || section.type === 'stats') ? (
+                        {(section.type === 'custom_text' || section.type === 'gallery' || section.type === 'results' || section.type === 'about' || section.type === 'hero' || section.type === 'stats' || section.type === 'testimonials' || section.type === 'faq') ? (
                           <button 
                             onClick={() => {
                               setEditingSection(section);
@@ -1701,28 +1706,158 @@ export function Institution() {
             </div>
           )}
 
-          {editingSection?.type === 'results' && (
+          {editingSection?.type === 'hero' && (
             <div className="space-y-4">
-              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1 block">Quick Result Portal</label>
-              <div className="p-4 bg-indigo-50 rounded-2xl border border-indigo-100 italic text-xs text-indigo-700">
-                This section automatically lists your published exam results. No manual links needed.
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Subtitle / Slogan</label>
+                <input 
+                  value={editingSection?.subtitle || ''} 
+                  onChange={(e) => setEditingSection(prev => prev ? { ...prev, subtitle: e.target.value } : null)}
+                  placeholder="e.g. Quality education for everyone"
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500/20" 
+                />
               </div>
-              <div className="space-y-2 max-h-[200px] overflow-y-auto">
-                {exams.filter(e => e.status === 'published').length === 0 ? (
-                  <p className="text-center py-4 text-gray-400 text-xs italic">No published exams found.</p>
-                ) : (
-                  exams.filter(e => e.status === 'published').map(e => (
-                    <div key={e.id} className="flex items-center gap-3 p-3 bg-white rounded-xl border border-gray-100">
-                      <div className="w-8 h-8 bg-emerald-100 rounded-lg flex items-center justify-center text-emerald-600">
-                        <CheckCircle className="w-4 h-4" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-bold text-gray-900 truncate">{e.title}</p>
-                        <p className="text-[10px] text-gray-500">{e.batchName} • {e.date}</p>
-                      </div>
+              <p className="text-[10px] text-gray-400 italic">This section uses your institution logo and primary color as defined in the profile tab.</p>
+            </div>
+          )}
+
+          {editingSection?.type === 'testimonials' && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Testimonials</label>
+                <button 
+                  onClick={() => {
+                    const testimonials = [...(editingSection.testimonials || []), { author: '', role: '', content: '' }];
+                    setEditingSection({ ...editingSection, testimonials });
+                  }}
+                  className="text-xs font-bold text-indigo-600 flex items-center gap-1"
+                >
+                  <Plus className="w-3 h-3" /> Add One
+                </button>
+              </div>
+              <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                {(editingSection.testimonials || []).map((t, idx) => (
+                  <div key={idx} className="p-4 bg-gray-50 rounded-2xl border border-gray-100 space-y-3 relative group">
+                    <button 
+                      onClick={() => {
+                        const testimonials = editingSection.testimonials?.filter((_, i) => i !== idx);
+                        setEditingSection({ ...editingSection, testimonials });
+                      }}
+                      className="absolute top-2 right-2 p-1 text-gray-300 hover:text-rose-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                    <div className="grid grid-cols-2 gap-3">
+                      <input 
+                        placeholder="Author Name"
+                        value={t.author}
+                        onChange={(e) => {
+                          const testimonials = [...(editingSection.testimonials || [])];
+                          testimonials[idx].author = e.target.value;
+                          setEditingSection({ ...editingSection, testimonials });
+                        }}
+                        className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-xs outline-none"
+                      />
+                      <input 
+                        placeholder="Role (e.g. Student)"
+                        value={t.role}
+                        onChange={(e) => {
+                          const testimonials = [...(editingSection.testimonials || [])];
+                          testimonials[idx].role = e.target.value;
+                          setEditingSection({ ...editingSection, testimonials });
+                        }}
+                        className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-xs outline-none"
+                      />
                     </div>
-                  ))
-                )}
+                    <textarea 
+                      placeholder="Comment content..."
+                      value={t.content}
+                      onChange={(e) => {
+                        const testimonials = [...(editingSection.testimonials || [])];
+                        testimonials[idx].content = e.target.value;
+                        setEditingSection({ ...editingSection, testimonials });
+                      }}
+                      rows={2}
+                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-xs outline-none resize-none"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {editingSection?.type === 'faq' && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">FAQ Items</label>
+                <button 
+                  onClick={() => {
+                    const faqs = [...(editingSection.faqs || []), { question: '', answer: '' }];
+                    setEditingSection({ ...editingSection, faqs });
+                  }}
+                  className="text-xs font-bold text-indigo-600 flex items-center gap-1"
+                >
+                  <Plus className="w-3 h-3" /> Add Question
+                </button>
+              </div>
+              <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                {(editingSection.faqs || []).map((faq, idx) => (
+                  <div key={idx} className="p-4 bg-gray-50 rounded-2xl border border-gray-100 space-y-2 relative group">
+                    <button 
+                      onClick={() => {
+                        const faqs = editingSection.faqs?.filter((_, i) => i !== idx);
+                        setEditingSection({ ...editingSection, faqs });
+                      }}
+                      className="absolute top-2 right-2 p-1 text-gray-300 hover:text-rose-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                    <input 
+                      placeholder="Question"
+                      value={faq.question}
+                      onChange={(e) => {
+                        const faqs = [...(editingSection.faqs || [])];
+                        faqs[idx].question = e.target.value;
+                        setEditingSection({ ...editingSection, faqs });
+                      }}
+                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-xs font-bold outline-none"
+                    />
+                    <textarea 
+                      placeholder="Answer"
+                      value={faq.answer}
+                      onChange={(e) => {
+                        const faqs = [...(editingSection.faqs || [])];
+                        faqs[idx].answer = e.target.value;
+                        setEditingSection({ ...editingSection, faqs });
+                      }}
+                      rows={2}
+                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-xs outline-none resize-none"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {editingSection?.type === 'stats' && (
+            <div className="space-y-4">
+              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1 block">Live Statistics</label>
+              <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-100 italic text-xs text-emerald-700">
+                This section automatically displays your student, teacher, and batch counts.
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                <div className="p-3 bg-gray-50 rounded-xl text-center">
+                  <p className="text-[10px] text-gray-400 uppercase font-black tracking-widest">Students</p>
+                  <p className="text-xl font-black text-gray-900">{stats.students}</p>
+                </div>
+                <div className="p-3 bg-gray-50 rounded-xl text-center">
+                  <p className="text-[10px] text-gray-400 uppercase font-black tracking-widest">Teachers</p>
+                  <p className="text-xl font-black text-gray-900">{stats.teachers}</p>
+                </div>
+                <div className="p-3 bg-gray-50 rounded-xl text-center">
+                  <p className="text-[10px] text-gray-400 uppercase font-black tracking-widest">Batches</p>
+                  <p className="text-xl font-black text-gray-900">{stats.batches}</p>
+                </div>
               </div>
             </div>
           )}
