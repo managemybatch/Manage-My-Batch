@@ -40,7 +40,7 @@ interface Student {
   monthlyFee: number;
   subjectGroup?: string;
   feeType?: string;
-  status: 'active' | 'inactive' | 'dropped';
+  status: 'active' | 'inactive';
   createdAt: any;
 }
 
@@ -446,12 +446,24 @@ export function Students() {
       }
       
       // Send Admission Message
-      const message = t('students.addModal.successMsg', {
+      const instName = institution?.name || 'Our Center';
+      let message = t('students.addModal.successMsg', {
         name: newStudent.name,
         aFee: admissionFee,
         mFee: monthlyFee,
         total: admissionFee + monthlyFee
       });
+
+      if (institution?.messageTemplates?.admission_success_whatsapp) {
+        message = institution.messageTemplates.admission_success_whatsapp
+          .replace('{{studentName}}', newStudent.name)
+          .replace('{{batchName}}', selectedBatch?.name || '')
+          .replace('{{rollNo}}', newStudent.rollNo)
+          .replace('{{admissionFee}}', String(admissionFee))
+          .replace('{{monthlyFee}}', String(monthlyFee))
+          .replace('{{institutionName}}', instName);
+      }
+
       const encodedMessage = encodeURIComponent(message);
       const cleanPhone = formatWhatsAppPhone(newStudent.guardianPhone);
       const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodedMessage}`;
@@ -569,8 +581,10 @@ export function Students() {
   };
 
   const filteredStudents = students.filter(s => {
-    const matchesSearch = s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      s.rollNo.includes(searchTerm);
+    const name = s.name || '';
+    const roll = String(s.rollNo || '');
+    const matchesSearch = name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      roll.includes(searchTerm);
     
     const batchId = searchParams.get('batch');
     const matchesBatch = batchId ? s.batchId === batchId : true;
@@ -578,7 +592,6 @@ export function Students() {
     
     const matchesStatus = 
       activeTab === 'inactive' ? s.status === 'inactive' : 
-      activeTab === 'dropped' ? s.status === 'dropped' :
       s.status === 'active';
     
     return matchesSearch && matchesBatch && matchesGrade && matchesStatus;
@@ -796,33 +809,16 @@ export function Students() {
           onClick={() => setActiveTab('inactive')}
           className={cn(
             "px-6 py-2.5 text-sm font-bold rounded-xl transition-all flex items-center gap-2",
-            activeTab === 'inactive' ? "bg-rose-600 text-white shadow-lg shadow-rose-100" : "text-gray-500 hover:bg-gray-50"
+            activeTab === 'inactive' ? "bg-gray-600 text-white shadow-lg shadow-gray-100" : "text-gray-500 hover:bg-gray-50"
           )}
         >
           <XCircle className="w-4 h-4" /> {t('students.inactive', { defaultValue: 'Inactive' })}
           {students.filter(s => s.status === 'inactive').length > 0 && (
             <span className={cn(
               "px-2 py-0.5 rounded-full text-[10px] font-black",
-              activeTab === 'inactive' ? "bg-white text-rose-600" : "bg-rose-100 text-rose-600"
+              activeTab === 'inactive' ? "bg-white text-gray-600" : "bg-gray-100 text-gray-600"
             )}>
               {students.filter(s => s.status === 'inactive').length}
-            </span>
-          )}
-        </button>
-        <button
-          onClick={() => setActiveTab('dropped')}
-          className={cn(
-            "px-6 py-2.5 text-sm font-bold rounded-xl transition-all flex items-center gap-2",
-            activeTab === 'dropped' ? "bg-amber-600 text-white shadow-lg shadow-amber-100" : "text-gray-500 hover:bg-gray-50"
-          )}
-        >
-          <XCircle className="w-4 h-4" /> {t('students.dropped', { defaultValue: 'Dropped/Gap' })}
-          {students.filter(s => s.status === 'dropped').length > 0 && (
-            <span className={cn(
-              "px-2 py-0.5 rounded-full text-[10px] font-black",
-              activeTab === 'dropped' ? "bg-white text-amber-600" : "bg-amber-100 text-amber-600"
-            )}>
-              {students.filter(s => s.status === 'dropped').length}
             </span>
           )}
         </button>
@@ -926,7 +922,7 @@ export function Students() {
           <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
         </div>
       ) : activeTab === 'id-cards' ? (
-        <IDCardDesigner students={students} institution={institution} />
+        <IDCardDesigner students={filteredStudents} institution={institution} />
       ) : (activeTab === 'students' || activeTab === 'inactive') ? (
         <Table headers={[
           t('students.table.student'),

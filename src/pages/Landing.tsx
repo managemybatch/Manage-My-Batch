@@ -23,46 +23,46 @@ import { SUBSCRIPTION_PLANS } from '../constants';
 
 const features = [
   {
-    title: 'শিক্ষা প্রতিষ্ঠান ম্যানেজমেন্ট সিস্টেম',
-    description: 'স্কুল, মাদ্রাসা ও কোচিং সেন্টারের ছাত্রদের ভর্তি, ডিজিটাল প্রোফাইল এবং একাডেমিক তথ্য সহজে পরিচালনা করুন।',
-    icon: Users,
-    color: 'text-blue-600',
-    bgColor: 'bg-blue-100'
-  },
-  {
-    title: 'অটোমেটেড ফি কালেকশন ও রসিদ',
-    description: 'স্কুলের মাসিক বেতন, মাদ্রাসার ফাণ্ড এবং কোচিংয়ের ফি ট্র্যাক করুন। অটোমেটেড পেমেন্ট রসিদ জেনারেট করুন।',
+    title: 'প্রফেশনাল এডমিট ও আইডি কার্ড ডিজাইন',
+    description: 'আপনার প্রতিষ্ঠানের লোগো এবং ব্র্যান্ডিং সহ প্রফেশনাল মানের আইডি কার্ড এবং এডমিট কার্ড (উভয় পিঠ) ডিজাইন ও জেনারেট করুন।',
     icon: CreditCard,
-    color: 'text-green-600',
-    bgColor: 'bg-green-100'
+    color: 'text-indigo-600',
+    bgColor: 'bg-indigo-100'
   },
   {
-    title: 'স্মার্ট ডিজিটাল উপস্থিতি',
-    description: 'ছাত্রদের প্রতিদিনের উপস্থিতি গ্রহণ এবং অনুপস্থিত থাকলে অভিভাবকদের ফোনে অটোমেটেড SMS পাঠানোর আধুনিক সিস্টেম।',
+    title: 'টিচার-লিঙ্কড স্মার্ট এটেনডেন্স',
+    description: 'ক্লাস টিচারের সাথে লিঙ্কড এটেনডেন্স সিস্টেম। সরাসরি হোয়াটসঅ্যাপে এটেনডেন্স লিঙ্ক পাঠানো এবং বিস্তারিত PDF রিপোর্ট ডাউনলোড সুবিধা।',
     icon: ClipboardCheck,
     color: 'text-purple-600',
     bgColor: 'bg-purple-100'
   },
   {
-    title: 'পরীক্ষার ফলাফল ও মার্কশিট',
+    title: 'বিস্তারিত ফি ও পেমেন্ট রিপোর্ট',
+    description: 'মাসিক বেতন, পরীক্ষার ফি এবং অন্যান্য বকেয়া ট্র্যাক করুন। লোগো সহ প্রফেশনাল পেমেন্ট রসিদ এবং দৈনন্দিন আয়-ব্যয়ের PDF রিপোর্ট জেনারেট করুন।',
+    icon: CreditCard,
+    color: 'text-green-600',
+    bgColor: 'bg-green-100'
+  },
+  {
+    title: 'ডিজিটাল কোচিং প্রোফাইল ও ডাটা',
+    description: 'স্কুল, মাদ্রাসা ও কোচিং সেন্টারের ছাত্রদের ভর্তি, ডিজিটাল প্রোফাইল এবং একাডেমিক তথ্য নিরাপদে পরিচালনা করুন।',
+    icon: Users,
+    color: 'text-blue-600',
+    bgColor: 'bg-blue-100'
+  },
+  {
+    title: 'পরীক্ষার রেজাল্ট ও অটোমেটিক মার্কশিট',
     description: 'সহজে পরীক্ষার মার্কস এন্ট্রি করুন এবং অটোমেটিক প্রগতি রিপোর্ট কার্ড বা ডিজিটাল মার্কশিট তৈরি করুন।',
     icon: BarChart3,
     color: 'text-orange-600',
     bgColor: 'bg-orange-100'
   },
   {
-    title: 'SMS ও জরুরি নোটিফিকেশন',
-    description: 'ভর্তি, ফি, উপস্থিতি ও পরীক্ষার নোটিশ অভিভাবকদের পাঠান অটোমেটেড SMS-এর মাধ্যমে।',
+    title: 'SMS ও কাস্টম নোটিফিকেশন',
+    description: 'ভর্তি, ফি, উপস্থিতি ও পরীক্ষার নোটিশ অভিভাবকদের পাঠান অটোমেটেড SMS এবং হোয়াটসঅ্যাপ মেসেজের মাধ্যমে।',
     icon: MessageSquare,
     color: 'text-pink-600',
     bgColor: 'bg-pink-100'
-  },
-  {
-    title: 'অনলাইন ভর্তি ফরম ও ব্যাচ',
-    description: 'প্রতিষ্ঠানটির জন্য কাস্টমাইজড অনলাইন ভর্তি ফরম এবং শৃঙ্খলার সাথে ক্লাস ও ব্যাচ ম্যানেজমেন্ট করুন।',
-    icon: Calendar,
-    color: 'text-indigo-600',
-    bgColor: 'bg-indigo-100'
   }
 ];
 
@@ -171,11 +171,11 @@ export function Landing() {
             স্কুল, মাদ্রাসা ও কোচিং ম্যানেজমেন্টের আধুনিক সমাধান
           </div>
           <h1 className="text-4xl md:text-6xl font-black text-gray-900 mb-6 leading-tight">
-            সেরা স্কুল, মাদ্রাসা ও কোচিং সেন্টার <br />
-            <span className="text-blue-600">ম্যানেজমেন্ট সফটওয়্যার</span>
+            শিক্ষা প্রতিষ্ঠানের জন্য <br />
+            <span className="text-blue-600">স্মার্ট ও প্রফেশনাল ম্যানেজমেন্ট</span>
           </h1>
           <p className="text-lg md:text-xl text-gray-600 mb-10 max-w-3xl mx-auto leading-relaxed">
-            আপনার শিক্ষা প্রতিষ্ঠানকে করুন স্মার্ট ও ডিজিটাল। অনলাইন ভর্তি, ফি ম্যানেজমেন্ট, অটোমেটেড SMS, ডিজিটাল এটেনডেন্স এবং পরীক্ষার রেজাল্ট - সবই পাবেন এক প্ল্যাটফর্মে। 
+            আপনার প্রতিষ্ঠানকে দিন একটি প্রফেশনাল রূপ। আইডি কার্ড, এডমিট কার্ড, এটেনডেন্স এবং ফি কালেকশন - সবকিছু এখন আপনার হাতের নাগালে। কোচিং, মাদ্রাসা বা স্কুলের সব জটিল সমস্যা সমাধান করুন এক ক্লিকে।
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 relative z-20">
             <Link 
@@ -260,6 +260,15 @@ export function Landing() {
                   <div>
                     <h4 className="font-bold text-gray-900 mb-1">কাগজ কলমের ঝামেলা মুক্তি</h4>
                     <p className="text-gray-600">সব তথ্য ডিজিটালভাবে সংরক্ষিত থাকে, তাই হারিয়ে যাওয়ার ভয় নেই।</p>
+                  </div>
+                </div>
+                <div className="flex gap-4">
+                  <div className="flex-shrink-0 w-6 h-6 bg-green-100 rounded-full flex items-center justify-center mt-1">
+                    <CheckCircle2 className="w-4 h-4 text-green-600" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-gray-900 mb-1">প্রফেশনাল ব্র্যান্ডিং ও আইডেন্টিটি</h4>
+                    <p className="text-gray-600">নিজস্ব লোগো সহ আইডি কার্ড ও এডমিট কার্ড তৈরি করে প্রতিষ্ঠানের সুনাম বৃদ্ধি করুন।</p>
                   </div>
                 </div>
                 <div className="flex gap-4">

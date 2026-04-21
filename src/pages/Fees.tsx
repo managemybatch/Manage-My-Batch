@@ -13,6 +13,7 @@ import { MONTHS } from '../constants';
 import { useTranslation } from 'react-i18next';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 interface Student {
   id: string;
@@ -40,10 +41,26 @@ interface FeeRecord {
   month: string;
   year: number;
   status: 'paid' | 'pending';
-  type: 'Monthly Fee' | 'Admission Fee' | 'Other';
+  type: 'Monthly Fee' | 'Admission Fee' | 'Exam Fee' | 'Other';
+  description?: string;
   paymentMethod?: 'Cash' | 'bKash';
   bkashNumber?: string;
   transactionId?: string;
+}
+
+interface OtherFeeTemplate {
+  id: string;
+  name: string;
+  amount: number;
+  batchId?: string;
+  isMandatory: boolean;
+}
+
+interface OfflineExam {
+  id: string;
+  title: string;
+  batchId: string;
+  examFee?: number;
 }
 
 export function Fees() {
@@ -58,7 +75,8 @@ export function Fees() {
   const [selectedBatch, setSelectedBatch] = useState('All Batches');
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
-  const [activeTab, setActiveTab] = useState<'all' | 'dues'>((searchParams.get('tab') as any) === 'dues' ? 'dues' : 'all');
+  const [activeTab, setActiveTab] = useState<'all' | 'dues' | 'manage_other'>((searchParams.get('tab') as any) === 'dues' ? 'dues' : 'all');
+  const [exams, setExams] = useState<OfflineExam[]>([]);
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [reportDates, setReportDates] = useState({ start: '', end: '' });
   const [isSaving, setIsSaving] = useState(false);
@@ -75,7 +93,10 @@ export function Fees() {
   const receiptRef = React.useRef<HTMLDivElement>(null);
 
   const [paymentData, setPaymentData] = useState({
+    type: 'Monthly Fee' as 'Monthly Fee' | 'Exam Fee' | 'Other',
     months: [] as string[],
+    examId: '',
+    otherFeeId: '',
     method: 'Cash' as 'Cash' | 'bKash',
     bkashNumber: '',
     transactionId: '',
@@ -153,7 +174,52 @@ export function Fees() {
       }
     };
     fetchInstData();
+
+    // Fetch Exams for fee reflection
+    const qExams = query(
+      collection(db, 'offline_exams'),
+      where('institutionId', '==', user.institutionId || user.uid)
+    );
+    const unsubExams = onSnapshot(qExams, (snapshot) => {
+      setExams(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as OfflineExam[]);
+    });
+
+    return () => unsubExams();
   }, [user]);
+
+  const saveOtherFeeTemplate = async (template: Omit<OtherFeeTemplate, 'id'> & { id?: string }) => {
+    if (!user) return;
+    const instId = user.institutionId || user.uid;
+    const currentTemplates = instData?.otherFeeTemplates || [];
+    
+    let updated;
+    if (template.id) {
+      updated = currentTemplates.map((t: any) => t.id === template.id ? template : t);
+    } else {
+      updated = [...currentTemplates, { ...template, id: Math.random().toString(36).substr(2, 9) }];
+    }
+
+    try {
+      await writeBatch(db).set(doc(db, 'institutions', instId), { otherFeeTemplates: updated }, { merge: true }).commit();
+      setSuccessMessage('Fee template saved successfully!');
+      setIsSuccessModalOpen(true);
+    } catch (error) {
+      console.error('Error saving template:', error);
+    }
+  };
+
+  const deleteOtherFeeTemplate = async (id: string) => {
+    if (!user) return;
+    const instId = user.institutionId || user.uid;
+    const updated = (instData?.otherFeeTemplates || []).filter((t: any) => t.id !== id);
+    try {
+      await writeBatch(db).set(doc(db, 'institutions', instId), { otherFeeTemplates: updated }, { merge: true }).commit();
+      setSuccessMessage('Fee template deleted!');
+      setIsSuccessModalOpen(true);
+    } catch (error) {
+      console.error('Error deleting template:', error);
+    }
+  };
 
   const generateReceiptPDF = async () => {
     if (!receiptRef.current) return;
@@ -196,26 +262,83 @@ export function Fees() {
     const joinYear = joinDate.getFullYear();
     const joinMonthIndex = joinDate.getMonth();
 
-    // Academic year starts in January, but we only count from join month if it's the same year
-    // If they joined in a previous year, we count from January of the current year
+    // Monthly Fee Dues
     const startMonthIndex = joinYear < currentYear ? 0 : joinMonthIndex;
-
-    const paidMonths = fees
+    const paidMonthlyMonths = fees
       .filter(f => f.studentId === student.id && f.year === currentYear && f.type === 'Monthly Fee' && f.status === 'paid')
       .map(f => f.month);
 
     const dueMonths = [];
     for (let i = startMonthIndex; i <= currentMonthIndex; i++) {
-      if (!paidMonths.includes(MONTHS[i])) {
+      if (!paidMonthlyMonths.includes(MONTHS[i])) {
         dueMonths.push(MONTHS[i]);
       }
     }
-    return dueMonths;
+
+    // Exam Fee Dues
+    const paidExams = fees
+      .filter(f => f.studentId === student.id && f.type === 'Exam Fee' && f.status === 'paid')
+      .map(f => f.description); // We'll store exam ID/Title in description
+
+    const dueExams = exams.filter(e => 
+      e.batchId === student.batchId && 
+      e.examFee && 
+      e.examFee > 0 && 
+      !paidExams.includes(e.title)
+    );
+
+    // Other Fee Dues (Mandatory only)
+    const paidOther = fees
+      .filter(f => f.studentId === student.id && f.type === 'Other' && f.status === 'paid')
+      .map(f => f.description);
+
+    const dueOther = (instData?.otherFeeTemplates || []).filter((t: OtherFeeTemplate) => 
+      t.isMandatory && 
+      (t.batchId === 'All' || !t.batchId || t.batchId === student.batchId) &&
+      !paidOther.includes(t.name)
+    );
+
+    return { monthly: dueMonths, exams: dueExams, other: dueOther };
+  };
+
+  const [isSendingReminder, setIsSendingReminder] = useState<string | null>(null);
+
+  const handleSendReminder = async (student: Student) => {
+    const dues = getStudentDues(student);
+    const hasDues = dues.monthly.length > 0 || dues.exams.length > 0 || dues.other.length > 0;
+    if (!hasDues) return;
+
+    const monthlyAmount = dues.monthly.length * student.monthlyFee;
+    const examsAmount = dues.exams.reduce((sum: number, e: any) => sum + (e.examFee || 0), 0);
+    const otherAmount = dues.other.reduce((sum: number, o: any) => sum + o.amount, 0);
+    const totalDue = monthlyAmount + examsAmount + otherAmount;
+
+    const instName = instData?.name || 'Our Center';
+    
+    // Check for custom template in instData
+    let message = `Due Reminder! \nStudent: ${student.name}\nBatch: ${student.batchName}\nDue Amount: ৳${totalDue}\nPending Months: ${dues.monthly.join(', ')}\nInstitution: ${instName}\nPlease clear your dues as soon as possible. Thank you.`;
+    
+    if (instData?.messageTemplates?.due_reminder_whatsapp) {
+      message = instData.messageTemplates.due_reminder_whatsapp
+        .replace('{{studentName}}', student.name)
+        .replace('{{batchName}}', student.batchName)
+        .replace('{{amount}}', String(totalDue))
+        .replace('{{months}}', dues.monthly.join(', '))
+        .replace('{{institutionName}}', instName);
+    }
+
+    const encodedMessage = encodeURIComponent(message);
+    const cleanPhone = formatWhatsAppPhone(student.guardianPhone);
+    const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodedMessage}`;
+    window.open(whatsappUrl, '_blank');
   };
 
   const handlePayment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user || !selectedStudent || paymentData.months.length === 0) return;
+    if (!user || !selectedStudent) return;
+    if (paymentData.type === 'Monthly Fee' && paymentData.months.length === 0) return;
+    if (paymentData.type === 'Exam Fee' && !paymentData.examId) return;
+    if (paymentData.type === 'Other' && !paymentData.otherFeeId) return;
 
     try {
       setIsSaving(true);
@@ -223,53 +346,139 @@ export function Fees() {
       const currentYear = new Date().getFullYear();
       const paymentDate = new Date().toISOString();
 
-      paymentData.months.forEach(month => {
-        const feeRef = doc(collection(db, 'fees'));
-        batch.set(feeRef, {
-          studentId: selectedStudent.id,
-          studentName: selectedStudent.name,
-          amount: selectedStudent.monthlyFee,
-          month,
-          year: currentYear,
-          date: paymentDate,
-          status: 'paid',
-          type: 'Monthly Fee',
-          paymentMethod: paymentData.method,
-          bkashNumber: paymentData.method === 'bKash' ? paymentData.bkashNumber : null,
-          transactionId: paymentData.method === 'bKash' ? paymentData.transactionId : null,
-          institutionId: user.institutionId || user.uid,
-          createdBy: user.uid,
-          createdAt: serverTimestamp(),
+      if (paymentData.type === 'Monthly Fee') {
+        paymentData.months.forEach(month => {
+          const feeRef = doc(collection(db, 'fees'));
+          batch.set(feeRef, {
+            studentId: selectedStudent.id,
+            studentName: selectedStudent.name,
+            amount: selectedStudent.monthlyFee,
+            month,
+            year: currentYear,
+            date: paymentDate,
+            status: 'paid',
+            type: 'Monthly Fee',
+            paymentMethod: paymentData.method,
+            bkashNumber: paymentData.method === 'bKash' ? paymentData.bkashNumber : null,
+            transactionId: paymentData.method === 'bKash' ? paymentData.transactionId : null,
+            institutionId: user.institutionId || user.uid,
+            createdBy: user.uid,
+            createdAt: serverTimestamp(),
+          });
         });
-      });
+      } else if (paymentData.type === 'Exam Fee') {
+        const exam = exams.find(e => e.id === paymentData.examId);
+        if (exam) {
+          const feeRef = doc(collection(db, 'fees'));
+          batch.set(feeRef, {
+            studentId: selectedStudent.id,
+            studentName: selectedStudent.name,
+            amount: exam.examFee || 0,
+            date: paymentDate,
+            status: 'paid',
+            type: 'Exam Fee',
+            description: exam.title,
+            paymentMethod: paymentData.method,
+            bkashNumber: paymentData.method === 'bKash' ? paymentData.bkashNumber : null,
+            transactionId: paymentData.method === 'bKash' ? paymentData.transactionId : null,
+            institutionId: user.institutionId || user.uid,
+            createdBy: user.uid,
+            createdAt: serverTimestamp(),
+          });
+        }
+      } else if (paymentData.type === 'Other') {
+        const template = (instData?.otherFeeTemplates || []).find((t: any) => t.id === paymentData.otherFeeId);
+        if (template) {
+          const feeRef = doc(collection(db, 'fees'));
+          batch.set(feeRef, {
+            studentId: selectedStudent.id,
+            studentName: selectedStudent.name,
+            amount: template.amount,
+            date: paymentDate,
+            status: 'paid',
+            type: 'Other',
+            description: template.name,
+            paymentMethod: paymentData.method,
+            bkashNumber: paymentData.method === 'bKash' ? paymentData.bkashNumber : null,
+            transactionId: paymentData.method === 'bKash' ? paymentData.transactionId : null,
+            institutionId: user.institutionId || user.uid,
+            createdBy: user.uid,
+            createdAt: serverTimestamp(),
+          });
+        }
+      }
 
       await batch.commit();
 
-      const totalAmount = selectedStudent.monthlyFee * paymentData.months.length;
+      let totalAmount = 0;
+      let purpose = '';
+
+      if (paymentData.type === 'Monthly Fee') {
+        totalAmount = selectedStudent.monthlyFee * paymentData.months.length;
+        purpose = `Monthly Fee (${paymentData.months.join(', ')})`;
+      } else if (paymentData.type === 'Exam Fee') {
+        const exam = exams.find(e => e.id === paymentData.examId);
+        totalAmount = exam?.examFee || 0;
+        purpose = `Exam Fee (${exam?.title})`;
+      } else {
+        const template = (instData?.otherFeeTemplates || []).find((t: any) => t.id === paymentData.otherFeeId);
+        totalAmount = template?.amount || 0;
+        purpose = template?.name || 'Other Fee';
+      }
       
       const details = {
         studentName: selectedStudent.name,
         rollNo: selectedStudent.rollNo,
         batchName: selectedStudent.batchName,
+        purpose,
         months: paymentData.months,
         amount: totalAmount,
         date: paymentDate,
         method: paymentData.method,
         phone: selectedStudent.guardianPhone,
-        dues: getStudentDues(selectedStudent).filter(m => !paymentData.months.includes(m))
+        dues: getStudentDues(selectedStudent).monthly.filter(m => !paymentData.months.includes(m))
       };
 
       setLastPaymentDetails(details);
       
-      const message = `${t('fees.whatsapp.success')}\n${t('fees.whatsapp.studentName')}: ${details.studentName}\n${t('fees.whatsapp.month')}: ${details.months.join(', ')}\n${t('fees.whatsapp.totalAmount')}: ৳${details.amount}\n${t('fees.whatsapp.method')}: ${details.method}\n${t('fees.whatsapp.thanks')}`;
+      const instName = instData?.name || 'Our Center';
+      let message = `${t('fees.whatsapp.success')}\n${t('fees.whatsapp.studentName')}: ${details.studentName}\nPurpose: ${details.purpose}\n${t('fees.whatsapp.totalAmount')}: ৳${details.amount}\n${t('fees.whatsapp.method')}: ${details.method}\n${t('fees.whatsapp.thanks')}`;
       
+      if (instData?.messageTemplates?.payment_success_whatsapp) {
+        message = instData.messageTemplates.payment_success_whatsapp
+          .replace('{{studentName}}', details.studentName)
+          .replace('{{rollNo}}', details.rollNo)
+          .replace('{{batchName}}', details.batchName)
+          .replace('{{amount}}', String(details.amount))
+          .replace('{{months}}', details.months.join(', '))
+          .replace('{{method}}', details.method)
+          .replace('{{date}}', new Date(details.date).toLocaleDateString())
+          .replace('{{institutionName}}', instName);
+      }
+
       const encodedMessage = encodeURIComponent(message);
       const cleanPhone = formatWhatsAppPhone(selectedStudent.guardianPhone);
       const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodedMessage}`;
       
+      // Handle Paid SMS API if configured
+      if (instData?.smsConfig?.apiUrl && instData?.messageTemplates?.payment_success_sms) {
+        const smsContent = instData.messageTemplates.payment_success_sms
+          .replace('{{studentName}}', details.studentName)
+          .replace('{{rollNo}}', details.rollNo)
+          .replace('{{batchName}}', details.batchName)
+          .replace('{{amount}}', String(details.amount))
+          .replace('{{months}}', details.months.join(', '))
+          .replace('{{method}}', details.method)
+          .replace('{{date}}', new Date(details.date).toLocaleDateString())
+          .replace('{{institutionName}}', instName)
+          .replace('{{dueMonthsCount}}', String(details.dues.length));
+        
+        sendSMS(instData.smsConfig, details.phone, smsContent).catch(console.error);
+      }
+
       setPendingWhatsappUrl(whatsappUrl);
       setIsPaymentModalOpen(false);
-      setPaymentData({ months: [], method: 'Cash', bkashNumber: '', transactionId: '', amount: 0 });
+      setPaymentData({ type: 'Monthly Fee', months: [], examId: '', otherFeeId: '', method: 'Cash', bkashNumber: '', transactionId: '', amount: 0 });
       setIsPaymentSuccessModalOpen(true);
     } catch (error) {
       handleFirestoreError(error, OperationType.CREATE, 'fees');
@@ -293,28 +502,77 @@ export function Fees() {
       filtered = filtered.filter(f => f.date >= startDate && f.date <= endDate);
     }
 
-    const csvContent = [
-      ['Student Name', 'Month', 'Year', 'Amount', 'Date', 'Method', 'Transaction ID'],
-      ...filtered.map(f => [
-        f.studentName,
-        f.month,
-        f.year,
-        f.amount,
-        f.date.split('T')[0],
-        f.paymentMethod || 'N/A',
-        f.transactionId || 'N/A'
-      ])
-    ].map(e => e.join(",")).join("\n");
+    const doc = new jsPDF();
+    const instName = instData?.name || 'Our Institution';
+    const logoUrl = user?.photoURL || '';
+    
+    // Header
+    if (logoUrl) {
+      try {
+        doc.addImage(logoUrl, 'PNG', 14, 10, 20, 20);
+      } catch (e) {
+        console.error("Logo error", e);
+      }
+    }
+    
+    doc.setFontSize(20);
+    doc.setTextColor(40);
+    doc.setFont("helvetica", "bold");
+    doc.text(instName, logoUrl ? 38 : 14, 22);
+    
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(100);
+    const reportTitle = type === 'daily' ? 'Daily Collection Report' : type === 'monthly' ? 'Monthly Collection Report' : 'Fee Collection Report';
+    const dateRange = type === 'custom' ? `From: ${startDate} To: ${endDate}` : `Date: ${now.toLocaleDateString()}`;
+    doc.text(`${reportTitle} | ${dateRange}`, logoUrl ? 38 : 14, 28);
+    
+    // Table
+    const tableData = filtered.map(f => [
+      f.studentName,
+      f.type,
+      f.type === 'Monthly Fee' ? `${f.month} ${f.year}` : f.description || 'N/A',
+      `৳${f.amount}`,
+      f.date.split('T')[0],
+      f.paymentMethod || 'N/A',
+      f.transactionId || 'N/A'
+    ]);
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement("a");
-    const url = URL.createObjectURL(blob);
-    link.setAttribute("href", url);
-    link.setAttribute("download", `fee_report_${type}_${new Date().getTime()}.csv`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const total = filtered.reduce((sum, f) => sum + f.amount, 0);
+
+    autoTable(doc, {
+      startY: 40,
+      head: [['Student Name', 'Type', 'Purpose/Month', 'Amount', 'Date', 'Method', 'Transaction ID']],
+      body: tableData,
+      theme: 'striped',
+      headStyles: { fillColor: [31, 41, 55], textColor: [255, 255, 255], fontSize: 9, fontStyle: 'bold' },
+      bodyStyles: { fontSize: 8 },
+      foot: [['', '', 'Total Collection:', `৳${total}`, '', '', '']],
+      footStyles: { fillColor: [243, 244, 246], textColor: [31, 41, 55], fontSize: 9, fontStyle: 'bold' }
+    });
+
+    // Footer
+    const pageCount = (doc as any).internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      const pageSize = doc.internal.pageSize;
+      const pageHeight = pageSize.height ? pageSize.height : pageSize.getHeight();
+      
+      doc.setFontSize(8);
+      doc.setTextColor(150);
+      doc.text(
+        `Generated on: ${new Date().toLocaleString()} | Page ${i} of ${pageCount}`,
+        14,
+        pageHeight - 10
+      );
+      doc.text(
+        "Powered by: Manage My Batch Management System",
+        pageSize.width - 80,
+        pageHeight - 10
+      );
+    }
+
+    doc.save(`fee_report_${type}_${new Date().getTime()}.pdf`);
   };
 
   const handleSendSMS = async () => {
@@ -342,12 +600,20 @@ export function Fees() {
                          s.guardianPhone.includes(searchTerm);
     const matchesBatch = selectedBatch === t('fees.allBatches') || s.batchId === selectedBatch;
     const dues = getStudentDues(s);
-    const matchesTab = activeTab === 'all' || dues.length > 0;
+    const hasDues = dues.monthly.length > 0 || dues.exams.length > 0 || dues.other.length > 0;
+    const matchesTab = activeTab === 'all' || hasDues;
     return matchesSearch && matchesBatch && matchesTab && s.status === 'active';
   });
 
   const totalCollected = fees.filter(f => f.status === 'paid').reduce((sum, f) => sum + f.amount, 0);
-  const studentsWithDues = students.filter(s => s.status === 'active' && getStudentDues(s).length > 0);
+  const studentsWithDues = students.filter(s => s.status === 'active' && (getStudentDues(s).monthly.length > 0 || getStudentDues(s).exams.length > 0 || getStudentDues(s).other.length > 0));
+  const totalOutstandingDues = studentsWithDues.reduce((sum, s) => {
+    const d = getStudentDues(s);
+    const mAmount = d.monthly.length * s.monthlyFee;
+    const eAmount = d.exams.reduce((sum, e) => sum + (e.examFee || 0), 0);
+    const oAmount = d.other.reduce((sum, o) => sum + o.amount, 0);
+    return sum + mAmount + eAmount + oAmount;
+  }, 0);
 
   return (
     <div className="space-y-8">
@@ -357,6 +623,10 @@ export function Fees() {
           <p className="text-gray-500 mt-1">{t('fees.subtitle')}</p>
         </div>
         <div className="flex items-center gap-3">
+          <div className="bg-rose-50 px-4 py-2 rounded-xl border border-rose-100">
+            <p className="text-[10px] font-black text-rose-600 uppercase tracking-widest">{t('dashboard.stats.studentsWithDues')}</p>
+            <p className="text-xl font-black text-rose-700">{formatCurrency(totalOutstandingDues)}</p>
+          </div>
           <div className="bg-emerald-50 px-4 py-2 rounded-xl border border-emerald-100">
             <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">{t('fees.totalCollected')}</p>
             <p className="text-xl font-black text-emerald-700">{formatCurrency(totalCollected)}</p>
@@ -365,11 +635,11 @@ export function Fees() {
       </div>
 
       {/* Tabs */}
-      <div className="flex items-center gap-2 bg-white p-1.5 rounded-2xl border border-gray-100 shadow-sm w-fit">
+      <div className="flex items-center gap-2 bg-white p-1.5 rounded-2xl border border-gray-100 shadow-sm w-fit overflow-x-auto no-scrollbar">
         <button
           onClick={() => setActiveTab('all')}
           className={cn(
-            "px-6 py-2.5 text-sm font-bold rounded-xl transition-all flex items-center gap-2",
+            "px-6 py-2.5 text-sm font-bold rounded-xl transition-all flex items-center gap-2 whitespace-nowrap",
             activeTab === 'all' ? "bg-indigo-600 text-white shadow-lg shadow-indigo-100" : "text-gray-500 hover:bg-gray-50"
           )}
         >
@@ -378,7 +648,7 @@ export function Fees() {
         <button
           onClick={() => setActiveTab('dues')}
           className={cn(
-            "px-6 py-2.5 text-sm font-bold rounded-xl transition-all flex items-center gap-2",
+            "px-6 py-2.5 text-sm font-bold rounded-xl transition-all flex items-center gap-2 whitespace-nowrap",
             activeTab === 'dues' ? "bg-rose-600 text-white shadow-lg shadow-rose-100" : "text-gray-500 hover:bg-gray-50"
           )}
         >
@@ -392,9 +662,87 @@ export function Fees() {
             </span>
           )}
         </button>
+        {user?.role !== 'staff' && (
+          <button
+            onClick={() => setActiveTab('manage_other')}
+            className={cn(
+              "px-6 py-2.5 text-sm font-bold rounded-xl transition-all flex items-center gap-2 whitespace-nowrap",
+              activeTab === 'manage_other' ? "bg-amber-600 text-white shadow-lg shadow-amber-100" : "text-gray-500 hover:bg-gray-50"
+            )}
+          >
+            <CreditCard className="w-4 h-4" /> Manage Other Fees
+          </button>
+        )}
       </div>
 
-      {/* Search & Filter */}
+      {activeTab === 'manage_other' ? (
+        <div className="space-y-6">
+          <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
+            <h3 className="text-lg font-bold text-gray-900 mb-6">Create Custom Fee Template</h3>
+            <form 
+              onSubmit={(e) => {
+                e.preventDefault();
+                const formData = new FormData(e.currentTarget);
+                saveOtherFeeTemplate({
+                  name: formData.get('name') as string,
+                  amount: parseInt(formData.get('amount') as string),
+                  batchId: formData.get('batchId') as string,
+                  isMandatory: formData.get('isMandatory') === 'on'
+                });
+                (e.target as HTMLFormElement).reset();
+              }}
+              className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end"
+            >
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Fee Name</label>
+                <input required name="name" type="text" placeholder="e.g. Admission / Book Fee" className="w-full px-4 py-2 border border-gray-100 rounded-xl text-sm" />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Amount</label>
+                <input required name="amount" type="number" placeholder="500" className="w-full px-4 py-2 border border-gray-100 rounded-xl text-sm" />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Target Batch</label>
+                <select name="batchId" className="w-full px-4 py-2 border border-gray-100 rounded-xl text-sm">
+                  <option value="All">All Batches</option>
+                  {batches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                </select>
+              </div>
+              <div className="flex items-center gap-4">
+                <label className="flex items-center gap-2 cursor-pointer pb-2">
+                  <input name="isMandatory" type="checkbox" className="w-4 h-4 text-indigo-600 rounded" />
+                  <span className="text-xs font-bold text-gray-500 uppercase tracking-widest">Mandatory</span>
+                </label>
+                <button type="submit" className="flex-1 bg-indigo-600 text-white rounded-xl py-2 text-sm font-bold shadow-lg shadow-indigo-100">Add Fee</button>
+              </div>
+            </form>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {(instData?.otherFeeTemplates || []).map((t: OtherFeeTemplate) => (
+              <div key={t.id} className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm relative group">
+                <button onClick={() => deleteOtherFeeTemplate(t.id)} className="absolute top-2 right-2 p-1.5 text-gray-300 hover:text-rose-600 opacity-0 group-hover:opacity-100 transition-all">
+                  <Plus className="w-4 h-4 rotate-45" />
+                </button>
+                <div className="flex items-center gap-3">
+                  <div className={cn("p-2 rounded-lg", t.isMandatory ? "bg-rose-50 text-rose-600" : "bg-indigo-50 text-indigo-600")}>
+                    <CreditCard className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <p className="font-bold text-gray-900">{t.name}</p>
+                    <p className="text-xs text-gray-500">৳{t.amount} • {t.batchId === 'All' ? 'All Batches' : batches.find(b => b.id === t.batchId)?.name || 'N/A'}</p>
+                  </div>
+                </div>
+                <div className="mt-2 text-[10px] font-black uppercase text-gray-400">
+                  {t.isMandatory ? 'Mandatory for all' : 'Optional / Pickup'}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* Search & Filter */}
       <div className="flex flex-col md:flex-row gap-4 items-center justify-between bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
         <div className="relative w-full md:w-96 group">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4 group-focus-within:text-indigo-500 transition-colors" />
@@ -481,35 +829,67 @@ export function Fees() {
                 <TableCell>
                   <span className={cn(
                     "px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest",
-                    dues.length === 0 ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600"
+                    (dues.monthly.length === 0 && dues.exams.length === 0 && dues.other.length === 0) ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600"
                   )}>
-                    {dues.length === 0 ? t('fees.status.paid') : t('fees.status.duesPending')}
+                    {(dues.monthly.length === 0 && dues.exams.length === 0 && dues.other.length === 0) ? t('fees.status.paid') : t('fees.status.duesPending')}
                   </span>
                 </TableCell>
                 <TableCell>
-                  <div className="flex flex-wrap gap-1 max-w-[200px]">
-                    {dues.length > 0 ? (
-                      dues.map(m => (
-                        <span key={m} className="px-1.5 py-0.5 bg-rose-50 text-rose-600 text-[10px] font-bold rounded border border-rose-100">
-                          {t(`common.months.${m}`)}
-                        </span>
-                      ))
-                    ) : (
+                  <div className="flex flex-col gap-1 max-w-[200px]">
+                    <div className="flex flex-wrap gap-1">
+                      {dues.monthly.length > 0 ? (
+                        dues.monthly.map(m => (
+                          <span key={m} className="px-1.5 py-0.5 bg-rose-50 text-rose-600 text-[8px] font-black rounded border border-rose-100 uppercase">
+                            {t(`common.months.${m}`)}
+                          </span>
+                        ))
+                      ) : null}
+                    </div>
+                    {dues.exams.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {dues.exams.map(e => (
+                          <span key={e.id} className="px-1.5 py-0.5 bg-amber-50 text-amber-600 text-[8px] font-black rounded border border-amber-100 uppercase">
+                            EXAM: {e.title}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    {dues.other.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {dues.other.map(o => (
+                          <span key={o.id} className="px-1.5 py-0.5 bg-purple-50 text-purple-600 text-[8px] font-black rounded border border-purple-100 uppercase">
+                            FEE: {o.name}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    {(dues.monthly.length === 0 && dues.exams.length === 0 && dues.other.length === 0) && (
                       <span className="text-[10px] text-emerald-600 font-bold italic">{t('fees.status.allClear')}</span>
                     )}
                   </div>
                 </TableCell>
                 <TableCell>
-                  <button 
-                    onClick={() => {
-                      setSelectedStudent(student);
-                      setPaymentData({ ...paymentData, months: dues });
-                      setIsPaymentModalOpen(true);
-                    }}
-                    className="flex items-center gap-2 px-3 py-1.5 text-xs font-black text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-all shadow-sm"
-                  >
-                    <CreditCard className="w-3.5 h-3.5" /> {t('fees.collectFee')}
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button 
+                      onClick={() => {
+                        setSelectedStudent(student);
+                        setPaymentData({ ...paymentData, type: 'Monthly Fee', months: dues.monthly, examId: '', otherFeeId: '' });
+                        setIsPaymentModalOpen(true);
+                      }}
+                      className="flex items-center gap-2 px-3 py-1.5 text-xs font-black text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-all shadow-sm"
+                    >
+                      <CreditCard className="w-3.5 h-3.5" /> {t('fees.collectFee')}
+                    </button>
+                    {(dues.monthly.length > 0 || dues.exams.length > 0 || dues.other.length > 0) && (
+                      <button 
+                        onClick={() => handleSendReminder(student)}
+                        className="flex items-center gap-2 px-3 py-1.5 text-xs font-black text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 transition-all shadow-sm"
+                        title="Send Reminder"
+                      >
+                        <MessageSquare className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
                 </TableCell>
               </TableRow>
             );
@@ -541,8 +921,13 @@ export function Fees() {
                       <p className="font-bold text-gray-900">{fee.studentName}</p>
                     </td>
                     <td className="px-6 py-4">
-                      <span className="text-xs font-medium text-gray-600 bg-gray-100 px-2 py-1 rounded">
-                        {fee.type === 'Monthly Fee' ? `${fee.month} ${fee.year}` : fee.type}
+                      <span className={cn(
+                        "text-[10px] font-black px-2 py-1 rounded uppercase tracking-wider",
+                        fee.type === 'Monthly Fee' ? "bg-indigo-50 text-indigo-700" :
+                        fee.type === 'Exam Fee' ? "bg-rose-50 text-rose-700" :
+                        "bg-amber-50 text-amber-700"
+                      )}>
+                        {fee.type === 'Monthly Fee' ? `${fee.month} ${fee.year}` : (fee.description || fee.type)}
                       </span>
                     </td>
                     <td className="px-6 py-4 font-black text-gray-900">৳{fee.amount}</td>
@@ -592,39 +977,131 @@ export function Fees() {
               </div>
             </div>
 
-            <div className="space-y-3">
-              <label className="text-xs font-black text-gray-500 uppercase tracking-widest">{t('fees.paymentModal.selectMonths')}</label>
-              <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                {MONTHS.map((month, idx) => {
-                  const isPaid = fees.some(f => f.studentId === selectedStudent.id && f.month === month && f.year === new Date().getFullYear() && f.status === 'paid');
-                  const isSelected = paymentData.months.includes(month);
-                  
-                  return (
+            <div className="flex items-center gap-2 p-1 bg-gray-100 rounded-xl">
+              {(['Monthly Fee', 'Exam Fee', 'Other'] as const).map((type) => (
+                <button
+                  key={type}
+                  type="button"
+                  onClick={() => setPaymentData({ ...paymentData, type })}
+                  className={cn(
+                    "flex-1 py-2 text-xs font-bold rounded-lg transition-all",
+                    paymentData.type === type ? "bg-white text-indigo-600 shadow-sm" : "text-gray-500"
+                  )}
+                >
+                  {type === 'Other' ? 'Book/Custom' : type}
+                </button>
+              ))}
+            </div>
+
+            {paymentData.type === 'Monthly Fee' && (
+              <div className="space-y-3 animate-in fade-in slide-in-from-top-2">
+                <label className="text-xs font-black text-gray-500 uppercase tracking-widest">{t('fees.paymentModal.selectMonths')}</label>
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                  {MONTHS.map((month) => {
+                    const isPaid = fees.some(f => f.studentId === selectedStudent.id && f.month === month && f.year === new Date().getFullYear() && f.status === 'paid' && f.type === 'Monthly Fee');
+                    const isSelected = paymentData.months.includes(month);
+                    
+                    return (
+                      <button
+                        key={month}
+                        type="button"
+                        disabled={isPaid}
+                        onClick={() => {
+                          if (isSelected) {
+                            setPaymentData({ ...paymentData, months: paymentData.months.filter(m => m !== month) });
+                          } else {
+                            setPaymentData({ ...paymentData, months: [...paymentData.months, month] });
+                          }
+                        }}
+                        className={cn(
+                          "py-2 px-1 rounded-xl text-[10px] font-black transition-all border",
+                          isPaid ? "bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed" :
+                          isSelected ? "bg-indigo-600 text-white border-indigo-600 shadow-md" :
+                          "bg-white text-gray-600 border-gray-200 hover:border-indigo-300"
+                        )}
+                      >
+                        {t(`common.months.${month}`)}
+                        {isPaid && <CheckCircle2 className="w-3 h-3 mx-auto mt-1" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {paymentData.type === 'Exam Fee' && (
+              <div className="space-y-3 animate-in fade-in slide-in-from-top-2">
+                <label className="text-xs font-black text-gray-500 uppercase tracking-widest">Select Pending Exam</label>
+                <div className="space-y-2">
+                  {getStudentDues(selectedStudent).exams.map(exam => (
                     <button
-                      key={month}
+                      key={exam.id}
                       type="button"
-                      disabled={isPaid}
-                      onClick={() => {
-                        if (isSelected) {
-                          setPaymentData({ ...paymentData, months: paymentData.months.filter(m => m !== month) });
-                        } else {
-                          setPaymentData({ ...paymentData, months: [...paymentData.months, month] });
-                        }
-                      }}
+                      onClick={() => setPaymentData({ ...paymentData, examId: paymentData.examId === exam.id ? '' : exam.id, amount: exam.examFee || 0 })}
                       className={cn(
-                        "py-2 px-1 rounded-xl text-[10px] font-black transition-all border",
-                        isPaid ? "bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed" :
-                        isSelected ? "bg-indigo-600 text-white border-indigo-600 shadow-md" :
-                        "bg-white text-gray-600 border-gray-200 hover:border-indigo-300"
+                        "w-full flex items-center justify-between p-4 rounded-xl border transition-all text-left",
+                        paymentData.examId === exam.id ? "bg-rose-50 border-rose-200 text-rose-700 shadow-sm" : "bg-white border-gray-100 hover:border-rose-100"
                       )}
                     >
-                      {t(`common.months.${month}`)}
-                      {isPaid && <CheckCircle2 className="w-3 h-3 mx-auto mt-1" />}
+                      <div>
+                        <p className="font-bold text-sm">{exam.title}</p>
+                        <p className="text-[10px] text-rose-400 font-black uppercase">Pending Fee</p>
+                      </div>
+                      <p className="text-lg font-black italic">৳{exam.examFee}</p>
                     </button>
-                  );
-                })}
+                  ))}
+                  {getStudentDues(selectedStudent).exams.length === 0 && (
+                    <div className="p-8 text-center text-gray-400 bg-gray-50 rounded-2xl border-2 border-dashed border-gray-100">
+                      No pending exam fees found.
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
+
+            {paymentData.type === 'Other' && (
+              <div className="space-y-3 animate-in fade-in slide-in-from-top-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-black text-gray-500 uppercase tracking-widest">Select custom fee</label>
+                  <span className="text-[10px] font-bold text-indigo-500 bg-indigo-50 px-2 py-0.5 rounded-full">Book / Materials</span>
+                </div>
+                <div className="space-y-2">
+                  {(instData?.otherFeeTemplates || []).map((template: OtherFeeTemplate) => {
+                    const isPaid = fees.some(f => f.studentId === selectedStudent.id && f.type === 'Other' && f.description === template.name && f.status === 'paid');
+                    const isApplicable = !template.batchId || template.batchId === 'All' || template.batchId === selectedStudent.batchId;
+                    
+                    if (isPaid || !isApplicable) return null;
+
+                    return (
+                      <button
+                        key={template.id}
+                        type="button"
+                        onClick={() => setPaymentData({ ...paymentData, otherFeeId: paymentData.otherFeeId === template.id ? '' : template.id, amount: template.amount })}
+                        className={cn(
+                          "w-full flex items-center justify-between p-4 rounded-xl border transition-all text-left",
+                          paymentData.otherFeeId === template.id ? "bg-amber-50 border-amber-200 text-amber-700 shadow-sm" : "bg-white border-gray-100 hover:border-amber-100"
+                        )}
+                      >
+                        <div>
+                          <p className="font-bold text-sm">{template.name}</p>
+                          <p className="text-[10px] text-amber-500 font-bold uppercase">{template.isMandatory ? 'Mandatory' : 'Optional Choice'}</p>
+                        </div>
+                        <p className="text-lg font-black italic">৳{template.amount}</p>
+                      </button>
+                    );
+                  })}
+                  {!(instData?.otherFeeTemplates || []).some((t: any) => {
+                    const isPaid = fees.some(f => f.studentId === selectedStudent.id && f.type === 'Other' && f.description === t.name && f.status === 'paid');
+                    const isApplicable = !t.batchId || t.batchId === 'All' || t.batchId === selectedStudent.batchId;
+                    return !isPaid && isApplicable;
+                  }) && (
+                    <div className="p-8 text-center text-gray-400 bg-gray-50 rounded-2xl border-2 border-dashed border-gray-100">
+                      No other fees available for this student.
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
             <div className="space-y-3">
               <label className="text-xs font-black text-gray-500 uppercase tracking-widest">{t('fees.paymentModal.paymentMethod')}</label>
@@ -680,11 +1157,18 @@ export function Fees() {
             <div className="pt-4 border-t border-gray-100">
               <div className="flex items-center justify-between mb-4">
                 <span className="text-sm font-bold text-gray-500">{t('fees.paymentModal.totalAmount')}:</span>
-                <span className="text-2xl font-black text-gray-900">৳{selectedStudent.monthlyFee * paymentData.months.length}</span>
+                <span className="text-2xl font-black text-gray-900">
+                  ৳{paymentData.type === 'Monthly Fee' 
+                    ? selectedStudent.monthlyFee * paymentData.months.length 
+                    : paymentData.type === 'Exam Fee' 
+                      ? (exams.find(e => e.id === paymentData.examId)?.examFee || 0)
+                      : ((instData?.otherFeeTemplates || []).find((t: any) => t.id === paymentData.otherFeeId)?.amount || 0)
+                  }
+                </span>
               </div>
               <button
                 type="submit"
-                disabled={paymentData.months.length === 0 || isSaving}
+                disabled={(paymentData.type === 'Monthly Fee' && paymentData.months.length === 0) || (paymentData.type === 'Exam Fee' && !paymentData.examId) || (paymentData.type === 'Other' && !paymentData.otherFeeId) || isSaving}
                 className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
@@ -936,6 +1420,8 @@ export function Fees() {
         confirmText={pendingWhatsappUrl ? t('common.sendWhatsApp', { defaultValue: 'Send WhatsApp' }) : t('common.ok', { defaultValue: 'OK' })}
         cancelText={pendingWhatsappUrl ? t('common.done', { defaultValue: 'Done' }) : undefined}
       />
-    </div>
+    </>
+  )}
+</div>
   );
 }

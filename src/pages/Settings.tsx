@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, Bell, Shield, Globe, Palette, LogOut, Mail, Phone, MapPin, Building, Loader2, CheckCircle, Moon, Sun, Monitor, UserPlus, Trash2, ShieldAlert, XCircle, AlertCircle, MessageSquare } from 'lucide-react';
+import { User, Bell, Shield, Globe, Palette, LogOut, Mail, Phone, MapPin, Building, Loader2, CheckCircle, Moon, Sun, Monitor, UserPlus, Trash2, ShieldAlert, XCircle, AlertCircle, MessageSquare, Smartphone } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import { useTheme } from '../lib/theme';
 import { cn } from '../lib/utils';
@@ -7,7 +7,7 @@ import { useTranslation } from 'react-i18next';
 import { collection, query, where, onSnapshot, doc, deleteDoc, setDoc, getDocs, writeBatch, getDoc } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { initializeApp, deleteApp } from 'firebase/app';
-import { getAuth, createUserWithEmailAndPassword, signOut, signInWithEmailAndPassword } from 'firebase/auth';
+import { getAuth, createUserWithEmailAndPassword, signOut, signInWithEmailAndPassword, sendPasswordResetEmail, updatePassword, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
 import firebaseConfig from '../../firebase-applet-config.json';
 import { Modal } from '../components/Modal';
 import { ConfirmModal } from '../components/ConfirmModal';
@@ -17,6 +17,7 @@ type SettingsTab = 'profile' | 'notifications' | 'sms' | 'security' | 'language'
 
 export function Settings() {
   const { user, logout, loading } = useAuth();
+  const auth = getAuth();
   const { theme, setTheme } = useTheme();
   const { t, i18n } = useTranslation();
   const [activeTab, setActiveTab] = useState<SettingsTab>('profile');
@@ -25,6 +26,66 @@ export function Settings() {
   const [staffLoading, setStaffLoading] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  
+  // Security Tab States
+  const [isResetEmailSent, setIsResetEmailSent] = useState(false);
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [passwordForm, setPasswordForm] = useState({
+    current: '',
+    new: '',
+    confirm: ''
+  });
+
+  const handleSendResetEmail = async () => {
+    if (!user?.email) return;
+    setIsSaving(true);
+    try {
+      await sendPasswordResetEmail(auth, user.email);
+      setIsResetEmailSent(true);
+      setToast({ message: 'Password reset email sent! Please check your inbox.', type: 'success' });
+    } catch (error: any) {
+      console.error('Reset email error:', error);
+      setToast({ message: error.message || 'Failed to send reset email.', type: 'error' });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleUpdatePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!auth.currentUser || !user?.email) return;
+
+    if (passwordForm.new !== passwordForm.confirm) {
+      setToast({ message: 'New passwords do not match!', type: 'error' });
+      return;
+    }
+
+    if (passwordForm.new.length < 6) {
+      setToast({ message: 'Password must be at least 6 characters.', type: 'error' });
+      return;
+    }
+
+    setIsChangingPassword(true);
+    try {
+      // Re-authenticate first
+      const credential = EmailAuthProvider.credential(user.email, passwordForm.current);
+      await reauthenticateWithCredential(auth.currentUser, credential);
+      
+      // Update password
+      await updatePassword(auth.currentUser, passwordForm.new);
+      
+      setToast({ message: 'Password updated successfully!', type: 'success' });
+      setPasswordForm({ current: '', new: '', confirm: '' });
+    } catch (error: any) {
+      console.error('Password update error:', error);
+      let message = 'Failed to update password.';
+      if (error.code === 'auth/wrong-password') message = 'Current password is incorrect.';
+      else if (error.code === 'auth/too-many-requests') message = 'Too many attempts. Try again later.';
+      setToast({ message, type: 'error' });
+    } finally {
+      setIsChangingPassword(false);
+    }
+  };
   const [profileData, setProfileData] = useState({
     displayName: user?.displayName || '',
     phone: user?.phone || '',
@@ -623,24 +684,145 @@ export function Settings() {
           )}
 
           {activeTab === 'security' && (
-            <div className="bg-white dark:bg-gray-900 p-8 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm space-y-6 transition-colors duration-300">
-              <h3 className="text-xl font-bold text-gray-900 dark:text-white">Security & Privacy</h3>
-              <div className="space-y-6">
-                <div className="p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-xl border border-indigo-100 dark:border-indigo-900/50 flex items-start gap-4">
-                  <Shield className="w-5 h-5 text-indigo-600 dark:text-indigo-400 mt-1" />
+            <div className="space-y-6">
+              {/* Password Management */}
+              <div className="bg-white dark:bg-gray-900 p-8 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm space-y-8 transition-colors duration-300">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-indigo-50 dark:bg-indigo-900/20 rounded-xl">
+                    <Shield className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
+                  </div>
                   <div>
-                    <p className="text-sm font-bold text-indigo-900 dark:text-indigo-100">Two-Factor Authentication</p>
-                    <p className="text-xs text-indigo-700/70 dark:text-indigo-300/70 mt-1">Add an extra layer of security to your account by requiring more than just a password to log in.</p>
-                    <button className="mt-3 px-4 py-2 bg-indigo-600 text-white text-xs font-bold rounded-lg hover:bg-indigo-700 transition-all">Enable 2FA</button>
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-white">Security & Account Access</h3>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Manage your password and security settings to protect your account.</p>
                   </div>
                 </div>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between p-4 border border-gray-100 dark:border-gray-800 rounded-xl">
-                    <div>
-                      <p className="text-sm font-bold text-gray-900 dark:text-white">Session Management</p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">You are currently logged in on 2 devices</p>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+                  <form onSubmit={handleUpdatePassword} className="space-y-6">
+                    <h4 className="text-sm font-black text-gray-900 dark:text-white uppercase tracking-widest border-b border-gray-100 dark:border-gray-800 pb-2">Change Password</h4>
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider ml-1">Current Password</label>
+                        <input 
+                          required
+                          type="password" 
+                          value={passwordForm.current}
+                          onChange={e => setPasswordForm(prev => ({ ...prev, current: e.target.value }))}
+                          className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-mono"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider ml-1">New Password</label>
+                        <input 
+                          required
+                          type="password" 
+                          value={passwordForm.new}
+                          onChange={e => setPasswordForm(prev => ({ ...prev, new: e.target.value }))}
+                          className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-mono"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider ml-1">Confirm New Password</label>
+                        <input 
+                          required
+                          type="password" 
+                          value={passwordForm.confirm}
+                          onChange={e => setPasswordForm(prev => ({ ...prev, confirm: e.target.value }))}
+                          className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-mono"
+                        />
+                      </div>
+                      <button 
+                        type="submit"
+                        disabled={isChangingPassword}
+                        className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 flex items-center justify-center gap-2 disabled:opacity-50"
+                      >
+                        {isChangingPassword ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
+                        Update Password
+                      </button>
                     </div>
-                    <button className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline">View All</button>
+                  </form>
+
+                  <div className="space-y-8">
+                    <div className="space-y-4">
+                      <h4 className="text-sm font-black text-gray-900 dark:text-white uppercase tracking-widest border-b border-gray-100 dark:border-gray-800 pb-2 text-rose-600">Recovery Options</h4>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+                        If you've forgotten your current password or want to reset it via email, use the option below.
+                      </p>
+                      <button 
+                        onClick={handleSendResetEmail}
+                        disabled={isSaving || isResetEmailSent}
+                        className={cn(
+                          "w-full py-3 px-4 rounded-xl border-2 font-bold text-sm transition-all flex items-center justify-center gap-2",
+                          isResetEmailSent 
+                            ? "bg-emerald-50 border-emerald-200 text-emerald-600 cursor-default" 
+                            : "border-indigo-100 dark:border-indigo-900/50 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20"
+                        )}
+                      >
+                        {isResetEmailSent ? <CheckCircle className="w-4 h-4" /> : <Mail className="w-4 h-4" />}
+                        {isResetEmailSent ? 'Reset Email Sent!' : 'Send Reset Email'}
+                      </button>
+                    </div>
+
+                    <div className="space-y-4 pt-4 border-t border-gray-100 dark:border-gray-800">
+                      <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400">
+                        <ShieldAlert className="w-5 h-5" />
+                        <h4 className="text-sm font-black uppercase tracking-widest leading-none pt-1">Security Tips</h4>
+                      </div>
+                      <ul className="space-y-3">
+                        {[
+                          'Use a unique password for this account.',
+                          'Enable dark mode to reduce eye strain.',
+                          'Log out from public computers after use.',
+                          'Never share your SuperAdmin credentials.'
+                        ].map((tip, i) => (
+                          <li key={i} className="flex items-start gap-2 text-xs text-gray-500 dark:text-gray-400 leading-none">
+                            <div className="w-1.5 h-1.5 rounded-full bg-indigo-400 mt-1 shrink-0" />
+                            {tip}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Advanced Security */}
+              <div className="bg-white dark:bg-gray-900 p-8 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm space-y-6 transition-colors duration-300">
+                <div className="flex items-center gap-4">
+                  <div className="p-3 bg-amber-50 dark:bg-amber-900/20 rounded-xl">
+                    <ShieldAlert className="w-6 h-6 text-amber-600 dark:text-amber-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-white leading-none">Advanced Security</h3>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">Enhanced protection for your panel and data.</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-1 gap-4">
+                  <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className="p-2 bg-white dark:bg-gray-900 rounded-lg shadow-sm">
+                        <Smartphone className="w-5 h-5 text-gray-400" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold text-gray-900 dark:text-white">Two-Factor Authentication (2FA)</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Additional verification for logins.</p>
+                      </div>
+                    </div>
+                    <span className="px-3 py-1 bg-gray-200 dark:bg-gray-700 rounded-full text-[9px] font-black uppercase text-gray-500 tracking-widest">Coming Soon</span>
+                  </div>
+
+                  <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className="p-2 bg-white dark:bg-gray-900 rounded-lg shadow-sm">
+                        <Globe className="w-5 h-5 text-gray-400" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold text-gray-900 dark:text-white">Active Sessions</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Manage your connected devices.</p>
+                      </div>
+                    </div>
+                    <button className="text-xs font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-widest hover:underline">View All</button>
                   </div>
                 </div>
               </div>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, Search, Filter, FileText, MoreVertical, Calendar, CheckCircle2, Clock, Loader2, Download, Palette, Layout, Award, Save, Trash2, Edit2, Share2, Copy, ExternalLink, Image as ImageIcon, Sparkles, Star, Trophy, BoxIcon } from 'lucide-react';
+import { Plus, Search, Filter, FileText, MoreVertical, Calendar, CheckCircle2, Clock, Loader2, Download, Palette, Layout, Award, Save, Trash2, Edit2, Share2, Copy, ExternalLink, Image as ImageIcon, Sparkles, Star, Trophy, BoxIcon, Globe } from 'lucide-react';
 import { motion } from 'motion/react';
 import { cn } from '../lib/utils';
 import { collection, onSnapshot, query, addDoc, serverTimestamp, deleteDoc, doc, orderBy, setDoc, where } from 'firebase/firestore';
@@ -10,6 +10,7 @@ import { ConfirmModal } from '../components/ConfirmModal';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { useTranslation } from 'react-i18next';
+import { AdmitCardDesigner } from '../components/AdmitCardDesigner';
 
 interface OfflineExam {
   id: string;
@@ -18,8 +19,12 @@ interface OfflineExam {
   batchId: string;
   batchName?: string;
   date?: string;
+  time?: string; // Total time for single exam
   totalMarks?: number;
   hasSubSections?: boolean;
+  isPublished?: boolean;
+  linkedExams?: string[];
+  examFee?: number;
   subSections?: {
     name: string;
     totalMarks: number;
@@ -28,6 +33,7 @@ interface OfflineExam {
     name: string;
     totalMarks: number;
     date: string;
+    time?: string;
     hasSubSections?: boolean;
     subSections?: {
       name: string;
@@ -67,8 +73,6 @@ export function OfflineExams() {
   const [selectedExam, setSelectedExam] = useState<OfflineExam | null>(null);
   const [isManageModalOpen, setIsManageModalOpen] = useState(false);
   const [manageTab, setManageTab] = useState<'overview' | 'seat-plan' | 'admit-cards' | 'results'>('overview');
-  const [admitCardStyle, setAdmitCardStyle] = useState<'modern' | 'classic' | 'minimal' | 'professional' | 'vibrant'>('modern');
-  const [admitCardColor, setAdmitCardColor] = useState('#4f46e5');
   const [studentMarks, setStudentMarks] = useState<Record<string, Record<string, number>>>({});
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
@@ -88,6 +92,11 @@ export function OfflineExams() {
   const [selectedStudentForResult, setSelectedStudentForResult] = useState<any>(null);
   const markSheetRef = useRef<HTMLDivElement>(null);
   const [isMarkSheetModalOpen, setIsMarkSheetModalOpen] = useState(false);
+
+  const [isCombinedModalOpen, setIsCombinedModalOpen] = useState(false);
+  const [combinedBatchId, setCombinedBatchId] = useState('');
+  const [selectedExamsForCombined, setSelectedExamsForCombined] = useState<string[]>([]);
+  const [combinedExamTitle, setCombinedExamTitle] = useState('');
 
   useEffect(() => {
     if (!user) return;
@@ -132,7 +141,64 @@ export function OfflineExams() {
       }, { merge: true });
       setSuccessMessage(t('offlineExams.manage.results.success', { defaultValue: 'Results saved successfully!' }));
       setIsSuccessModalOpen(true);
-      setIsManageModalOpen(false);
+      // Removed setIsManageModalOpen(false) to allow further actions like publishing
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `offline_exams/${selectedExam.id}`);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleCreateCombinedResult = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user || !combinedBatchId || selectedExamsForCombined.length < 2 || !combinedExamTitle) {
+      alert('Please select at least 2 exams and provide a title.');
+      return;
+    }
+    
+    setIsSaving(true);
+    try {
+      const batch = batches.find(b => b.id === combinedBatchId);
+      const newCombinedExam = {
+        title: combinedExamTitle,
+        type: 'school',
+        batchId: combinedBatchId,
+        batchName: batch?.name || '',
+        status: 'completed',
+        isPublished: true,
+        linkedExams: selectedExamsForCombined,
+        createdAt: serverTimestamp(),
+        institutionId: user.institutionId || user.uid,
+        institutionName: instData?.name || ''
+      };
+      
+      await addDoc(collection(db, 'offline_exams'), newCombinedExam);
+      setIsCombinedModalOpen(false);
+      setCombinedBatchId('');
+      setSelectedExamsForCombined([]);
+      setCombinedExamTitle('');
+      setSuccessMessage('Combined result prepared and published successfully!');
+      setIsSuccessModalOpen(true);
+    } catch (error) {
+      console.error('Error creating combined result:', error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleTogglePublish = async () => {
+    if (!selectedExam) return;
+    setIsSaving(true);
+    const newPublishStatus = !selectedExam.isPublished;
+    try {
+      await setDoc(doc(db, 'offline_exams', selectedExam.id), {
+        isPublished: newPublishStatus,
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+      
+      setSelectedExam(prev => prev ? { ...prev, isPublished: newPublishStatus } : null);
+      setSuccessMessage(newPublishStatus ? "Result published on website!" : "Result removed from website!");
+      setIsSuccessModalOpen(true);
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, `offline_exams/${selectedExam.id}`);
     } finally {
@@ -140,7 +206,6 @@ export function OfflineExams() {
     }
   };
   const scheduleRef = useRef<HTMLDivElement>(null);
-  const admitCardsRef = useRef<HTMLDivElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
 
   const [newExam, setNewExam] = useState({
@@ -148,11 +213,14 @@ export function OfflineExams() {
     title: '',
     batchId: '',
     date: new Date().toISOString().split('T')[0],
+    time: '10:00 AM',
     totalMarks: 100,
+    examFee: 0,
     hasSubSections: false,
     subSections: [{ name: '', totalMarks: 50 }],
-    subjects: [{ name: '', totalMarks: 100, date: new Date().toISOString().split('T')[0], hasSubSections: false, subSections: [{ name: '', totalMarks: 50 }] }],
+    subjects: [{ name: '', totalMarks: 100, date: new Date().toISOString().split('T')[0], time: '10:00 AM', hasSubSections: false, subSections: [{ name: '', totalMarks: 50 }] }],
     institutionName: '',
+    linkedExams: [] as string[],
   });
 
   useEffect(() => {
@@ -248,6 +316,7 @@ export function OfflineExams() {
         batchId: batches[0]?.id || '',
         date: new Date().toISOString().split('T')[0],
         totalMarks: 100,
+        examFee: 0,
         hasSubSections: false,
         subSections: [{ name: '', totalMarks: 50 }],
         subjects: [{ name: '', totalMarks: 100, date: new Date().toISOString().split('T')[0], hasSubSections: false, subSections: [{ name: '', totalMarks: 50 }] }],
@@ -297,7 +366,7 @@ export function OfflineExams() {
   const handleAddSubject = () => {
     setNewExam(prev => ({
       ...prev,
-      subjects: [...prev.subjects, { name: '', totalMarks: 100, date: new Date().toISOString().split('T')[0], hasSubSections: false, subSections: [{ name: '', totalMarks: 50 }] }]
+      subjects: [...prev.subjects, { name: '', totalMarks: 100, date: new Date().toISOString().split('T')[0], time: '10:00 AM', hasSubSections: false, subSections: [{ name: '', totalMarks: 50 }] }]
     }));
   };
 
@@ -331,6 +400,7 @@ export function OfflineExams() {
   };
 
   const calculateGrade = (marks: number, total: number) => {
+    if (total === 0) return 'N/A';
     const percentage = (marks / total) * 100;
     if (percentage >= 80) return 'A+';
     if (percentage >= 70) return 'A';
@@ -341,41 +411,64 @@ export function OfflineExams() {
     return 'F';
   };
 
-  const getRankedStudents = () => {
-    if (!selectedExam) return [];
-    const studentsWithTotals = examStudents.map(student => {
-      const marks = studentMarks[student.id] || {};
+  const getRankedStudents = (examOverride?: OfflineExam) => {
+    const targetExam = examOverride || selectedExam;
+    if (!targetExam) return [];
+    
+    // Check for linked exams for combined result
+    const linkedExamsData = targetExam.linkedExams ? exams.filter(e => targetExam.linkedExams?.includes(e.id)) : [];
+
+    const studentsWithTotals = (targetExam.batchId ? students.filter(s => s.batchId === targetExam.batchId) : []).map(student => {
+      // Calculate current exam marks
+      const marks = targetExam.studentMarks?.[student.id] || {};
       let totalObtained = 0;
       let totalPossible = 0;
 
-      if (selectedExam.type === 'single') {
-        if (selectedExam.hasSubSections && selectedExam.subSections) {
-          selectedExam.subSections.forEach(ss => {
-            totalObtained += marks[ss.name] || 0;
-            totalPossible += ss.totalMarks;
-          });
-        } else {
-          totalObtained = marks['total'] || 0;
-          totalPossible = selectedExam.totalMarks || 100;
-        }
-      } else {
-        selectedExam.subjects?.forEach(s => {
-          if (s.hasSubSections && s.subSections) {
-            s.subSections.forEach(ss => {
-              totalObtained += marks[`${s.name}_${ss.name}`] || 0;
+      const processExam = (exam: OfflineExam, mks: any) => {
+        let obtained = 0;
+        let possible = 0;
+        if (exam.type === 'single') {
+          if (exam.hasSubSections && exam.subSections) {
+            exam.subSections.forEach(ss => {
+              obtained += mks[ss.name] || 0;
+              possible += ss.totalMarks;
             });
           } else {
-            totalObtained += marks[s.name] || 0;
+            obtained = mks['total'] || 0;
+            possible = exam.totalMarks || 100;
           }
-          totalPossible += s.totalMarks;
-        });
-      }
+        } else {
+          exam.subjects?.forEach(s => {
+            if (s.hasSubSections && s.subSections) {
+              s.subSections.forEach(ss => {
+                obtained += mks[`${s.name}_${ss.name}`] || 0;
+              });
+            } else {
+              obtained += mks[s.name] || 0;
+            }
+            possible += s.totalMarks;
+          });
+        }
+        return { obtained, possible };
+      };
+
+      const current = processExam(targetExam, marks);
+      totalObtained = current.obtained;
+      totalPossible = current.possible;
+
+      // Add linked exams marks
+      linkedExamsData.forEach(le => {
+        const leMarks = le.studentMarks?.[student.id] || {};
+        const leRes = processExam(le, leMarks);
+        totalObtained += leRes.obtained;
+        totalPossible += leRes.possible;
+      });
 
       return {
         ...student,
         totalObtained,
         totalPossible,
-        percentage: (totalObtained / totalPossible) * 100,
+        percentage: totalPossible > 0 ? (totalObtained / totalPossible) * 100 : 0,
         grade: calculateGrade(totalObtained, totalPossible)
       };
     });
@@ -457,74 +550,6 @@ export function OfflineExams() {
     }
   };
 
-  const downloadAllAdmitCards = async () => {
-    if (examStudents.length === 0) return;
-    setIsGeneratingPDF(true);
-    
-    try {
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = pdf.internal.pageSize.getHeight();
-      
-      for (let i = 0; i < examStudents.length; i++) {
-        const student = examStudents[i];
-        const element = document.getElementById(`admit-card-${student.id}`);
-        if (!element) continue;
-        
-        // Clone and prepare element for screenshot
-        const container = document.createElement('div');
-        container.style.position = 'fixed';
-        container.style.left = '-9999px';
-        container.style.top = '0';
-        container.style.width = '210mm';
-        container.style.backgroundColor = 'white';
-        
-        const clone = element.cloneNode(true) as HTMLDivElement;
-        clone.style.display = 'block';
-        clone.style.width = '100%';
-        clone.style.transform = 'none';
-        
-        container.appendChild(clone);
-        document.body.appendChild(container);
-        
-        // Wait for images
-        await new Promise(resolve => setTimeout(resolve, 800));
-        
-        const canvas = await html2canvas(clone, {
-          scale: 2,
-          useCORS: true,
-          allowTaint: true,
-          backgroundColor: '#ffffff',
-          logging: false,
-        });
-        
-        const imgData = canvas.toDataURL('image/png', 1.0);
-        
-        // Calculate dimensions to fit nicely on A4
-        const margin = 15;
-        const imgWidth = pdfWidth - (margin * 2);
-        const imgHeight = (canvas.height * imgWidth) / canvas.width;
-        
-        if (i > 0) {
-          pdf.addPage();
-        }
-        
-        // Center vertically if it fits
-        const yOffset = imgHeight < pdfHeight ? (pdfHeight - imgHeight) / 2 : margin;
-        
-        pdf.addImage(imgData, 'PNG', margin, yOffset, imgWidth, imgHeight);
-        
-        document.body.removeChild(container);
-      }
-      
-      pdf.save(`Admit_Cards_${selectedExam?.title.replace(/\s+/g, '_')}.pdf`);
-    } catch (error) {
-      console.error('PDF Generation Error:', error);
-      alert('Error generating all admit cards. Please try individual downloads if this fails.');
-    } finally {
-      setIsGeneratingPDF(false);
-    }
-  };
 
   const handleMarkChange = (studentId: string, subjectName: string, value: string) => {
     const marks = parseInt(value) || 0;
@@ -559,12 +584,20 @@ export function OfflineExams() {
           <h1 className="text-3xl font-bold text-gray-900 tracking-tight">{t('offlineExams.title')}</h1>
           <p className="text-gray-500 mt-1">{t('offlineExams.subtitle')}</p>
         </div>
-        <button 
-          onClick={() => setIsAddModalOpen(true)}
-          className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 transition-all shadow-md shadow-indigo-200"
-        >
-          <Plus className="w-4 h-4" /> {t('offlineExams.createNew')}
-        </button>
+        <div className="flex gap-2">
+          <button 
+            onClick={() => setIsCombinedModalOpen(true)}
+            className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-indigo-600 bg-indigo-50 rounded-xl hover:bg-indigo-100 transition-all"
+          >
+            <Trophy className="w-4 h-4" /> Combined Result
+          </button>
+          <button 
+            onClick={() => setIsAddModalOpen(true)}
+            className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 transition-all shadow-md shadow-indigo-200"
+          >
+            <Plus className="w-4 h-4" /> {t('offlineExams.createNew')}
+          </button>
+        </div>
       </div>
 
       <div className="flex flex-col md:flex-row gap-4 items-center justify-between bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
@@ -795,31 +828,41 @@ export function OfflineExams() {
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">{t('offlineExams.modal.examTitle')}</label>
-              <input
-                required
-                type="text"
-                placeholder={newExam.type === 'single' ? "e.g. Math Final" : "e.g. First Term Exam"}
-                value={newExam.title}
-                onChange={e => setNewExam({...newExam, title: e.target.value})}
-                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
-              />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">{t('offlineExams.modal.examTitle')}</label>
+                <input
+                  required
+                  type="text"
+                  placeholder={newExam.type === 'single' ? "e.g. Math Final" : "e.g. First Term Exam"}
+                  value={newExam.title}
+                  onChange={e => setNewExam({...newExam, title: e.target.value})}
+                  className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Exam Fee (Optional)</label>
+                <input
+                  type="number"
+                  placeholder="৳0.00"
+                  value={newExam.examFee || ''}
+                  onChange={e => setNewExam({...newExam, examFee: parseInt(e.target.value) || 0})}
+                  className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-bold text-indigo-600"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">{t('offlineExams.modal.selectBatch')}</label>
+                <select
+                  required
+                  value={newExam.batchId}
+                  onChange={e => setNewExam({...newExam, batchId: e.target.value})}
+                  className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                >
+                  <option value="">{t('offlineExams.modal.selectBatch')}</option>
+                  {batches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                </select>
+              </div>
             </div>
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">{t('offlineExams.modal.selectBatch')}</label>
-              <select
-                required
-                value={newExam.batchId}
-                onChange={e => setNewExam({...newExam, batchId: e.target.value})}
-                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
-              >
-                <option value="">{t('offlineExams.modal.selectBatch')}</option>
-                {batches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-              </select>
-            </div>
-          </div>
 
           {newExam.type === 'single' ? (
             <div className="grid grid-cols-2 gap-4">
@@ -830,6 +873,17 @@ export function OfflineExams() {
                   type="date"
                   value={newExam.date}
                   onChange={e => setNewExam({...newExam, date: e.target.value})}
+                  className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Exam Time</label>
+                <input
+                  required
+                  type="text"
+                  placeholder="e.g. 10:00 AM"
+                  value={newExam.time || ''}
+                  onChange={e => setNewExam({...newExam, time: e.target.value})}
                   className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
                 />
               </div>
@@ -905,30 +959,39 @@ export function OfflineExams() {
                       </button>
                     </div>
 
-                    <div className="col-span-12 mt-2 pt-2 border-t border-gray-100">
-                      <div className="flex items-center gap-4">
-                        <label className="flex items-center gap-2 cursor-pointer">
-                          <input 
-                            type="checkbox" 
-                            checked={subject.hasSubSections} 
-                            onChange={e => handleSubjectChange(index, 'hasSubSections', e.target.checked)}
-                            className="w-3 h-3 rounded text-indigo-600 focus:ring-indigo-500"
-                          />
-                          <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Has Parts (MCQ/CQ)</span>
-                        </label>
-                        {subject.hasSubSections && (
-                          <button 
-                            type="button" 
-                            onClick={() => {
-                              const ss = [...(subject.subSections || []), { name: '', totalMarks: 0 }];
-                              handleSubjectChange(index, 'subSections', ss);
-                            }}
-                            className="text-[10px] font-bold text-indigo-600 hover:text-indigo-700 underline"
-                          >
-                            + Add Part
-                          </button>
-                        )}
+                    <div className="col-span-12 mt-2 pt-2 border-t border-gray-100 flex flex-wrap gap-4 items-center">
+                      <div className="flex-1 min-w-[150px] space-y-1">
+                        <label className="text-[10px] font-bold text-gray-400 uppercase">Exam Time</label>
+                        <input
+                          type="text"
+                          placeholder="10:00 AM"
+                          value={subject.time || ''}
+                          onChange={e => handleSubjectChange(index, 'time', e.target.value)}
+                          className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                        />
                       </div>
+                      <label className="flex items-center gap-2 cursor-pointer pt-4">
+                        <input 
+                          type="checkbox" 
+                          checked={subject.hasSubSections} 
+                          onChange={e => handleSubjectChange(index, 'hasSubSections', e.target.checked)}
+                          className="w-3 h-3 rounded text-indigo-600 focus:ring-indigo-500"
+                        />
+                        <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Has Parts (MCQ/CQ)</span>
+                      </label>
+                      {subject.hasSubSections && (
+                        <button 
+                          type="button" 
+                          onClick={() => {
+                            const ss = [...(subject.subSections || []), { name: '', totalMarks: 0 }];
+                            handleSubjectChange(index, 'subSections', ss);
+                          }}
+                          className="text-[10px] font-bold text-indigo-600 hover:text-indigo-700 underline pt-4"
+                        >
+                          + Add Part
+                        </button>
+                      )}
+                    </div>
                       
                       {subject.hasSubSections && (
                         <div className="mt-2 space-y-2 grid grid-cols-2 gap-2">
@@ -973,7 +1036,6 @@ export function OfflineExams() {
                         </div>
                       )}
                     </div>
-                  </div>
                 ))}
               </div>
             </div>
@@ -1076,7 +1138,7 @@ export function OfflineExams() {
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">{t('offlineExams.modal.examTitle')}</label>
                 <input
@@ -1086,6 +1148,16 @@ export function OfflineExams() {
                   value={editingExam.title}
                   onChange={e => setEditingExam({...editingExam, title: e.target.value})}
                   className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Exam Fee (Optional)</label>
+                <input
+                  type="number"
+                  placeholder="৳0.00"
+                  value={editingExam.examFee || ''}
+                  onChange={e => setEditingExam({...editingExam, examFee: parseInt(e.target.value) || 0})}
+                  className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-bold text-indigo-600"
                 />
               </div>
               <div className="space-y-2">
@@ -1200,6 +1272,32 @@ export function OfflineExams() {
               </div>
             )}
 
+            <div className="space-y-2 border-t border-gray-100 pt-6">
+              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-2">Combine with other exams (for Final Result)</label>
+              <div className="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto p-3 bg-gray-50 rounded-xl border border-gray-100">
+                {exams.filter(e => e.batchId === editingExam.batchId && e.id !== editingExam.id).map(exam => (
+                  <label key={exam.id} className="flex items-center gap-2 p-2 bg-white rounded-lg border border-gray-100 cursor-pointer hover:border-indigo-200 transition-colors">
+                    <input 
+                      type="checkbox"
+                      checked={editingExam.linkedExams?.includes(exam.id)}
+                      onChange={e => {
+                        const current = editingExam.linkedExams || [];
+                        const updated = e.target.checked 
+                          ? [...current, exam.id]
+                          : current.filter(id => id !== exam.id);
+                        setEditingExam({...editingExam, linkedExams: updated});
+                      }}
+                      className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500"
+                    />
+                    <span className="text-xs font-medium text-gray-700 truncate">{exam.title}</span>
+                  </label>
+                ))}
+                {exams.filter(e => e.batchId === editingExam.batchId && e.id !== editingExam.id).length === 0 && (
+                  <p className="text-[10px] text-gray-400 italic col-span-2 text-center py-2">No other exams found for this batch.</p>
+                )}
+              </div>
+            </div>
+
             <button type="submit" className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200">
               {t('offlineExams.modal.submitUpdate')}
             </button>
@@ -1227,7 +1325,18 @@ export function OfflineExams() {
           {manageTab === 'overview' && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="bg-gray-50 p-6 rounded-2xl border border-gray-100">
-                <h4 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-4">{t('offlineExams.modal.examTitle')}</h4>
+                <div className="flex items-center justify-between mb-4">
+                  <h4 className="text-sm font-bold text-gray-900 uppercase tracking-wider">{t('offlineExams.modal.examTitle')}</h4>
+                  <div className="flex items-center gap-2">
+                    {selectedExam?.isPublished ? (
+                      <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-[10px] font-bold rounded-full flex items-center gap-1">
+                        <Globe className="w-3 h-3" /> Published
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 bg-gray-100 text-gray-500 text-[10px] font-bold rounded-full">Draft</span>
+                    )}
+                  </div>
+                </div>
                 <div className="space-y-3">
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-500">{t('offlineExams.modal.type')}:</span>
@@ -1239,7 +1348,7 @@ export function OfflineExams() {
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-500">{t('offlineExams.table.status')}:</span>
-                    <span className="font-bold text-indigo-600 uppercase">{selectedExam?.status}</span>
+                    <span className="font-bold text-indigo-600 uppercase">{selectedExam ? t(`offlineExams.status.${selectedExam.status}`) : ''}</span>
                   </div>
                   {selectedExam?.type === 'single' ? (
                     <>
@@ -1248,19 +1357,47 @@ export function OfflineExams() {
                         <span className="font-bold text-gray-900">{selectedExam.date ? new Date(selectedExam.date).toLocaleDateString() : 'N/A'}</span>
                       </div>
                       <div className="flex justify-between text-sm">
+                        <span className="text-gray-500 text-[10px] uppercase font-bold tracking-widest">Time:</span>
+                        <span className="font-bold text-gray-900">{selectedExam.time || '10:00 AM'}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
                         <span className="text-gray-500">{t('offlineExams.modal.totalMarks')}:</span>
                         <span className="font-bold text-gray-900">{selectedExam.totalMarks}</span>
                       </div>
+                      {selectedExam.examFee ? (
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-500">Exam Fee:</span>
+                          <span className="font-black text-rose-600">৳{selectedExam.examFee}</span>
+                        </div>
+                      ) : null}
                     </>
                   ) : (
                     <div className="pt-3 border-t border-gray-200">
                       <span className="text-xs font-bold text-gray-400 uppercase">{t('offlineExams.card.subjects')}</span>
                       <div className="mt-2 space-y-2">
                         {selectedExam?.subjects?.map((s, i) => (
-                          <div key={i} className="flex justify-between text-xs">
-                            <span className="text-gray-600">{s.name}</span>
-                            <span className="font-bold text-gray-900">{s.totalMarks} {t('offlineExams.modal.marks')} ({new Date(s.date).toLocaleDateString()})</span>
+                          <div key={i} className="flex flex-col gap-1 pb-2 border-b border-gray-50 last:border-0">
+                            <div className="flex justify-between text-xs">
+                              <span className="font-bold text-gray-900">{s.name}</span>
+                              <span className="font-bold text-indigo-600">{s.totalMarks} {t('offlineExams.modal.marks')}</span>
+                            </div>
+                            <div className="flex justify-between text-[10px] text-gray-500">
+                              <span>{new Date(s.date).toLocaleDateString()}</span>
+                              <span className="italic font-medium">{s.time || '10:00 AM'}</span>
+                            </div>
                           </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {selectedExam?.linkedExams && selectedExam.linkedExams.length > 0 && (
+                    <div className="pt-3 border-t border-gray-200">
+                      <span className="text-xs font-bold text-indigo-600 uppercase tracking-widest">Combined with:</span>
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {exams.filter(e => selectedExam.linkedExams?.includes(e.id)).map(e => (
+                          <span key={e.id} className="px-2 py-0.5 bg-indigo-50 text-indigo-700 text-[9px] font-bold rounded border border-indigo-100">
+                            {e.title}
+                          </span>
                         ))}
                       </div>
                     </div>
@@ -1271,16 +1408,14 @@ export function OfflineExams() {
               <div className="bg-indigo-50 p-6 rounded-2xl border border-indigo-100">
                 <h4 className="text-sm font-bold text-indigo-900 uppercase tracking-wider mb-4">{t('offlineExams.card.manage')}</h4>
                 <div className="grid grid-cols-1 gap-3">
-                  {selectedExam?.type === 'school' && (
-                    <button 
-                      onClick={() => generatePDF(scheduleRef, `Exam_Schedule_${selectedExam.title}`)} 
-                      disabled={isGeneratingPDF}
-                      className="w-full py-3 bg-white text-indigo-600 rounded-xl text-sm font-bold hover:bg-indigo-50 transition-all border border-indigo-100 flex items-center justify-center gap-2 disabled:opacity-50"
-                    >
-                      {isGeneratingPDF ? <Loader2 className="w-4 h-4 animate-spin" /> : <Calendar className="w-4 h-4" />}
-                      {t('offlineExams.manage.overview.downloadSchedule')}
-                    </button>
-                  )}
+                  <button 
+                    onClick={() => generatePDF(scheduleRef, `Exam_Schedule_${selectedExam?.title}`)} 
+                    disabled={isGeneratingPDF}
+                    className="w-full py-3 bg-white text-indigo-600 rounded-xl text-sm font-bold hover:bg-indigo-50 transition-all border border-indigo-100 flex items-center justify-center gap-2 disabled:opacity-50"
+                  >
+                    {isGeneratingPDF ? <Loader2 className="w-4 h-4 animate-spin" /> : <Calendar className="w-4 h-4" />}
+                    {t('offlineExams.manage.overview.downloadSchedule')}
+                  </button>
                   <button onClick={() => setManageTab('seat-plan')} className="w-full py-3 bg-white text-indigo-600 rounded-xl text-sm font-bold hover:bg-indigo-50 transition-all border border-indigo-100">{t('offlineExams.manage.seatPlan.title')}</button>
                   <button onClick={() => setManageTab('admit-cards')} className="w-full py-3 bg-white text-indigo-600 rounded-xl text-sm font-bold hover:bg-indigo-50 transition-all border border-indigo-100">{t('offlineExams.manage.admitCards.title')}</button>
                   <button onClick={() => setManageTab('results')} className="w-full py-3 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-700 transition-all shadow-md shadow-indigo-200">{t('offlineExams.manage.results.title')}</button>
@@ -1304,7 +1439,7 @@ export function OfflineExams() {
                       </div>
                       <div className="h-1 w-32 mx-auto mb-8 rounded-full" style={{ backgroundColor: '#4f46e5' }}></div>
                       <h2 className="text-3xl font-black uppercase tracking-[0.15em] mb-3" style={{ color: '#111827' }}>{selectedExam?.title}</h2>
-                      <p className="text-lg font-bold uppercase tracking-widest" style={{ color: '#4f46e5' }}>Batch: {selectedExam?.batchName}</p>
+                      <p className="text-lg font-bold uppercase tracking-widest" style={{ color: '#4f46e5' }}>ব্যাচ: {selectedExam?.batchName}</p>
                     </div>
 
                     <div className="flex-grow">
@@ -1312,10 +1447,10 @@ export function OfflineExams() {
                         <table className="w-full border-collapse">
                           <thead>
                             <tr style={{ backgroundColor: '#4f46e5', color: '#ffffff' }}>
-                              <th className="py-6 px-10 text-left font-black uppercase tracking-widest text-[11px]">Subject</th>
-                              <th className="py-6 px-10 text-left font-black uppercase tracking-widest text-[11px]">Date</th>
-                              <th className="py-6 px-10 text-left font-black uppercase tracking-widest text-[11px]">Time</th>
-                              <th className="py-6 px-10 text-center font-black uppercase tracking-widest text-[11px]">Marks</th>
+                              <th className="py-6 px-10 text-left font-black uppercase tracking-widest text-[11px]">{t('offlineExams.modal.subjectName')}</th>
+                              <th className="py-6 px-10 text-left font-black uppercase tracking-widest text-[11px]">{t('offlineExams.modal.date')}</th>
+                              <th className="py-6 px-10 text-left font-black uppercase tracking-widest text-[11px]">সময়</th>
+                              <th className="py-6 px-10 text-center font-black uppercase tracking-widest text-[11px]">{t('offlineExams.modal.marks')}</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -1323,8 +1458,8 @@ export function OfflineExams() {
                               selectedExam.subjects?.map((s, i) => (
                                 <tr key={i} className="border-b" style={{ backgroundColor: i % 2 === 0 ? '#ffffff' : 'rgba(238, 242, 255, 0.2)', borderColor: '#eef2ff' }}>
                                   <td className="py-6 px-10 font-black text-xl" style={{ color: '#111827' }}>{s.name}</td>
-                                  <td className="py-6 px-10 font-bold text-sm" style={{ color: '#374151' }}>{new Date(s.date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</td>
-                                  <td className="py-6 px-10 font-medium italic text-sm" style={{ color: '#4b5563' }}>10:00 AM - 01:00 PM</td>
+                                  <td className="py-6 px-10 font-bold text-sm" style={{ color: '#374151' }}>{new Date(s.date).toLocaleDateString('bn-BD', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</td>
+                                  <td className="py-6 px-10 font-medium italic text-sm" style={{ color: '#4b5563' }}>{s.time || '10:00 AM'}</td>
                                   <td className="py-6 px-10 text-center">
                                     <span className="px-5 py-2 rounded-xl font-black text-lg" style={{ backgroundColor: '#e0e7ff', color: '#4338ca' }}>{s.totalMarks}</span>
                                   </td>
@@ -1333,8 +1468,8 @@ export function OfflineExams() {
                             ) : (
                               <tr style={{ backgroundColor: '#ffffff' }}>
                                 <td className="py-6 px-10 font-black text-xl" style={{ color: '#111827' }}>{selectedExam?.title}</td>
-                                <td className="py-6 px-10 font-bold text-sm" style={{ color: '#374151' }}>{selectedExam?.date ? new Date(selectedExam.date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) : 'N/A'}</td>
-                                <td className="py-6 px-10 font-medium italic text-sm" style={{ color: '#4b5563' }}>10:00 AM - 01:00 PM</td>
+                                <td className="py-6 px-10 font-bold text-sm" style={{ color: '#374151' }}>{selectedExam?.date ? new Date(selectedExam.date).toLocaleDateString('bn-BD', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) : 'N/A'}</td>
+                                <td className="py-6 px-10 font-medium italic text-sm" style={{ color: '#4b5563' }}>{selectedExam?.time || '10:00 AM'}</td>
                                 <td className="py-6 px-10 text-center">
                                   <span className="px-5 py-2 rounded-xl font-black text-lg" style={{ backgroundColor: '#e0e7ff', color: '#4338ca' }}>{selectedExam?.totalMarks}</span>
                                 </td>
@@ -1348,11 +1483,11 @@ export function OfflineExams() {
                     <div className="mt-10 grid grid-cols-2 gap-20 px-12 pb-20">
                       <div className="text-center">
                         <div className="h-px w-full mb-2" style={{ backgroundColor: '#d1d5db' }}></div>
-                        <p className="font-black uppercase text-[10px] tracking-widest" style={{ color: '#111827' }}>Principal Signature</p>
+                        <p className="font-black uppercase text-[10px] tracking-widest" style={{ color: '#111827' }}>অধ্যক্ষের স্বাক্ষর</p>
                       </div>
                       <div className="text-center">
                         <div className="h-px w-full mb-2" style={{ backgroundColor: '#d1d5db' }}></div>
-                        <p className="font-black uppercase text-[10px] tracking-widest" style={{ color: '#111827' }}>Exam Controller</p>
+                        <p className="font-black uppercase text-[10px] tracking-widest" style={{ color: '#111827' }}>পরীক্ষা নিয়ন্ত্রক</p>
                       </div>
                     </div>
 
@@ -1360,7 +1495,7 @@ export function OfflineExams() {
                       <div className="flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-[0.4em]" style={{ color: '#9ca3af' }}>
                         <span>Powered by</span>
                         <span style={{ color: '#4f46e5' }}>Manage My Batch</span>
-                        <span>Management System</span>
+                        <span>ম্যানেজমেন্ট সিস্টেম</span>
                       </div>
                     </div>
                   </div>
@@ -1388,314 +1523,43 @@ export function OfflineExams() {
           )}
 
           {manageTab === 'admit-cards' && (
-            <div className="space-y-6">
-              <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm space-y-6">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                    <Palette className="w-5 h-5 text-indigo-600" /> {t('offlineExams.manage.admitCards.title')}
-                  </h4>
-                  <button 
-                    onClick={downloadAllAdmitCards}
-                    disabled={isGeneratingPDF}
-                    className="px-6 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-700 transition-all shadow-md shadow-indigo-200 flex items-center gap-2 disabled:opacity-50"
-                  >
-                    {isGeneratingPDF ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-                    {t('offlineExams.manage.admitCards.downloadAll')}
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-3">
-                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2">
-                      <Layout className="w-3 h-3" /> {t('offlineExams.manage.admitCards.style')}
-                    </label>
-                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-                      {['modern', 'classic', 'minimal', 'professional', 'vibrant'].map((style) => (
-                        <button
-                          key={style}
-                          onClick={() => setAdmitCardStyle(style as any)}
-                          className={cn(
-                            "py-2 text-[10px] font-black uppercase tracking-widest rounded-lg border transition-all",
-                            admitCardStyle === style ? "bg-indigo-50 border-indigo-200 text-indigo-600 shadow-sm" : "bg-white border-gray-100 text-gray-500 hover:border-gray-200"
-                          )}
-                        >
-                          {style}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="space-y-3">
-                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2">
-                      <Palette className="w-3 h-3" /> {t('offlineExams.manage.admitCards.color')}
-                    </label>
-                    <div className="flex flex-wrap gap-2">
-                      {['#4f46e5', '#059669', '#dc2626', '#d97706', '#7c3aed', '#111827', '#2563eb', '#db2777'].map((color) => (
-                        <button
-                          key={color}
-                          onClick={() => setAdmitCardColor(color)}
-                          className={cn(
-                            "w-7 h-7 rounded-full border-2 transition-all",
-                            admitCardColor === color ? "border-white ring-2 ring-indigo-500 scale-110" : "border-transparent hover:scale-105"
-                          )}
-                          style={{ backgroundColor: color }}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* PDF Template for Admit Cards (Off-screen) */}
-              <div className="fixed left-[-9999px] top-0 pointer-events-none">
-                <div ref={admitCardsRef} className="p-8 w-[210mm] min-h-[297mm] space-y-8 font-sans" style={{ backgroundColor: '#f3f4f6' }}>
-                  {examStudents.map((student, idx) => (
-                    <div 
-                      key={student.id} 
-                      id={`admit-card-${student.id}`}
-                      className={cn(
-                        "w-full h-[140mm] relative overflow-hidden p-10 flex flex-col justify-between",
-                        admitCardStyle === 'modern' && "rounded-[3rem] shadow-2xl border-t-[16px]",
-                        admitCardStyle === 'classic' && "border-[12px] border-double",
-                        admitCardStyle === 'minimal' && "border-b-[20px]",
-                        admitCardStyle === 'professional' && "rounded-none border-4",
-                        admitCardStyle === 'vibrant' && "rounded-none border-0"
-                      )}
-                      style={{ 
-                        backgroundColor: '#ffffff',
-                        borderTopColor: admitCardStyle === 'modern' ? admitCardColor : admitCardColor,
-                        borderRightColor: admitCardColor,
-                        borderBottomColor: admitCardStyle === 'minimal' ? admitCardColor : admitCardColor,
-                        borderLeftColor: admitCardColor,
-                        background: admitCardStyle === 'vibrant' ? 'linear-gradient(to bottom right, #ffffff, #f9fafb)' : '#ffffff'
-                      }}
-                    >
-                      {admitCardStyle === 'vibrant' && (
-                        <div className="absolute top-0 right-0 rounded-full -mr-32 -mt-32" style={{ backgroundColor: admitCardColor + '10', width: '256px', height: '256px' }}></div>
-                      )}
-                      {admitCardStyle === 'vibrant' && (
-                        <div className="absolute bottom-0 left-0 rounded-full -ml-32 -mb-32" style={{ backgroundColor: admitCardColor + '10', width: '256px', height: '256px' }}></div>
-                      )}
-
-                      {/* Background Pattern */}
-                      <div className="absolute inset-0 pointer-events-none" style={{ 
-                        backgroundImage: admitCardStyle === 'modern' ? `radial-gradient(circle at 2px 2px, ${admitCardColor} 1px, rgba(255, 255, 255, 0) 0)` : 
-                                       admitCardStyle === 'classic' ? `linear-gradient(45deg, ${admitCardColor} 1px, rgba(255, 255, 255, 0) 1px)` : 
-                                       admitCardStyle === 'vibrant' ? `repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0) 10px, ${admitCardColor} 10px, ${admitCardColor} 11px)` : 'none',
-                        backgroundSize: '24px 24px',
-                        color: admitCardColor,
-                        opacity: 0.03
-                      }}></div>
-
-                      {/* Watermark */}
-                      <div className="absolute inset-0 flex items-center justify-center rotate-[-25deg] pointer-events-none" style={{ opacity: 0.05 }}>
-                        {user?.photoURL ? (
-                          <img src={user.photoURL} style={{ width: '256px', height: '256px', objectFit: 'contain', filter: 'grayscale(100%)' }} referrerPolicy="no-referrer" />
-                        ) : (
-                          <h1 className="text-8xl font-black uppercase tracking-[0.5em]">Manage My Batch</h1>
-                        )}
-                      </div>
-
-                      <div className="relative z-10">
-                        <div className="flex items-center justify-between mb-8">
-                          <div className="flex items-center gap-4">
-                            {user?.photoURL && <img src={user.photoURL} className="rounded-xl shadow-md" referrerPolicy="no-referrer" style={{ width: '64px', height: '64px' }} />}
-                            <div>
-                              <h1 className="text-3xl font-black uppercase tracking-tighter leading-none" style={{ color: admitCardColor }}>{selectedExam?.institutionName}</h1>
-                              <p className="text-[10px] font-black uppercase tracking-[0.3em] mt-1" style={{ color: '#9ca3af' }}>Official Admit Card</p>
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <div className="px-4 py-1 text-[10px] font-black uppercase tracking-widest rounded-full" style={{ backgroundColor: '#111827', color: '#ffffff' }}>
-                              No: {idx + 1001}
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="flex gap-10">
-                          <div className="shrink-0">
-                            <div className="border-4 flex items-center justify-center" style={{ 
-                              borderColor: admitCardColor + '30', 
-                              backgroundColor: '#f9fafb',
-                              width: '160px',
-                              height: '160px',
-                              borderRadius: admitCardStyle === 'modern' ? '2.5rem' : '0',
-                              transform: admitCardStyle === 'modern' ? 'rotate(-3deg)' : 'none',
-                              overflow: 'hidden',
-                              boxShadow: 'inset 0 2px 4px 0 rgba(0, 0, 0, 0.05)'
-                            }}>
-                              {student.photoUrl ? (
-                                <img src={student.photoUrl} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                              ) : (
-                                <Loader2 className="w-10 h-10 text-gray-200" />
-                              )}
-                            </div>
-                          </div>
-
-                          <div className="flex-1 grid grid-cols-2 gap-x-12 gap-y-6">
-                            <div className="col-span-2">
-                              <p className="text-[10px] font-black uppercase tracking-widest mb-1" style={{ color: '#9ca3af' }}>Student Name</p>
-                              <p className="text-2xl font-black uppercase tracking-tight" style={{ color: '#111827' }}>{student.name}</p>
-                            </div>
-                            <div>
-                              <p className="text-[10px] font-black uppercase tracking-widest mb-1" style={{ color: '#9ca3af' }}>Roll Number</p>
-                              <p className="text-xl font-black" style={{ color: admitCardColor }}>{student.rollNo}</p>
-                            </div>
-                            <div>
-                              <p className="text-[10px] font-black uppercase tracking-widest mb-1" style={{ color: '#9ca3af' }}>Batch Group</p>
-                              <p className="text-xl font-black" style={{ color: '#111827' }}>{selectedExam?.batchName}</p>
-                            </div>
-                            <div className="col-span-2">
-                              <p className="text-[10px] font-black uppercase tracking-widest mb-1" style={{ color: '#9ca3af' }}>Examination Title</p>
-                              <p className="text-lg font-bold uppercase" style={{ color: '#374151' }}>{selectedExam?.title}</p>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="relative z-10 flex items-end justify-between pt-8 border-t" style={{ borderColor: '#f3f4f6' }}>
-                        <div className="space-y-4">
-                          <div className="flex items-center gap-2">
-                            <Clock className="w-4 h-4" style={{ color: '#9ca3af' }} />
-                            <p className="text-xs font-bold uppercase tracking-widest" style={{ color: '#6b7280' }}>Reporting Time: 09:30 AM</p>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Calendar className="w-4 h-4" style={{ color: '#9ca3af' }} />
-                            <p className="text-xs font-bold uppercase tracking-widest" style={{ color: '#6b7280' }}>
-                              Date: {selectedExam?.type === 'single' ? (selectedExam.date ? new Date(selectedExam.date).toLocaleDateString() : 'N/A') : 'As per Schedule'}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex gap-12">
-                          <div className="text-center">
-                            <div className="w-32 h-12 border-b-2 mb-1" style={{ borderColor: '#111827' }}></div>
-                            <p className="text-[8px] font-black uppercase tracking-widest" style={{ color: '#9ca3af' }}>Candidate Sign</p>
-                          </div>
-                          <div className="text-center">
-                            <div className="w-32 h-12 border-b-2 mb-1" style={{ borderColor: '#111827' }}></div>
-                            <p className="text-[8px] font-black uppercase tracking-widest" style={{ color: '#9ca3af' }}>Authorized Sign</p>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Bottom Branding */}
-                      <div className="absolute bottom-4 left-0 right-0 text-center">
-                        <p className="text-[8px] font-black uppercase tracking-[0.6em]" style={{ color: '#d1d5db' }}>Manage My Batch Management System • Official Document</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Preview Grid */}
-              <div className="grid grid-cols-1 gap-8 p-4 bg-gray-50 rounded-2xl">
-                {examStudents.map((student) => (
-                  <div 
-                    key={student.id} 
-                    className={cn(
-                      "p-8 bg-white relative overflow-hidden transition-all group",
-                      admitCardStyle === 'modern' && "rounded-3xl border-l-[12px] shadow-lg",
-                      admitCardStyle === 'classic' && "border-4 border-double",
-                      admitCardStyle === 'minimal' && "border-b-4 border-gray-100 shadow-sm",
-                      admitCardStyle === 'professional' && "border-2",
-                      admitCardStyle === 'vibrant' && "rounded-none border-0 bg-gradient-to-br from-white to-gray-50 shadow-xl"
-                    )}
-                    style={{ 
-                      borderTopColor: admitCardColor,
-                      borderRightColor: admitCardColor,
-                      borderBottomColor: admitCardStyle === 'minimal' ? admitCardColor : admitCardColor,
-                      borderLeftColor: admitCardStyle === 'modern' ? admitCardColor : admitCardColor
-                    }}
-                  >
-                    {/* Individual Download Button */}
-                    <div className="absolute top-4 right-4 z-20 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button
-                        onClick={() => {
-                          const element = document.getElementById(`admit-card-${student.id}`);
-                          if (element) {
-                            generatePDF({ current: element } as any, `Admit_Card_${student.rollNo}_${student.name}`);
-                          }
-                        }}
-                        className="p-2 bg-indigo-600 text-white rounded-lg shadow-lg hover:bg-indigo-700 transition-all flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest"
-                      >
-                        <Download className="w-3 h-3" />
-                        Download
-                      </button>
-                    </div>
-
-                    {admitCardStyle === 'vibrant' && (
-                      <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-600/5 rounded-full -mr-16 -mt-16 blur-2xl" style={{ backgroundColor: admitCardColor + '10' }}></div>
-                    )}
-                    {/* Branding Watermark */}
-                    <div className="absolute -bottom-4 -right-4 opacity-[0.05] rotate-[-15deg] pointer-events-none">
-                      <h1 className="text-6xl font-black uppercase tracking-tighter">Manage My Batch</h1>
-                    </div>
-
-                    <div className="flex items-start justify-between relative z-10">
-                      <div className="flex gap-8">
-                        <div className={cn(
-                          "w-32 h-32 bg-gray-50 border-2 overflow-hidden flex items-center justify-center shrink-0",
-                          admitCardStyle === 'modern' ? "rounded-2xl rotate-[-2deg]" : "rounded-none"
-                        )} style={{ borderColor: admitCardColor + '20' }}>
-                          {student.photoUrl ? (
-                            <img src={student.photoUrl} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                          ) : (
-                            <Loader2 className="w-8 h-8 text-gray-200" />
-                          )}
-                        </div>
-                        <div className="space-y-1">
-                          <h5 className="text-2xl font-black uppercase tracking-tighter" style={{ color: admitCardColor }}>
-                            {selectedExam?.institutionName}
-                          </h5>
-                          <div className="flex items-center gap-2">
-                            <span className="px-2 py-0.5 bg-gray-900 text-white text-[10px] font-bold uppercase tracking-widest rounded">Admit Card</span>
-                            <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">{selectedExam?.title}</span>
-                          </div>
-                          
-                          <div className="grid grid-cols-2 gap-x-12 gap-y-4 mt-6">
-                            <div>
-                              <p className="text-[10px] text-gray-400 uppercase font-black tracking-widest">Student Name</p>
-                              <p className="text-lg font-bold text-gray-900 leading-none mt-1">{student.name}</p>
-                            </div>
-                            <div>
-                              <p className="text-[10px] text-gray-400 uppercase font-black tracking-widest">Roll Number</p>
-                              <p className="text-lg font-bold text-gray-900 leading-none mt-1">{student.rollNo}</p>
-                            </div>
-                            <div>
-                              <p className="text-[10px] text-gray-400 uppercase font-black tracking-widest">Batch Group</p>
-                              <p className="text-sm font-bold text-gray-700 leading-none mt-1">{selectedExam?.batchName}</p>
-                            </div>
-                            <div>
-                              <p className="text-[10px] text-gray-400 uppercase font-black tracking-widest">Exam Date</p>
-                              <p className="text-sm font-bold text-gray-700 leading-none mt-1">
-                                {selectedExam?.type === 'single' ? (selectedExam.date ? new Date(selectedExam.date).toLocaleDateString() : 'N/A') : 'See Schedule'}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="text-right">
-                        <div className="w-24 h-24 bg-gray-50 border-2 border-dashed rounded-xl flex items-center justify-center mb-2" style={{ borderColor: admitCardColor + '40' }}>
-                          <Award className="w-8 h-8 opacity-20" style={{ color: admitCardColor }} />
-                        </div>
-                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Official Seal</p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <AdmitCardDesigner 
+              students={examStudents.map(s => ({
+                id: s.id,
+                name: s.name,
+                rollNo: s.rollNo,
+                photoUrl: s.photoUrl,
+                batchName: selectedExam?.batchName,
+                studentId: s.rollNo
+              }))}
+              exam={selectedExam}
+              institution={instData}
+              onClose={() => setManageTab('overview')}
+            />
           )}
 
           {manageTab === 'results' && (
             <div className="space-y-6">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
                 <h4 className="text-lg font-bold text-gray-900">{t('offlineExams.manage.results.title')}</h4>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+                  <button 
+                    onClick={handleTogglePublish}
+                    disabled={isSaving}
+                    className={cn(
+                      "flex-1 sm:flex-none px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 shadow-md disabled:opacity-50",
+                      selectedExam?.isPublished 
+                        ? "bg-amber-600 text-white hover:bg-amber-700 shadow-amber-100" 
+                        : "bg-indigo-600 text-white hover:bg-indigo-700 shadow-indigo-100"
+                    )}
+                  >
+                    {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Globe className="w-4 h-4" />}
+                    {selectedExam?.isPublished ? "Unpublish from Website" : "Publish on Website"}
+                  </button>
                   <button 
                     onClick={handleSaveResults}
                     disabled={isSaving}
-                    className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-xs font-bold hover:bg-emerald-700 transition-all flex items-center gap-2 shadow-md shadow-emerald-100 disabled:opacity-50"
+                    className="flex-1 sm:flex-none px-4 py-2 bg-emerald-600 text-white rounded-lg text-xs font-bold hover:bg-emerald-700 transition-all flex items-center justify-center gap-2 shadow-md shadow-emerald-100 disabled:opacity-50"
                   >
                     {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                     {t('offlineExams.manage.results.save')}
@@ -1703,13 +1567,25 @@ export function OfflineExams() {
                   <button 
                     onClick={() => generatePDF(resultsRef, `Result_Sheet_${selectedExam?.title}`)}
                     disabled={isGeneratingPDF}
-                    className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 transition-all flex items-center gap-2 disabled:opacity-50 shadow-md shadow-indigo-100"
+                    className="flex-1 sm:flex-none px-4 py-2 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 transition-all flex items-center justify-center gap-2 disabled:opacity-50 shadow-md shadow-indigo-100"
                   >
                     {isGeneratingPDF ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-                    {t('offlineExams.manage.overview.downloadSchedule')}
+                    Download Overall Sheet
                   </button>
                 </div>
               </div>
+
+              {selectedExam?.linkedExams && selectedExam.linkedExams.length > 0 && (
+                <div className="p-4 bg-indigo-50 border border-indigo-100 rounded-2xl flex items-center gap-3">
+                  <Award className="w-5 h-5 text-indigo-600" />
+                  <p className="text-xs text-indigo-800 font-medium tracking-tight">
+                    This is a <span className="font-bold">Combined Result</span> including: 
+                    <span className="font-bold italic ml-1">
+                      {exams.filter(e => selectedExam.linkedExams?.includes(e.id)).map(e => e.title).join(', ')}
+                    </span>
+                  </p>
+                </div>
+              )}
 
               <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
                 {/* Desktop Table */}
@@ -2003,11 +1879,11 @@ export function OfflineExams() {
                       <table className="w-full border-collapse">
                         <thead>
                           <tr style={{ backgroundColor: '#4f46e5', color: '#ffffff' }}>
-                            <th className="py-6 px-6 text-left font-black uppercase text-[10px] tracking-widest">Rank</th>
-                            <th className="py-6 px-6 text-left font-black uppercase text-[10px] tracking-widest">Roll</th>
-                            <th className="py-6 px-6 text-left font-black uppercase text-[10px] tracking-widest">Student Name</th>
-                            <th className="py-6 px-6 text-center font-black uppercase text-[10px] tracking-widest">Total</th>
-                            <th className="py-6 px-6 text-center font-black uppercase text-[10px] tracking-widest">Grade</th>
+                            <th className="py-6 px-6 text-left font-black uppercase text-[10px] tracking-widest">র‍্যাঙ্ক</th>
+                            <th className="py-6 px-6 text-left font-black uppercase text-[10px] tracking-widest">রোল</th>
+                            <th className="py-6 px-6 text-left font-black uppercase text-[10px] tracking-widest">শিক্ষার্থীর নাম</th>
+                            <th className="py-6 px-6 text-center font-black uppercase text-[10px] tracking-widest">মোট নম্বর</th>
+                            <th className="py-6 px-6 text-center font-black uppercase text-[10px] tracking-widest">গ্রেড</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -2134,60 +2010,107 @@ export function OfflineExams() {
                   </div>
                 </div>
 
-                <div className="overflow-hidden border-2 rounded-[2rem]" style={{ borderColor: '#eef2ff' }}>
-                  <table className="w-full border-collapse">
-                    <thead>
-                      <tr style={{ backgroundColor: '#4f46e5', color: '#ffffff' }}>
-                        <th className="py-5 px-8 text-left font-black uppercase tracking-widest text-[10px]">Subject Name</th>
-                        <th className="py-5 px-8 text-center font-black uppercase tracking-widest text-[10px]">Full Marks</th>
-                        <th className="py-5 px-8 text-center font-black uppercase tracking-widest text-[10px]">Marks Obtained</th>
-                        <th className="py-5 px-8 text-center font-black uppercase tracking-widest text-[10px]">Grade</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {selectedExam?.subjects?.map((s, idx) => {
-                        const marks = studentMarks[selectedStudentForResult?.id] || {};
-                        let obtained = 0;
-                        if (s.hasSubSections && s.subSections) {
-                          s.subSections.forEach(ss => {
-                            obtained += marks[`${s.name}_${ss.name}`] || 0;
-                          });
-                        } else {
-                          obtained = marks[s.name] || 0;
-                        }
-                        const grade = calculateGrade(obtained, s.totalMarks);
-                        
-                        return (
-                          <tr key={idx} className="border-b" style={{ borderColor: '#f8fafc', backgroundColor: idx % 2 === 0 ? '#ffffff' : '#f8fafc' }}>
-                            <td className="py-5 px-8">
-                              <p className="font-bold text-gray-900">{s.name}</p>
-                              {s.hasSubSections && s.subSections && (
-                                <div className="mt-1 flex gap-2">
-                                  {s.subSections.map((ss, ssIdx) => (
-                                    <span key={ssIdx} className="text-[9px] font-medium text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded leading-none">
-                                      {ss.name}: {marks[`${s.name}_${ss.name}`] || 0}/{ss.totalMarks}
-                                    </span>
-                                  ))}
-                                </div>
-                              )}
-                            </td>
-                            <td className="py-5 px-8 text-center font-bold text-gray-600">{s.totalMarks}</td>
-                            <td className="py-5 px-8 text-center font-black text-indigo-600">{obtained}</td>
-                            <td className="py-5 px-8 text-center">
-                              <span className="font-black text-indigo-700">{grade}</span>
-                            </td>
+                    <div className="overflow-hidden border-2 rounded-[2rem]" style={{ borderColor: '#eef2ff' }}>
+                      <table className="w-full border-collapse">
+                        <thead>
+                          <tr style={{ backgroundColor: '#4f46e5', color: '#ffffff' }}>
+                            <th className="py-5 px-8 text-left font-black uppercase tracking-widest text-[10px]">Subject / Exam Name</th>
+                            <th className="py-5 px-8 text-center font-black uppercase tracking-widest text-[10px]">Full Marks</th>
+                            <th className="py-5 px-8 text-center font-black uppercase tracking-widest text-[10px]">Marks Obtained</th>
+                            <th className="py-5 px-8 text-center font-black uppercase tracking-widest text-[10px]">Grade</th>
                           </tr>
-                        );
-                      })}
-                      <tr className="bg-indigo-600 text-white">
-                        <td className="py-6 px-8 font-black uppercase tracking-[0.2em] text-xs">Final Result</td>
-                        <td className="py-6 px-8 text-center font-black text-lg">{selectedStudentForResult?.totalPossible}</td>
-                        <td className="py-6 px-8 text-center font-black text-lg">{selectedStudentForResult?.totalObtained}</td>
-                        <td className="py-6 px-8 text-center font-black text-lg">{selectedStudentForResult?.grade}</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
+                        </thead>
+                        <tbody>
+                          {selectedExam?.linkedExams ? (
+                            // For Combined Results
+                            exams
+                              .filter(e => selectedExam.linkedExams?.includes(e.id))
+                              .map((le, idx) => {
+                                const marks = le.studentMarks?.[selectedStudentForResult?.id] || {};
+                                let obtained = 0;
+                                let possible = 0;
+                                
+                                if (le.type === 'single') {
+                                  if (le.hasSubSections && le.subSections) {
+                                    le.subSections.forEach(ss => {
+                                      obtained += marks[ss.name] || 0;
+                                      possible += ss.totalMarks;
+                                    });
+                                  } else {
+                                    obtained = marks['total'] || 0;
+                                    possible = le.totalMarks || 100;
+                                  }
+                                } else {
+                                  le.subjects?.forEach(s => {
+                                    if (s.hasSubSections && s.subSections) {
+                                      s.subSections.forEach(ss => {
+                                        obtained += marks[`${s.name}_${ss.name}`] || 0;
+                                      });
+                                    } else {
+                                      obtained += marks[s.name] || 0;
+                                    }
+                                    possible += s.totalMarks;
+                                  });
+                                }
+                                
+                                const grade = calculateGrade(obtained, possible);
+                                return (
+                                  <tr key={idx} className="border-b" style={{ borderColor: '#f8fafc', backgroundColor: idx % 2 === 0 ? '#ffffff' : '#f8fafc' }}>
+                                    <td className="py-5 px-8 font-bold text-gray-900">{le.title}</td>
+                                    <td className="py-5 px-8 text-center font-bold text-gray-600">{possible}</td>
+                                    <td className="py-5 px-8 text-center font-black text-indigo-600">{obtained}</td>
+                                    <td className="py-5 px-8 text-center">
+                                      <span className="font-black text-indigo-700">{grade}</span>
+                                    </td>
+                                  </tr>
+                                );
+                              })
+                          ) : (
+                            // For Normal Exams
+                            selectedExam?.subjects?.map((s, idx) => {
+                              const marks = studentMarks[selectedStudentForResult?.id] || {};
+                              let obtained = 0;
+                              if (s.hasSubSections && s.subSections) {
+                                s.subSections.forEach(ss => {
+                                  obtained += marks[`${s.name}_${ss.name}`] || 0;
+                                });
+                              } else {
+                                obtained = marks[s.name] || 0;
+                              }
+                              const grade = calculateGrade(obtained, s.totalMarks);
+                              
+                              return (
+                                <tr key={idx} className="border-b" style={{ borderColor: '#f8fafc', backgroundColor: idx % 2 === 0 ? '#ffffff' : '#f8fafc' }}>
+                                  <td className="py-5 px-8">
+                                    <p className="font-bold text-gray-900">{s.name}</p>
+                                    {s.hasSubSections && s.subSections && (
+                                      <div className="mt-1 flex gap-2">
+                                        {s.subSections.map((ss, ssIdx) => (
+                                          <span key={ssIdx} className="text-[9px] font-medium text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded leading-none">
+                                            {ss.name}: {marks[`${s.name}_${ss.name}`] || 0}/{ss.totalMarks}
+                                          </span>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </td>
+                                  <td className="py-5 px-8 text-center font-bold text-gray-600">{s.totalMarks}</td>
+                                  <td className="py-5 px-8 text-center font-black text-indigo-600">{obtained}</td>
+                                  <td className="py-5 px-8 text-center">
+                                    <span className="font-black text-indigo-700">{grade}</span>
+                                  </td>
+                                </tr>
+                              );
+                            })
+                          )}
+                          <tr className="bg-indigo-600 text-white">
+                            <td className="py-6 px-8 font-black uppercase tracking-[0.2em] text-xs">Final Result</td>
+                            <td className="py-6 px-8 text-center font-black text-lg">{getRankedStudents().find(s => s.id === selectedStudentForResult?.id)?.totalPossible}</td>
+                            <td className="py-6 px-8 text-center font-black text-lg">{getRankedStudents().find(s => s.id === selectedStudentForResult?.id)?.totalObtained}</td>
+                            <td className="py-6 px-8 text-center font-black text-lg">{getRankedStudents().find(s => s.id === selectedStudentForResult?.id)?.grade}</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
 
                 <div className="mt-12 grid grid-cols-2 gap-20 px-10 pb-20">
                     <div className="text-center">
@@ -2344,6 +2267,103 @@ export function OfflineExams() {
             </div>
           </div>
         </div>
+      </Modal>
+
+      {/* Combined Result Modal */}
+      <Modal 
+        isOpen={isCombinedModalOpen} 
+        onClose={() => setIsCombinedModalOpen(false)} 
+        title="Prepare Combined Result"
+        maxWidth="max-w-2xl"
+      >
+        <form onSubmit={handleCreateCombinedResult} className="space-y-6">
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Select Batch</label>
+              <select
+                required
+                value={combinedBatchId}
+                onChange={e => {
+                  setCombinedBatchId(e.target.value);
+                  setSelectedExamsForCombined([]);
+                }}
+                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-bold"
+              >
+                <option value="">Select a batch</option>
+                {batches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+              </select>
+            </div>
+
+            {combinedBatchId && (
+              <>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Combined Result Title</label>
+                  <input
+                    required
+                    type="text"
+                    placeholder="e.g. Final Combined Result 2026"
+                    value={combinedExamTitle}
+                    onChange={e => setCombinedExamTitle(e.target.value)}
+                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-bold"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Select Exams to Combine (Select at least 2)</label>
+                  <div className="grid grid-cols-1 gap-2 max-h-60 overflow-y-auto p-1">
+                    {exams
+                      .filter(e => e.batchId === combinedBatchId && e.status === 'completed' && !e.linkedExams)
+                      .map(exam => (
+                        <label 
+                          key={exam.id} 
+                          className={cn(
+                            "flex items-center justify-between p-4 rounded-xl border-2 transition-all cursor-pointer",
+                            selectedExamsForCombined.includes(exam.id) 
+                              ? "bg-indigo-50 border-indigo-500" 
+                              : "bg-white border-gray-100 hover:border-gray-200"
+                          )}
+                        >
+                          <div className="flex items-center gap-3">
+                            <input 
+                              type="checkbox"
+                              className="hidden"
+                              checked={selectedExamsForCombined.includes(exam.id)}
+                              onChange={() => {
+                                if (selectedExamsForCombined.includes(exam.id)) {
+                                  setSelectedExamsForCombined(prev => prev.filter(id => id !== exam.id));
+                                } else {
+                                  setSelectedExamsForCombined(prev => [...prev, exam.id]);
+                                }
+                              }}
+                            />
+                            <div className={cn(
+                              "w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all",
+                              selectedExamsForCombined.includes(exam.id) ? "bg-indigo-600 border-indigo-600" : "border-gray-300"
+                            )}>
+                              {selectedExamsForCombined.includes(exam.id) && <Plus className="w-3.5 h-3.5 text-white" />}
+                            </div>
+                            <div>
+                                <p className="font-bold text-gray-900">{exam.title}</p>
+                                <p className="text-[10px] text-gray-400 font-bold uppercase">{t(`offlineExams.card.${exam.type}`)} • {exam.subjects?.length || 0} Subjects</p>
+                            </div>
+                          </div>
+                        </label>
+                      ))}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+
+          <button 
+            type="submit" 
+            disabled={isSaving || selectedExamsForCombined.length < 2 || !combinedExamTitle}
+            className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          >
+            {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
+            Prepare & Publish Combined Result
+          </button>
+        </form>
       </Modal>
     </div>
   );

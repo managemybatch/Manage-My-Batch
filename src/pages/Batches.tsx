@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Search, Filter, Layers, MoreVertical, Users, Loader2, ChevronDown, ChevronUp, X, Clock, Calendar, CreditCard, BookOpen, MessageSquare, Trash2, XCircle } from 'lucide-react';
+import { Plus, Search, Filter, Layers, MoreVertical, Users, Loader2, ChevronDown, ChevronUp, X, Clock, Calendar, CreditCard, BookOpen, MessageSquare, Trash2, XCircle, Briefcase } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { collection, onSnapshot, query, addDoc, serverTimestamp, deleteDoc, doc, orderBy, updateDoc, where } from 'firebase/firestore';
@@ -11,23 +11,7 @@ import { ConfirmModal } from '../components/ConfirmModal';
 import { GRADES, SECTIONS, SUBSCRIPTION_PLANS } from '../constants';
 import { useTranslation } from 'react-i18next';
 import { SubscriptionModal } from '../components/SubscriptionModal';
-
-interface Batch {
-  id: string;
-  name: string;
-  description?: string;
-  color?: string;
-  grade: string;
-  section: string;
-  batchTime?: string;
-  duration?: string;
-  subjects?: string[];
-  weeklyDays?: string[];
-  admissionFee: number;
-  monthlyFee: number;
-  studentCount?: number;
-  createdAt: any;
-}
+import { Batch, Teacher } from '../types';
 
 const WEEK_DAYS = [
   { id: 'Sun', label: 'Sun' },
@@ -71,6 +55,7 @@ export function Batches() {
   const [selectedBatch, setSelectedBatch] = useState<Batch | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [teachers, setTeachers] = useState<Teacher[]>([]);
 
   const handleViewDetails = (batch: Batch) => {
     setSelectedBatch(batch);
@@ -89,6 +74,8 @@ export function Batches() {
     weeklyDays: [] as string[],
     admissionFee: 0,
     monthlyFee: 0,
+    classTeacherId: '',
+    classTeacherName: '',
   });
 
   useEffect(() => {
@@ -118,7 +105,21 @@ export function Batches() {
       handleFirestoreError(error, OperationType.LIST, 'batches');
     });
 
-    return () => unsubscribe();
+    const unsubscribeTeachers = onSnapshot(
+      query(collection(db, 'teachers'), where('institutionId', '==', instId)),
+      (snapshot) => {
+        const teacherData = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        })) as Teacher[];
+        setTeachers(teacherData);
+      }
+    );
+
+    return () => {
+      unsubscribe();
+      unsubscribeTeachers();
+    };
   }, [user]);
 
   const handleAddBatch = async (e: React.FormEvent) => {
@@ -163,6 +164,8 @@ export function Batches() {
       weeklyDays: [],
       admissionFee: 0,
       monthlyFee: 0,
+      classTeacherId: '',
+      classTeacherName: '',
     });
     setShowAdvanced(false);
     setSubjectInput('');
@@ -223,6 +226,8 @@ export function Batches() {
       weeklyDays: batch.weeklyDays || [],
       admissionFee: batch.admissionFee,
       monthlyFee: batch.monthlyFee,
+      classTeacherId: batch.classTeacherId || '',
+      classTeacherName: batch.classTeacherName || '',
     });
     setIsEditModalOpen(true);
     setActiveMenu(null);
@@ -258,6 +263,256 @@ export function Batches() {
     const matchesGrade = selectedGrade ? b.grade === selectedGrade : true;
     return matchesSearch && matchesGrade;
   });
+
+  const renderBatchForm = (onSubmit: (e: React.FormEvent) => void, submitText: string) => (
+    <form onSubmit={onSubmit} className="space-y-6 max-h-[80vh] overflow-y-auto px-1">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <label className="text-sm font-bold text-gray-700">{t('batches.addModal.name')}</label>
+            <input
+              required
+              type="text"
+              placeholder={t('batches.addModal.namePlaceholder')}
+              value={newBatch.name}
+              onChange={e => setNewBatch({...newBatch, name: e.target.value})}
+              className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-bold text-gray-700">{t('batches.addModal.description')}</label>
+            <textarea
+              placeholder={t('batches.addModal.descriptionPlaceholder')}
+              value={newBatch.description}
+              onChange={e => setNewBatch({...newBatch, description: e.target.value})}
+              rows={2}
+              className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all resize-none"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-bold text-gray-700">{t('batches.addModal.color')}</label>
+            <div className="flex flex-wrap gap-2">
+              {BATCH_COLORS.map(color => (
+                <button
+                  key={color}
+                  type="button"
+                  onClick={() => setNewBatch({...newBatch, color})}
+                  className={cn(
+                    "w-8 h-8 rounded-full transition-all border-2",
+                    color,
+                    newBatch.color === color ? "border-gray-900 scale-110" : "border-transparent"
+                  )}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <label className="text-sm font-bold text-gray-700 flex items-center gap-2">
+                <CreditCard className="w-4 h-4 text-indigo-500" />
+                {t('batches.addModal.admissionFee')}
+              </label>
+              <div className="relative">
+                <input
+                  required
+                  type="number"
+                  placeholder="0"
+                  value={newBatch.admissionFee}
+                  onChange={e => setNewBatch({...newBatch, admissionFee: parseFloat(e.target.value) || 0})}
+                  className="w-full pl-4 pr-10 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold">৳</span>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-bold text-gray-700 flex items-center gap-2">
+                <CreditCard className="w-4 h-4 text-emerald-500" />
+                {t('batches.addModal.monthlyFee')}
+              </label>
+              <div className="relative">
+                <input
+                  required
+                  type="number"
+                  placeholder="0"
+                  value={newBatch.monthlyFee}
+                  onChange={e => setNewBatch({...newBatch, monthlyFee: parseFloat(e.target.value) || 0})}
+                  className="w-full pl-4 pr-10 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold">৳</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-bold text-gray-700">{t('batches.addModal.class')}</label>
+            <select
+              value={newBatch.grade}
+              onChange={e => setNewBatch({...newBatch, grade: e.target.value})}
+              className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+            >
+              <option value="No class">{t('common.grades.No class')}</option>
+              {GRADES.map(g => <option key={g} value={g}>{t(`common.grades.${g}`)}</option>)}
+            </select>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-bold text-gray-700 flex items-center gap-2">
+              <Briefcase className="w-4 h-4 text-amber-500" />
+              Class Teacher
+            </label>
+            <select
+              value={newBatch.classTeacherId}
+              onChange={e => {
+                const teacher = teachers.find(t => t.id === e.target.value);
+                setNewBatch({
+                  ...newBatch, 
+                  classTeacherId: e.target.value,
+                  classTeacherName: teacher?.name || ''
+                });
+              }}
+              className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-medium"
+            >
+              <option value="">No Class Teacher</option>
+              {teachers.map(t => (
+                <option key={t.id} value={t.id}>{t.name} ({t.subject})</option>
+              ))}
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div className="pt-4 border-t border-gray-100">
+        <button
+          type="button"
+          onClick={() => setShowAdvanced(!showAdvanced)}
+          className="flex items-center gap-2 text-sm font-bold text-indigo-600 hover:text-indigo-700 transition-colors"
+        >
+          {t('batches.addModal.advanced')}
+          {showAdvanced ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+        </button>
+
+        <AnimatePresence>
+          {showAdvanced && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="overflow-hidden"
+            >
+              <div className="pt-6 space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <label className="text-sm font-bold text-gray-700 flex items-center gap-2">
+                      <Clock className="w-4 h-4 text-indigo-500" />
+                      {t('batches.addModal.batchTime')}
+                    </label>
+                    <input
+                      type="text"
+                      placeholder={t('batches.addModal.batchTimePlaceholder')}
+                      value={newBatch.batchTime}
+                      onChange={e => setNewBatch({...newBatch, batchTime: e.target.value})}
+                      className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-bold text-gray-700 flex items-center gap-2">
+                      <Calendar className="w-4 h-4 text-indigo-500" />
+                      {t('batches.addModal.duration')}
+                    </label>
+                    <input
+                      type="text"
+                      placeholder={t('batches.addModal.durationPlaceholder')}
+                      value={newBatch.duration}
+                      onChange={e => setNewBatch({...newBatch, duration: e.target.value})}
+                      className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-bold text-gray-700 flex items-center gap-2">
+                    <BookOpen className="w-4 h-4 text-indigo-500" />
+                    {t('batches.addModal.subjects')}
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder={t('batches.addModal.subjectsPlaceholder')}
+                      value={subjectInput}
+                      onChange={e => setSubjectInput(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addSubject())}
+                      className="flex-1 px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                    />
+                    <button
+                      type="button"
+                      onClick={addSubject}
+                      className="px-4 py-2.5 bg-gray-100 text-gray-700 rounded-xl font-bold text-sm hover:bg-gray-200 transition-all"
+                    >
+                      {t('batches.addModal.add')}
+                    </button>
+                  </div>
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {newBatch.subjects.map(subject => (
+                      <span key={subject} className="flex items-center gap-1 px-3 py-1 bg-indigo-50 text-indigo-600 rounded-full text-xs font-medium">
+                        {subject}
+                        <button type="button" onClick={() => removeSubject(subject)} className="hover:text-indigo-800">
+                          <X className="w-3 h-3" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-bold text-gray-700">{t('batches.addModal.weeklyDays')}</label>
+                  <div className="flex flex-wrap gap-2">
+                    {WEEK_DAYS.map(day => (
+                      <button
+                        key={day.id}
+                        type="button"
+                        onClick={() => toggleDay(day.id)}
+                        className={cn(
+                          "px-4 py-2 rounded-xl text-xs font-bold transition-all border",
+                          newBatch.weeklyDays.includes(day.id)
+                            ? "bg-indigo-600 text-white border-indigo-600"
+                            : "bg-gray-50 text-gray-500 border-gray-200 hover:border-indigo-200"
+                        )}
+                      >
+                        {t(`common.weekDays.${day.id}`)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
+      <div className="flex gap-4 pt-6 border-t border-gray-100">
+        <button
+          type="button"
+          onClick={() => { setIsEditModalOpen(false); setIsAddModalOpen(false); resetForm(); }}
+          className="flex-1 py-3.5 bg-gray-100 text-gray-700 rounded-2xl font-bold hover:bg-gray-200 transition-all"
+        >
+          {t('common.cancel')}
+        </button>
+        <button
+          type="submit"
+          disabled={isSaving}
+          className="flex-1 py-3.5 bg-indigo-600 text-white rounded-2xl font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+        >
+          {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
+          {submitText}
+        </button>
+      </div>
+    </form>
+  );
 
   return (
     <div className="space-y-8">
@@ -392,6 +647,16 @@ export function Batches() {
                     <span>{batch.monthlyFee}৳ / {t('batches.month')}</span>
                   </div>
                 </div>
+
+                {batch.classTeacherName && (
+                  <div className="mt-4 p-3 bg-amber-50 rounded-xl border border-amber-100 flex items-center gap-3">
+                    <Briefcase className="w-4 h-4 text-amber-600" />
+                    <div>
+                      <p className="text-[10px] font-bold text-amber-500 uppercase tracking-widest">Class Teacher</p>
+                      <p className="text-sm font-bold text-gray-900">{batch.classTeacherName}</p>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="mt-6 pt-6 border-t border-gray-50 flex items-center justify-between">
@@ -467,101 +732,9 @@ export function Batches() {
                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">{t('batches.students')}</p>
                 <p className="text-sm font-bold text-gray-900">{selectedBatch.studentCount || 0}</p>
               </div>
-            </div>
-
-            {selectedBatch.subjects && selectedBatch.subjects.length > 0 && (
-              <div className="space-y-4">
-                <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest">{t('batches.subjects')}</h4>
-                <div className="flex flex-wrap gap-2">
-                  {selectedBatch.subjects.map((subject, idx) => (
-                    <span key={idx} className="px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-bold text-gray-700">
-                      {subject}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {selectedBatch.weeklyDays && selectedBatch.weeklyDays.length > 0 && (
-              <div className="space-y-4">
-                <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest">{t('batches.weeklyDays')}</h4>
-                <div className="flex flex-wrap gap-2">
-                  {selectedBatch.weeklyDays.map((day, idx) => (
-                    <span key={idx} className="px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-lg text-xs font-bold">
-                      {day}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <div className="flex gap-4 pt-4">
-              <button
-                onClick={() => {
-                  setIsDetailModalOpen(false);
-                  navigate(`/students?batch=${selectedBatch.id}`);
-                }}
-                className="flex-1 py-4 bg-indigo-600 text-white rounded-2xl font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 flex items-center justify-center gap-2"
-              >
-                <Users className="w-5 h-5" />
-                {t('batches.viewStudents')}
-              </button>
-              <button
-                onClick={() => {
-                  setIsDetailModalOpen(false);
-                  handleEditBatch(selectedBatch);
-                }}
-                className="px-8 py-4 bg-gray-100 text-gray-600 rounded-2xl font-bold hover:bg-gray-200 transition-all"
-              >
-                {t('common.edit')}
-              </button>
-            </div>
-          </div>
-        )}
-      </Modal>
-
-      <Modal 
-        isOpen={isDetailModalOpen} 
-        onClose={() => setIsDetailModalOpen(false)} 
-        title={t('batches.detailModal.title', { defaultValue: 'Batch Details' })}
-        maxWidth="max-w-2xl"
-      >
-        {selectedBatch && (
-          <div className="space-y-8">
-            <div className="flex items-start justify-between">
-              <div>
-                <h3 className="text-2xl font-black text-gray-900 tracking-tight">{selectedBatch.name}</h3>
-                <p className="text-gray-500 mt-1 font-medium">{selectedBatch.description}</p>
-              </div>
-              <div className="px-4 py-2 bg-indigo-50 text-indigo-600 rounded-xl font-bold text-sm">
-                {selectedBatch.grade}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
-              <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100">
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">{t('batches.section')}</p>
-                <p className="text-sm font-bold text-gray-900">{selectedBatch.section || 'N/A'}</p>
-              </div>
-              <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100">
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">{t('batches.time')}</p>
-                <p className="text-sm font-bold text-gray-900">{selectedBatch.batchTime || 'N/A'}</p>
-              </div>
-              <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100">
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">{t('batches.duration')}</p>
-                <p className="text-sm font-bold text-gray-900">{selectedBatch.duration || '0'} {t('batches.minutes')}</p>
-              </div>
-              <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100">
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">{t('batches.monthlyFee')}</p>
-                <p className="text-sm font-bold text-indigo-600">৳{selectedBatch.monthlyFee}</p>
-              </div>
-              <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100">
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">{t('batches.admissionFee')}</p>
-                <p className="text-sm font-bold text-indigo-600">৳{selectedBatch.admissionFee}</p>
-              </div>
-              <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100">
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">{t('batches.students')}</p>
-                <p className="text-sm font-bold text-gray-900">{selectedBatch.studentCount || 0}</p>
+              <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100">
+                <p className="text-[10px] font-bold text-amber-500 uppercase tracking-widest mb-1">Class Teacher</p>
+                <p className="text-sm font-bold text-gray-900">{selectedBatch.classTeacherName || 'None'}</p>
               </div>
             </div>
 
@@ -618,453 +791,12 @@ export function Batches() {
 
       {/* Edit Modal */}
       <Modal isOpen={isEditModalOpen} onClose={() => { setIsEditModalOpen(false); resetForm(); }} title={t('batches.editModal.title', { defaultValue: 'Edit Batch' })}>
-        <form onSubmit={handleUpdateBatch} className="space-y-6 max-h-[80vh] overflow-y-auto px-1">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-gray-700">{t('batches.addModal.name')}</label>
-                <input
-                  required
-                  type="text"
-                  placeholder={t('batches.addModal.namePlaceholder')}
-                  value={newBatch.name}
-                  onChange={e => setNewBatch({...newBatch, name: e.target.value})}
-                  className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-gray-700">{t('batches.addModal.description')}</label>
-                <textarea
-                  placeholder={t('batches.addModal.descriptionPlaceholder')}
-                  value={newBatch.description}
-                  onChange={e => setNewBatch({...newBatch, description: e.target.value})}
-                  rows={2}
-                  className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all resize-none"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-gray-700">{t('batches.addModal.color')}</label>
-                <div className="flex flex-wrap gap-2">
-                  {BATCH_COLORS.map(color => (
-                    <button
-                      key={color}
-                      type="button"
-                      onClick={() => setNewBatch({...newBatch, color})}
-                      className={cn(
-                        "w-8 h-8 rounded-full transition-all border-2",
-                        color,
-                        newBatch.color === color ? "border-gray-900 scale-110" : "border-transparent"
-                      )}
-                    />
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-bold text-gray-700 flex items-center gap-2">
-                    <CreditCard className="w-4 h-4 text-indigo-500" />
-                    {t('batches.addModal.admissionFee')}
-                  </label>
-                  <div className="relative">
-                    <input
-                      required
-                      type="number"
-                      placeholder="0"
-                      value={newBatch.admissionFee}
-                      onChange={e => setNewBatch({...newBatch, admissionFee: parseFloat(e.target.value) || 0})}
-                      className="w-full pl-4 pr-10 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
-                    />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold">৳</span>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-bold text-gray-700 flex items-center gap-2">
-                    <CreditCard className="w-4 h-4 text-emerald-500" />
-                    {t('batches.addModal.monthlyFee')}
-                  </label>
-                  <div className="relative">
-                    <input
-                      required
-                      type="number"
-                      placeholder="0"
-                      value={newBatch.monthlyFee}
-                      onChange={e => setNewBatch({...newBatch, monthlyFee: parseFloat(e.target.value) || 0})}
-                      className="w-full pl-4 pr-10 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
-                    />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold">৳</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-gray-700">{t('batches.addModal.class')}</label>
-                <select
-                  value={newBatch.grade}
-                  onChange={e => setNewBatch({...newBatch, grade: e.target.value})}
-                  className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
-                >
-                  <option value="No class">{t('common.grades.No class')}</option>
-                  {GRADES.map(g => <option key={g} value={g}>{t(`common.grades.${g}`)}</option>)}
-                </select>
-              </div>
-            </div>
-          </div>
-
-          <div className="pt-4 border-t border-gray-100">
-            <button
-              type="button"
-              onClick={() => setShowAdvanced(!showAdvanced)}
-              className="flex items-center gap-2 text-sm font-bold text-indigo-600 hover:text-indigo-700 transition-colors"
-            >
-              {t('batches.addModal.advanced')}
-              {showAdvanced ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-            </button>
-
-            <AnimatePresence>
-              {showAdvanced && (
-                <motion.div
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: 'auto', opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  className="overflow-hidden"
-                >
-                  <div className="pt-6 space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="space-y-2">
-                        <label className="text-sm font-bold text-gray-700 flex items-center gap-2">
-                          <Clock className="w-4 h-4 text-indigo-500" />
-                          {t('batches.addModal.batchTime')}
-                        </label>
-                        <input
-                          type="text"
-                          placeholder={t('batches.addModal.batchTimePlaceholder')}
-                          value={newBatch.batchTime}
-                          onChange={e => setNewBatch({...newBatch, batchTime: e.target.value})}
-                          className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-sm font-bold text-gray-700 flex items-center gap-2">
-                          <Calendar className="w-4 h-4 text-indigo-500" />
-                          {t('batches.addModal.duration')}
-                        </label>
-                        <input
-                          type="text"
-                          placeholder={t('batches.addModal.durationPlaceholder')}
-                          value={newBatch.duration}
-                          onChange={e => setNewBatch({...newBatch, duration: e.target.value})}
-                          className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="text-sm font-bold text-gray-700 flex items-center gap-2">
-                        <BookOpen className="w-4 h-4 text-indigo-500" />
-                        {t('batches.addModal.subjects')}
-                      </label>
-                      <div className="flex gap-2">
-                        <input
-                          type="text"
-                          placeholder={t('batches.addModal.subjectsPlaceholder')}
-                          value={subjectInput}
-                          onChange={e => setSubjectInput(e.target.value)}
-                          onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addSubject())}
-                          className="flex-1 px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
-                        />
-                        <button
-                          type="button"
-                          onClick={addSubject}
-                          className="px-4 py-2.5 bg-gray-100 text-gray-700 rounded-xl font-bold text-sm hover:bg-gray-200 transition-all"
-                        >
-                          {t('batches.addModal.add')}
-                        </button>
-                      </div>
-                      <div className="flex flex-wrap gap-2 mt-2">
-                        {newBatch.subjects.map(subject => (
-                          <span key={subject} className="flex items-center gap-1 px-3 py-1 bg-indigo-50 text-indigo-600 rounded-full text-xs font-medium">
-                            {subject}
-                            <button type="button" onClick={() => removeSubject(subject)} className="hover:text-indigo-800">
-                              <X className="w-3 h-3" />
-                            </button>
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="text-sm font-bold text-gray-700">{t('batches.addModal.weeklyDays')}</label>
-                      <div className="flex flex-wrap gap-2">
-                        {WEEK_DAYS.map(day => (
-                          <button
-                            key={day.id}
-                            type="button"
-                            onClick={() => toggleDay(day.id)}
-                            className={cn(
-                              "px-4 py-2 rounded-xl text-xs font-bold transition-all border",
-                              newBatch.weeklyDays.includes(day.id)
-                                ? "bg-indigo-600 text-white border-indigo-600"
-                                : "bg-gray-50 text-gray-500 border-gray-200 hover:border-indigo-200"
-                            )}
-                          >
-                            {t(`common.weekDays.${day.id}`)}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-
-          <div className="flex gap-4 pt-6 border-t border-gray-100">
-            <button
-              type="button"
-              onClick={() => { setIsEditModalOpen(false); resetForm(); }}
-              className="flex-1 py-3.5 bg-gray-100 text-gray-700 rounded-2xl font-bold hover:bg-gray-200 transition-all"
-            >
-              {t('common.cancel')}
-            </button>
-            <button
-              type="submit"
-              className="flex-[2] py-3.5 bg-indigo-600 text-white rounded-2xl font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200"
-            >
-              {t('common.saveChanges', { defaultValue: 'Save Changes' })}
-            </button>
-          </div>
-        </form>
+        {renderBatchForm(handleUpdateBatch, t('common.saveChanges'))}
       </Modal>
 
-      <Modal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} title={t('batches.addModal.title')}>
-        <form onSubmit={handleAddBatch} className="space-y-6 max-h-[80vh] overflow-y-auto px-1">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-gray-700">{t('batches.addModal.name')}</label>
-                <input
-                  required
-                  type="text"
-                  placeholder={t('batches.addModal.namePlaceholder')}
-                  value={newBatch.name}
-                  onChange={e => setNewBatch({...newBatch, name: e.target.value})}
-                  className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-gray-700">{t('batches.addModal.description')}</label>
-                <textarea
-                  placeholder={t('batches.addModal.descriptionPlaceholder')}
-                  value={newBatch.description}
-                  onChange={e => setNewBatch({...newBatch, description: e.target.value})}
-                  rows={2}
-                  className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all resize-none"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-gray-700">{t('batches.addModal.color')}</label>
-                <div className="flex flex-wrap gap-2">
-                  {BATCH_COLORS.map(color => (
-                    <button
-                      key={color}
-                      type="button"
-                      onClick={() => setNewBatch({...newBatch, color})}
-                      className={cn(
-                        "w-8 h-8 rounded-full transition-all border-2",
-                        color,
-                        newBatch.color === color ? "border-gray-900 scale-110" : "border-transparent"
-                      )}
-                    />
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-bold text-gray-700 flex items-center gap-2">
-                    <CreditCard className="w-4 h-4 text-indigo-500" />
-                    {t('batches.addModal.admissionFee')}
-                  </label>
-                  <div className="relative">
-                    <input
-                      required
-                      type="number"
-                      placeholder="0"
-                      value={newBatch.admissionFee}
-                      onChange={e => setNewBatch({...newBatch, admissionFee: parseFloat(e.target.value) || 0})}
-                      className="w-full pl-4 pr-10 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
-                    />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold">৳</span>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-bold text-gray-700 flex items-center gap-2">
-                    <CreditCard className="w-4 h-4 text-emerald-500" />
-                    {t('batches.addModal.monthlyFee')}
-                  </label>
-                  <div className="relative">
-                    <input
-                      required
-                      type="number"
-                      placeholder="0"
-                      value={newBatch.monthlyFee}
-                      onChange={e => setNewBatch({...newBatch, monthlyFee: parseFloat(e.target.value) || 0})}
-                      className="w-full pl-4 pr-10 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
-                    />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold">৳</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-gray-700">{t('batches.addModal.class')}</label>
-                <select
-                  value={newBatch.grade}
-                  onChange={e => setNewBatch({...newBatch, grade: e.target.value})}
-                  className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
-                >
-                  <option value="No class">{t('common.grades.No class')}</option>
-                  {GRADES.map(g => <option key={g} value={g}>{t(`common.grades.${g}`)}</option>)}
-                </select>
-              </div>
-            </div>
-          </div>
-
-          <div className="pt-4 border-t border-gray-100">
-            <button
-              type="button"
-              onClick={() => setShowAdvanced(!showAdvanced)}
-              className="flex items-center gap-2 text-sm font-bold text-indigo-600 hover:text-indigo-700 transition-colors"
-            >
-              {t('batches.addModal.advanced')}
-              {showAdvanced ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-            </button>
-
-            <AnimatePresence>
-              {showAdvanced && (
-                <motion.div
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: 'auto', opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  className="overflow-hidden"
-                >
-                  <div className="pt-6 space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="space-y-2">
-                        <label className="text-sm font-bold text-gray-700 flex items-center gap-2">
-                          <Clock className="w-4 h-4 text-indigo-500" />
-                          {t('batches.addModal.batchTime')}
-                        </label>
-                        <input
-                          type="text"
-                          placeholder={t('batches.addModal.batchTimePlaceholder')}
-                          value={newBatch.batchTime}
-                          onChange={e => setNewBatch({...newBatch, batchTime: e.target.value})}
-                          className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-sm font-bold text-gray-700 flex items-center gap-2">
-                          <Calendar className="w-4 h-4 text-indigo-500" />
-                          {t('batches.addModal.duration')}
-                        </label>
-                        <input
-                          type="text"
-                          placeholder={t('batches.addModal.durationPlaceholder')}
-                          value={newBatch.duration}
-                          onChange={e => setNewBatch({...newBatch, duration: e.target.value})}
-                          className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="text-sm font-bold text-gray-700 flex items-center gap-2">
-                        <BookOpen className="w-4 h-4 text-indigo-500" />
-                        {t('batches.addModal.subjects')}
-                      </label>
-                      <div className="flex gap-2">
-                        <input
-                          type="text"
-                          placeholder={t('batches.addModal.subjectsPlaceholder')}
-                          value={subjectInput}
-                          onChange={e => setSubjectInput(e.target.value)}
-                          onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addSubject())}
-                          className="flex-1 px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
-                        />
-                        <button
-                          type="button"
-                          onClick={addSubject}
-                          className="px-4 py-2.5 bg-gray-100 text-gray-700 rounded-xl font-bold text-sm hover:bg-gray-200 transition-all"
-                        >
-                          {t('batches.addModal.add')}
-                        </button>
-                      </div>
-                      <div className="flex flex-wrap gap-2 mt-2">
-                        {newBatch.subjects.map(subject => (
-                          <span key={subject} className="flex items-center gap-1 px-3 py-1 bg-indigo-50 text-indigo-600 rounded-full text-xs font-medium">
-                            {subject}
-                            <button type="button" onClick={() => removeSubject(subject)} className="hover:text-indigo-800">
-                              <X className="w-3 h-3" />
-                            </button>
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="text-sm font-bold text-gray-700">{t('batches.addModal.weeklyDays')}</label>
-                      <div className="flex flex-wrap gap-2">
-                        {WEEK_DAYS.map(day => (
-                          <button
-                            key={day.id}
-                            type="button"
-                            onClick={() => toggleDay(day.id)}
-                            className={cn(
-                              "px-4 py-2 rounded-xl text-xs font-bold transition-all border",
-                              newBatch.weeklyDays.includes(day.id)
-                                ? "bg-indigo-600 text-white border-indigo-600"
-                                : "bg-gray-50 text-gray-500 border-gray-200 hover:border-indigo-200"
-                            )}
-                          >
-                            {t(`common.weekDays.${day.id}`)}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-
-          <div className="flex gap-4 pt-6 border-t border-gray-100">
-            <button
-              type="button"
-              onClick={() => setIsAddModalOpen(false)}
-              className="flex-1 py-3.5 bg-gray-100 text-gray-700 rounded-2xl font-bold hover:bg-gray-200 transition-all"
-            >
-              {t('common.cancel')}
-            </button>
-            <button
-              type="submit"
-              disabled={isSaving}
-              className="flex-1 py-3.5 bg-indigo-600 text-white rounded-2xl font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-            >
-              {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
-              {t('batches.createBatch')}
-            </button>
-          </div>
-        </form>
+      {/* Add Modal */}
+      <Modal isOpen={isAddModalOpen} onClose={() => { setIsAddModalOpen(false); resetForm(); }} title={t('batches.addModal.title')}>
+        {renderBatchForm(handleAddBatch, t('batches.createBatch'))}
       </Modal>
 
       <SubscriptionModal 
@@ -1079,17 +811,18 @@ export function Batches() {
           setIsSaving(true);
           try {
             await deleteDoc(doc(db, 'batches', batchToDelete));
+            setIsDeleteModalOpen(false);
+            setBatchToDelete(null);
           } catch (error) {
             handleFirestoreError(error, OperationType.DELETE, `batches/${batchToDelete}`);
           } finally {
             setIsSaving(false);
-            setIsDeleteModalOpen(false);
-            setBatchToDelete(null);
           }
         }}
-        title="Delete Batch"
-        message={`Are you sure you want to delete ${batchToDeleteName}? All students in this batch will be affected.`}
+        title="Delete Batch?"
+        message={`Are you sure you want to delete "${batchToDeleteName}"? This action cannot be undone.`}
         variant="danger"
+        confirmText="Delete"
       />
     </div>
   );

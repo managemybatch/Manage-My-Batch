@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Briefcase, Plus, Search, Filter, Download, Calendar, CheckCircle, Clock, Share2, ExternalLink, Loader2, Trash2, Edit2, UserPlus, Mail, Phone, MapPin, ChevronDown, MessageSquare, CheckCircle2, AlertCircle, Info, X } from 'lucide-react';
+import { Briefcase, Plus, Search, Filter, Download, Calendar, CheckCircle, Clock, Share2, ExternalLink, Loader2, Trash2, Edit2, UserPlus, Mail, Phone, MapPin, ChevronDown, MessageSquare, CheckCircle2, AlertCircle, Info, X, Globe } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
@@ -41,6 +41,7 @@ interface Circular {
   salaryRange: string;
   deadline: string;
   active: boolean;
+  published: boolean;
   institutionId: string;
 }
 
@@ -165,6 +166,7 @@ export function Teachers() {
             salaryRange: c.salaryRange,
             deadline: c.deadline,
             active: c.active,
+            published: c.published ?? true,
             institutionId: c.institutionId
           };
         });
@@ -433,6 +435,7 @@ export function Teachers() {
         experience: formData.get('experience'),
         jobType: formData.get('jobType'),
         active: true,
+        published: true,
         institutionId: instId,
         createdAt: serverTimestamp()
       });
@@ -443,6 +446,18 @@ export function Teachers() {
       handleFirestoreError(error, OperationType.WRITE, 'circulars');
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const toggleCircularPublish = async (circularId: string, current: boolean) => {
+    try {
+      await updateDoc(doc(db, 'circulars', circularId), {
+        published: !current
+      });
+      setCirculars(prev => prev.map(c => c.id === circularId ? { ...c, published: !current } : c));
+      setToast({ message: current ? 'Removed from website' : 'Published to website', type: 'success' });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, 'circulars');
     }
   };
 
@@ -900,6 +915,18 @@ export function Teachers() {
                             <CheckCircle className="w-3 h-3" /> Active & Receiving Applications
                           </span>
                           <div className="flex items-center gap-4">
+                            <button 
+                              onClick={() => toggleCircularPublish(circular.id, circular.published)}
+                              className={cn(
+                                "px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 border",
+                                circular.published 
+                                  ? "bg-emerald-50 text-emerald-600 border-emerald-100 hover:bg-emerald-100" 
+                                  : "bg-gray-50 text-gray-400 border-gray-200 hover:bg-gray-100"
+                              )}
+                            >
+                              <Globe className="w-3 h-3" />
+                              {circular.published ? 'Published on Website' : 'Show on Website'}
+                            </button>
                             <span className="text-xs font-bold text-gray-500 bg-gray-100 px-2 py-1 rounded-lg">
                               {applications.filter(app => app.circularId === circular.id).length} Applications
                             </span>

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { db, handleFirestoreError, OperationType } from '../../firebase';
 import { doc, getDoc, collection, query, where, getDocs, limit, orderBy } from 'firebase/firestore';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Building, MapPin, Phone, Mail, Globe, Users, Briefcase, Layers, CheckCircle, Loader2, GraduationCap, Calendar, Download, Megaphone, Newspaper, ArrowRight, Clock, Info, FileText, TrendingUp, Star, HelpCircle } from 'lucide-react';
+import { Building, MapPin, Phone, Mail, Globe, Users, Briefcase, Layers, CheckCircle, Loader2, GraduationCap, Calendar, Download, Megaphone, Newspaper, ArrowRight, Clock, Info, FileText, TrendingUp, Star, HelpCircle, Facebook, Youtube, Linkedin, User } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../../lib/utils';
 import html2canvas from 'html2canvas';
@@ -68,10 +68,10 @@ export function InstitutionProfile() {
           getDocs(query(collection(db, 'students'), where('institutionId', '==', instId))),
           getDocs(query(collection(db, 'teachers'), where('institutionId', '==', instId))),
           getDocs(query(collection(db, 'batches'), where('institutionId', '==', instId))),
-          getDocs(query(collection(db, 'notices'), where('institutionId', '==', instId), where('active', '==', true), orderBy('createdAt', 'desc'), limit(5))),
-          getDocs(query(collection(db, 'events'), where('institutionId', '==', instId), where('active', '==', true), orderBy('date', 'asc'), limit(5))),
-          getDocs(query(collection(db, 'circulars'), where('institutionId', '==', instId), where('active', '==', true), orderBy('createdAt', 'desc'), limit(5))),
-          getDocs(query(collection(db, 'offline_exams'), where('institutionId', '==', instId), where('status', '==', 'published'), orderBy('date', 'desc'), limit(6)))
+          getDocs(query(collection(db, 'notices'), where('institutionId', '==', instId))),
+          getDocs(query(collection(db, 'events'), where('institutionId', '==', instId))),
+          getDocs(query(collection(db, 'circulars'), where('institutionId', '==', instId))),
+          getDocs(query(collection(db, 'offline_exams'), where('institutionId', '==', instId)))
         ]);
 
         const [studentsSnap, teachersSnap, batchesSnap, noticesSnap, eventsSnap, circularsSnap, examsSnap] = results.map(r => r.status === 'fulfilled' ? r.value : null);
@@ -83,10 +83,45 @@ export function InstitutionProfile() {
             batches: batchesSnap.size
           });
         }
-        if (noticesSnap) setNotices(noticesSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-        if (eventsSnap) setEvents(eventsSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-        if (circularsSnap) setCirculars(circularsSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-        if (examsSnap) setExams(examsSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+
+        if (noticesSnap) {
+          const fetchedNotices = noticesSnap.docs
+            .map(d => ({ id: d.id, ...d.data() }))
+            .filter((n: any) => n.active)
+            .sort((a: any, b: any) => {
+              const dateA = a.createdAt ? (typeof a.createdAt === 'string' ? new Date(a.createdAt).getTime() : (a.createdAt as any).seconds * 1000) : 0;
+              const dateB = b.createdAt ? (typeof b.createdAt === 'string' ? new Date(b.createdAt).getTime() : (b.createdAt as any).seconds * 1000) : 0;
+              return dateB - dateA;
+            })
+            .slice(0, 5);
+          setNotices(fetchedNotices);
+        }
+
+        if (eventsSnap) {
+          const fetchedEvents = eventsSnap.docs
+            .map(d => ({ id: d.id, ...d.data() }))
+            .filter((e: any) => e.active)
+            .sort((a: any, b: any) => new Date(a.date || 0).getTime() - new Date(b.date || 0).getTime())
+            .slice(0, 5);
+          setEvents(fetchedEvents);
+        }
+
+        if (circularsSnap) {
+          const fetchedCirculars = circularsSnap.docs
+            .map(d => ({ id: d.id, ...d.data() }))
+            .filter((c: any) => c.active && (c.published !== false))
+            .sort((a: any, b: any) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
+            .slice(0, 5);
+          setCirculars(fetchedCirculars);
+        }
+
+        if (examsSnap) {
+          const fetchedExams = examsSnap.docs
+            .map(d => ({ id: d.id, ...d.data() }))
+            .filter((e: any) => e.isPublished)
+            .sort((a: any, b: any) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
+          setExams(fetchedExams);
+        }
       } catch (err) {
         handleFirestoreError(err, OperationType.GET, 'institutions');
       } finally {
@@ -178,26 +213,84 @@ export function InstitutionProfile() {
     switch (section.type) {
       case 'hero':
         return (
-          <div key={section.id} className="bg-brand text-white pt-20 pb-40 px-6">
-            <div className="max-w-5xl mx-auto flex flex-col md:flex-row items-center gap-8">
-              <div className="w-32 h-32 bg-white/20 rounded-3xl flex items-center justify-center text-5xl font-black ring-8 ring-white/10 overflow-hidden">
-                {institution.logoURL ? (
-                  <img src={institution.logoURL} alt="Logo" className="w-full h-full object-contain p-4" referrerPolicy="no-referrer" />
-                ) : (
-                  institution.name.charAt(0)
+          <div key={section.id} className="relative overflow-hidden">
+            {/* Top Bar */}
+            {institution.websiteConfig?.topBar && (
+              <div className="bg-brand-dark/20 backdrop-blur-md text-white py-2 px-6 flex flex-col md:flex-row items-center justify-between text-[10px] font-bold uppercase tracking-widest border-b border-white/10 relative z-30">
+                <div className="flex items-center gap-6">
+                  {institution.websiteConfig.topBar.phone && (
+                    <span className="flex items-center gap-1.5"><Phone className="w-3 h-3 text-brand-light" /> {institution.websiteConfig.topBar.phone}</span>
+                  )}
+                  {institution.websiteConfig.topBar.email && (
+                    <span className="flex items-center gap-1.5"><Mail className="w-3 h-3 text-brand-light" /> {institution.websiteConfig.topBar.email}</span>
+                  )}
+                </div>
+                {institution.websiteConfig.socialLinks && (
+                  <div className="flex items-center gap-4 mt-2 md:mt-0">
+                    {institution.websiteConfig.socialLinks.facebook && <a href={institution.websiteConfig.socialLinks.facebook} target="_blank" rel="noreferrer" className="hover:text-brand-light transition-colors">Facebook</a>}
+                    {institution.websiteConfig.socialLinks.youtube && <a href={institution.websiteConfig.socialLinks.youtube} target="_blank" rel="noreferrer" className="hover:text-brand-light transition-colors">Youtube</a>}
+                    {institution.websiteConfig.socialLinks.whatsapp && <a href={`https://wa.me/${institution.websiteConfig.socialLinks.whatsapp.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" className="hover:text-brand-light transition-colors">WhatsApp</a>}
+                  </div>
                 )}
               </div>
-              <div className="text-center md:text-left space-y-2">
-                <div className="flex items-center justify-center md:justify-start gap-2">
-                  <span className="px-3 py-1 bg-white/20 text-xs font-bold uppercase tracking-widest rounded-full">Coaching Center</span>
-                  <span className="px-3 py-1 bg-emerald-500 text-xs font-bold uppercase tracking-widest rounded-full flex items-center gap-1">
-                    <CheckCircle className="w-3 h-3" /> Verified
-                  </span>
+            )}
+
+            <div className={cn(
+              "relative bg-brand text-white pt-12 pb-20 px-6 min-h-[250px] flex items-center transition-all",
+              institution.websiteConfig?.heroBannerURL ? "bg-black/60" : "bg-brand"
+            )}>
+              {institution.websiteConfig?.heroBannerURL && (
+                <div className="absolute inset-0 z-0">
+                  <img 
+                    src={institution.websiteConfig.heroBannerURL} 
+                    alt="Background" 
+                    className="w-full h-full object-cover opacity-40 mix-blend-overlay"
+                    referrerPolicy="no-referrer"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-brand/90 via-brand/40 to-transparent" />
                 </div>
-                <h1 className="text-4xl md:text-5xl font-black tracking-tight">{institution.name}</h1>
-                <p className="text-white/80 flex items-center justify-center md:justify-start gap-2">
-                  <MapPin className="w-4 h-4" /> {institution.address || 'Address not provided'}
-                </p>
+              )}
+              
+              <div className="relative z-10 max-w-5xl mx-auto flex flex-col md:flex-row items-center gap-10 w-full">
+                <motion.div 
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="w-40 h-40 bg-white/20 rounded-[40px] flex items-center justify-center text-6xl font-black ring-8 ring-white/10 overflow-hidden shadow-2xl"
+                >
+                  {institution.logoURL ? (
+                    <img src={institution.logoURL} alt="Logo" className="w-full h-full object-contain p-4" referrerPolicy="no-referrer" />
+                  ) : (
+                    institution.name.charAt(0)
+                  )}
+                </motion.div>
+                <div className="text-center md:text-left space-y-4 flex-1">
+                  <div className="flex flex-wrap items-center justify-center md:justify-start gap-2">
+                    <span className="px-4 py-1 bg-white/20 text-[10px] font-black uppercase tracking-widest rounded-full backdrop-blur-sm border border-white/10">Coaching Center</span>
+                    <span className="px-4 py-1 bg-emerald-500 text-[10px] font-black uppercase tracking-widest rounded-full flex items-center gap-1 shadow-lg shadow-emerald-500/20">
+                      <CheckCircle className="w-3 h-3" /> Verified
+                    </span>
+                  </div>
+                  <motion.h1 
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    className="text-5xl md:text-7xl font-black tracking-tight"
+                  >
+                    {institution.name}
+                  </motion.h1>
+                  {section.subtitle && (
+                    <motion.p 
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: 0.2 }}
+                      className="text-2xl font-medium text-white/90 italic max-w-2xl"
+                    >
+                      {section.subtitle}
+                    </motion.p>
+                  )}
+                  <p className="text-white/80 flex items-center justify-center md:justify-start gap-2 font-medium">
+                    <MapPin className="w-5 h-5 text-brand-light" /> {institution.address || 'Address not provided'}
+                  </p>
+                </div>
               </div>
             </div>
           </div>
@@ -205,26 +298,26 @@ export function InstitutionProfile() {
 
       case 'stats':
         return (
-          <div key={section.id} className="max-w-5xl mx-auto px-6 -mt-20 mb-12">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div key={section.id} className="max-w-5xl mx-auto px-6 -mt-10 mb-12 relative z-20">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {[
-                { label: 'Students', value: stats.students, icon: Users, color: 'bg-blue-500' },
-                { label: 'Teachers', value: stats.teachers, icon: Briefcase, color: 'bg-emerald-500' },
-                { label: 'Batches', value: stats.batches, icon: Layers, color: 'bg-amber-500' },
+                { label: 'Students', value: stats.students, icon: Users, color: 'bg-indigo-600' },
+                { label: 'Teachers', value: stats.teachers, icon: Briefcase, color: 'bg-emerald-600' },
+                { label: 'Batches', value: stats.batches, icon: Layers, color: 'bg-amber-600' },
               ].map((stat, idx) => (
                 <motion.div 
                   key={idx}
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: idx * 0.1 }}
-                  className="bg-white p-6 rounded-3xl shadow-xl shadow-indigo-100/50 border border-gray-100 flex items-center gap-6"
+                  className="bg-white p-6 rounded-3xl shadow-2xl shadow-gray-200/50 border border-gray-100 flex items-center gap-6"
                 >
-                  <div className={cn("w-14 h-14 rounded-2xl flex items-center justify-center text-white", stat.color)}>
+                  <div className={cn("w-14 h-14 rounded-2xl flex items-center justify-center text-white shrink-0", stat.color)}>
                     <stat.icon className="w-7 h-7" />
                   </div>
                   <div>
-                    <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">{stat.label}</p>
-                    <h3 className="text-2xl font-black text-gray-900">{stat.value}</h3>
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">{stat.label}</p>
+                    <h3 className="text-3xl font-black text-gray-900 leading-none mt-1">{stat.value}</h3>
                   </div>
                 </motion.div>
               ))}
@@ -263,6 +356,41 @@ export function InstitutionProfile() {
                 )}
               </div>
             )}
+          </section>
+        );
+
+      case 'principal':
+        return (institution.principalName || institution.principalPhotoURL) && (
+          <section key={section.id} className="bg-gray-900 rounded-[3rem] overflow-hidden shadow-2xl relative">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-brand/10 rounded-full -mr-32 -mt-32 blur-3xl" />
+            <div className="absolute bottom-0 left-0 w-64 h-64 bg-indigo-500/10 rounded-full -ml-32 -mb-32 blur-3xl" />
+            
+            <div className="relative p-8 md:p-12 flex flex-col md:flex-row items-center gap-12">
+               <div className="shrink-0 w-48 h-48 md:w-64 md:h-64 rounded-[3rem] overflow-hidden ring-8 ring-white/5 shadow-2xl bg-gray-800">
+                  {institution.principalPhotoURL ? (
+                    <img src={institution.principalPhotoURL} alt="Principal" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                       <User className="w-24 h-24 text-gray-700" />
+                    </div>
+                  )}
+               </div>
+               <div className="flex-1 space-y-6 text-center md:text-left">
+                  <div className="space-y-1">
+                    <h2 className="text-3xl font-black text-white">{section.title || "Principal's Message"}</h2>
+                    <p className="text-brand font-black uppercase tracking-[0.2em] text-xs">Excellence in Leadership</p>
+                  </div>
+                  
+                  <blockquote className="text-gray-400 text-lg md:text-xl font-medium leading-relaxed italic border-l-4 border-brand-light/20 pl-6 py-2">
+                    "{institution.principalMessage || institution.vision || "We believe in nurturing young minds for a brighter future. Our goal is to provide quality education and foster a culture of excellence in everything we do."}"
+                  </blockquote>
+
+                  <div className="pt-4">
+                     <h4 className="text-xl font-black text-white leading-none">{institution.principalName || "Principal Name"}</h4>
+                     <p className="text-gray-500 font-bold mt-1">{institution.principalTitle || "Head of Institution"}</p>
+                  </div>
+               </div>
+            </div>
           </section>
         );
 
@@ -307,16 +435,20 @@ export function InstitutionProfile() {
         );
 
       case 'results':
-        return exams.length > 0 && (
+        const displayExams = (section.images || []).length > 0 
+          ? exams.filter(e => section.images?.includes(e.id))
+          : exams;
+
+        return displayExams.length > 0 && (
           <section key={section.id} className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm space-y-6">
             <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
               <CheckCircle className="w-6 h-6 text-emerald-500" /> {section.title || 'Exam Results'}
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {exams.map(exam => (
+              {displayExams.map(exam => (
                 <button 
                   key={exam.id}
-                  onClick={() => navigate(`/public/exam/${exam.id}`)}
+                  onClick={() => navigate(`/public/exam-result/${exam.id}`)}
                   className="p-5 bg-brand text-white rounded-[24px] text-left hover:shadow-xl hover:-translate-y-1 transition-all space-y-4 group opacity-90 hover:opacity-100"
                 >
                   <div className="flex items-center justify-between">
@@ -458,13 +590,22 @@ export function InstitutionProfile() {
     }
   };
 
-  const sections = institution.websiteConfig?.sections?.sort((a: any, b: any) => a.order - b.order) || [
+  const defaultSections = [
     { id: 'sec_hero', type: 'hero', active: true, order: 0 },
     { id: 'sec_stats', type: 'stats', active: true, order: 1 },
-    { id: 'sec_about', type: 'about', active: true, order: 2 },
-    { id: 'sec_news', type: 'news', active: true, order: 3 },
-    { id: 'sec_results', type: 'results', active: true, order: 4 },
+    { id: 'sec_principal', type: 'principal', active: true, order: 2 },
+    { id: 'sec_about', type: 'about', active: true, order: 3 },
+    { id: 'sec_news', type: 'news', title: 'Latest Notices', active: notices.length > 0, order: 4 },
+    { id: 'sec_results', type: 'results', title: 'Exam Results', active: exams.length > 0, order: 5 },
+    { id: 'sec_events', type: 'events', title: 'Timeline & Events', active: events.length > 0, order: 6 },
+    { id: 'sec_circulars', type: 'circulars', title: 'Career Opportunities', active: circulars.length > 0, order: 7 },
+    { id: 'sec_faq', type: 'faq', title: 'Frequently Asked Questions', active: false, order: 8 },
   ];
+
+  const sections = institution.websiteConfig?.sections?.sort((a: any, b: any) => a.order - b.order) || defaultSections;
+  
+  // Ensure that if it's not custom, we at least show existing content
+  const finalSections = institution.websiteConfig?.sections?.length ? sections : defaultSections.filter(s => s.active || ['hero', 'stats', 'about', 'principal'].includes(s.type));
 
   const primaryColor = institution?.primaryColor || '#4f46e5';
 
@@ -506,7 +647,7 @@ export function InstitutionProfile() {
         
         {/* Dynamic Sections */}
         <div className="space-y-12 flex-grow">
-        {sections.filter((s: any) => s.active).map(section => (
+        {finalSections.filter((s: any) => s.active).map(section => (
           <div key={section.id} className={cn(
             section.type === 'hero' ? "" : "max-w-5xl mx-auto px-6"
           )}>
@@ -516,22 +657,25 @@ export function InstitutionProfile() {
       </div>
 
       {/* Persistent Footer and Contact Card */}
-      <div className="max-w-5xl mx-auto px-6 mt-12 grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="max-w-5xl mx-auto px-6 mt-12 grid grid-cols-1 lg:grid-cols-3 gap-8 pb-12">
         <div className="lg:col-span-2">
-          {institution.principalName && !sections.find(s => s.type === 'about') && (
+          {institution.principalName && (
             <div className="bg-white p-8 rounded-[40px] border border-gray-100 shadow-sm">
                 <div className="flex flex-col md:flex-row gap-8 items-start">
                   {institution.principalPhotoURL && (
-                    <div className="w-32 h-32 rounded-3xl overflow-hidden shrink-0 shadow-lg ring-8 ring-indigo-50">
+                    <div className="w-32 h-32 rounded-3xl overflow-hidden shrink-0 shadow-lg ring-8 ring-indigo-50 bg-gray-50 flex items-center justify-center">
                       <img src={institution.principalPhotoURL} alt="Principal" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                     </div>
                   )}
-                  <div className="space-y-2">
-                    <p className="text-2xl font-black text-gray-900">{institution.principalName}</p>
-                    <p className="text-brand font-bold text-xs uppercase tracking-widest">{institution.principalTitle || 'Principal'}</p>
-                    <p className="text-gray-500 italic leading-relaxed text-lg pt-4 line-clamp-4">
-                      "Welcome to our institution. We are committed to providing the highest quality education and fostering a nurturing environment for all our students."
-                    </p>
+                  <div className="space-y-2 flex-1">
+                    <h3 className="text-sm font-black text-brand uppercase tracking-[0.2em]">Principal's Message</h3>
+                    <p className="text-3xl font-black text-gray-900 pt-1 tracking-tight">{institution.principalName}</p>
+                    <p className="text-gray-400 font-bold text-xs uppercase tracking-widest">{institution.principalTitle || 'Principal'}</p>
+                    <div className="relative mt-6">
+                      <p className="text-gray-500 italic leading-relaxed text-lg pt-4 line-clamp-6 relative z-10">
+                        "Welcome to our institution. We are committed to providing the highest quality education and fostering a nurturing environment for all our students to excel in their academic journey."
+                      </p>
+                    </div>
                   </div>
                 </div>
             </div>
@@ -736,6 +880,86 @@ function HiddenBioTemplate({ institution, stats, bioRef }: { institution: any, s
           </div>
         </div>
       </div>
+
+      {/* Professional Web Footer */}
+      <footer className="bg-brand-dark text-white py-20 px-6 relative overflow-hidden">
+        <div className="absolute inset-0 opacity-[0.03]">
+          <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-white via-transparent to-transparent" />
+        </div>
+        
+        <div className="max-w-5xl mx-auto relative z-10">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-12">
+            <div className="md:col-span-2 space-y-8">
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 bg-white/10 rounded-[22px] flex items-center justify-center backdrop-blur-md border border-white/10">
+                  {institution.logoURL ? (
+                    <img src={institution.logoURL} alt="Logo" className="w-full h-full object-contain p-3" referrerPolicy="no-referrer" />
+                  ) : (
+                    <Building className="w-7 h-7 text-brand-light" />
+                  )}
+                </div>
+                <div>
+                  <h3 className="text-2xl font-black tracking-tight">{institution.name}</h3>
+                  <p className="text-brand-light text-[10px] font-black uppercase tracking-[0.2em] mt-1">Established {institution.established || 'Recently'}</p>
+                </div>
+              </div>
+              <p className="text-white/60 text-base leading-relaxed italic max-w-sm">
+                "{institution.vision || 'Empowering students through quality education and expert mentorship.'}"
+              </p>
+            </div>
+
+            <div className="space-y-6">
+              <h4 className="text-[11px] font-black uppercase tracking-[0.25em] text-brand-light/70 border-l-2 border-brand-light/30 pl-4 ml-[-1rem]">Contact Info</h4>
+              <ul className="space-y-5">
+                <li className="flex items-start gap-4 group">
+                  <MapPin className="w-5 h-5 text-brand-light/40 group-hover:text-brand-light transition-colors shrink-0 mt-0.5" />
+                  <span className="text-sm text-white/70 leading-relaxed group-hover:text-white transition-colors">{institution.address}</span>
+                </li>
+                <li className="flex items-center gap-4 group">
+                  <Phone className="w-5 h-5 text-brand-light/40 group-hover:text-brand-light transition-colors" />
+                  <span className="text-sm text-white/70 group-hover:text-white transition-colors">{institution.phone}</span>
+                </li>
+              </ul>
+            </div>
+
+            <div className="space-y-6">
+              <h4 className="text-[11px] font-black uppercase tracking-[0.25em] text-brand-light/70 border-l-2 border-brand-light/30 pl-4 ml-[-1rem]">Follow Us</h4>
+              <div className="flex flex-wrap gap-4">
+                {institution.websiteConfig?.socialLinks?.facebook && (
+                  <a href={institution.websiteConfig.socialLinks.facebook} target="_blank" rel="noreferrer" className="w-11 h-11 bg-white/5 rounded-2xl flex items-center justify-center hover:bg-brand-light/20 hover:-translate-y-1 transition-all border border-white/5">
+                    <Facebook className="w-5 h-5" />
+                  </a>
+                )}
+                {institution.websiteConfig?.socialLinks?.youtube && (
+                  <a href={institution.websiteConfig.socialLinks.youtube} target="_blank" rel="noreferrer" className="w-11 h-11 bg-white/5 rounded-2xl flex items-center justify-center hover:bg-brand-light/20 hover:-translate-y-1 transition-all border border-white/5">
+                    <Youtube className="w-5 h-5" />
+                  </a>
+                )}
+                {institution.websiteConfig?.socialLinks?.linkedin && (
+                  <a href={institution.websiteConfig.socialLinks.linkedin} target="_blank" rel="noreferrer" className="w-11 h-11 bg-white/5 rounded-2xl flex items-center justify-center hover:bg-brand-light/20 hover:-translate-y-1 transition-all border border-white/5">
+                    <Linkedin className="w-5 h-5" />
+                  </a>
+                )}
+                {institution.websiteConfig?.socialLinks?.whatsapp && (
+                  <a href={`https://wa.me/${institution.websiteConfig.socialLinks.whatsapp.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" className="w-11 h-11 bg-white/5 rounded-2xl flex items-center justify-center hover:bg-brand-light/20 hover:-translate-y-1 transition-all border border-white/5">
+                    <Phone className="w-5 h-5" />
+                  </a>
+                )}
+              </div>
+            </div>
+          </div>
+          
+          <div className="border-t border-white/5 mt-20 pt-10 flex flex-col md:flex-row items-center justify-between gap-6">
+            <p className="text-[10px] font-bold text-white/30 uppercase tracking-[0.3em]">
+              &copy; {new Date().getFullYear()} {institution.name} Portal. All Rights Reserved.
+            </p>
+            <div className="flex items-center gap-2 drop-shadow-sm grayscale opacity-50 hover:grayscale-0 hover:opacity-100 transition-all cursor-default text-white/40">
+              <span className="text-[9px] font-black uppercase tracking-widest">Powered by</span>
+              <div className="bg-white/10 px-2 py-0.5 rounded text-[11px] font-black italic">AIS</div>
+            </div>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }

@@ -201,9 +201,13 @@ const resources = {
           allClear: "All clear ✨"
         },
         collectFee: "Collect Fee",
+        manageOther: "Manage Other Fees",
+        otherFeeTemplates: "Custom Fee Templates",
         paymentModal: {
-          title: "Collect Monthly Fee",
+          title: "Collect Payments",
           selectMonths: "Select Months to Pay",
+          selectExams: "Select Pending Exams",
+          selectOther: "Select Custom Fees",
           paymentMethod: "Payment Method",
           cash: "Cash",
           bkash: "bKash",
@@ -248,6 +252,7 @@ const resources = {
           createTitle: "Create New Exam",
           editTitle: "Edit Exam",
           type: "Exam Type",
+          examFee: "Exam Fee",
           types: {
             single: "Single Exam (Coaching)",
             school: "School Exam (Term/Final)"
@@ -264,6 +269,13 @@ const resources = {
           date: "Date",
           submitCreate: "Create Exam",
           submitUpdate: "Update Exam"
+        },
+        table: {
+          status: "Status"
+        },
+        status: {
+          pending: "Pending",
+          completed: "Completed"
         },
         manage: {
           tabs: {
@@ -847,9 +859,13 @@ bn: {
           allClear: "সব পরিষ্কার ✨"
         },
         collectFee: "ফি সংগ্রহ করুন",
+        manageOther: "অন্যান্য ফি পরিচালনা",
+        otherFeeTemplates: "কাস্টম ফি টেমপ্লেট",
         paymentModal: {
-          title: "মাসিক ফি সংগ্রহ করুন",
+          title: "পেমেন্ট সংগ্রহ করুন",
           selectMonths: "পরিশোধের মাস নির্বাচন করুন",
+          selectExams: "অপেক্ষমান পরীক্ষা নির্বাচন করুন",
+          selectOther: "কাস্টম ফি নির্বাচন করুন",
           paymentMethod: "পেমেন্ট পদ্ধতি",
           cash: "নগদ (Cash)",
           bkash: "বিকাশ (bKash)",
@@ -894,6 +910,7 @@ bn: {
           createTitle: "নতুন পরীক্ষা তৈরি করুন",
           editTitle: "পরীক্ষা সম্পাদনা করুন",
           type: "পরীক্ষার ধরন",
+          examFee: "পরীক্ষার ফি",
           types: {
             single: "একক পরীক্ষা (কোচিং)",
             school: "স্কুল পরীক্ষা (টার্ম/ফাইনাল)"
@@ -911,6 +928,13 @@ bn: {
           submitCreate: "পরীক্ষা তৈরি করুন",
           submitUpdate: "পরীক্ষা আপডেট করুন"
         },
+        status: {
+          pending: "চলমান",
+          completed: "সম্পন্ন"
+        },
+        table: {
+          status: "অবস্থা"
+        },
         manage: {
           tabs: {
             overview: "ওভারভিউ",
@@ -919,8 +943,8 @@ bn: {
             results: "ফলাফল"
           },
           overview: {
-            schedule: "পরীক্ষার সময়সূচী",
-            downloadSchedule: "সময়সূচী ডাউনলোড করুন"
+            schedule: "পরীক্ষার রুটিন",
+            downloadSchedule: "রুটিন ডাউনলোড করুন"
           },
           seatPlan: {
             title: "সিট প্ল্যান",
@@ -928,15 +952,17 @@ bn: {
           },
           admitCards: {
             title: "অ্যাডমিট কার্ড",
-            style: "কার্ড স্টাইল",
+            style: "কার্ড ডিজাইন",
             color: "থিম কালার",
-            downloadAll: "সব ডাউনলোড করুন",
+            downloadAll: "সবগুলো ডাউনলোড করুন",
             downloadIndividual: "ডাউনলোড"
           },
           results: {
             title: "ফলাফল এন্ট্রি",
             save: "ফলাফল সংরক্ষণ করুন",
-            success: "ফলাফল সফলভাবে সংরক্ষণ করা হয়েছে! পরীক্ষাটি আর্কাইভে সরানো হয়েছে।"
+            success: "ফলাফল সফলভাবে সংরক্ষিত হয়েছে।",
+            downloadMarksheet: "মার্কশিট ডাউনলোড",
+            generateSuccessStory: "সাফল্যের ছবি তৈরি"
           }
         }
       },

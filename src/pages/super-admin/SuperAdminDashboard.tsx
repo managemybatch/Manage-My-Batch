@@ -285,6 +285,37 @@ export function SuperAdminDashboard() {
             </div>
           </div>
 
+          {/* Security Snapshot */}
+          <div className="bg-emerald-600 rounded-3xl p-6 text-white relative overflow-hidden shadow-xl shadow-emerald-100 dark:shadow-none">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
+            <div className="flex items-center gap-2 mb-4">
+               <ShieldCheck className="w-5 h-5" />
+               <h3 className="text-lg font-bold">Security Snapshot</h3>
+            </div>
+            <div className="space-y-4 relative z-10">
+               <div className="flex items-center justify-between text-xs font-medium">
+                  <span className="opacity-80">Access Protocol</span>
+                  <span className="bg-emerald-500 px-2 py-0.5 rounded-lg border border-emerald-400">HARDENED</span>
+               </div>
+               <div className="flex items-center justify-between text-xs font-medium">
+                  <span className="opacity-80">Active Sessions</span>
+                  <span>1 (Current)</span>
+               </div>
+               <div className="flex items-center justify-between text-xs font-medium">
+                  <span className="opacity-80">MFA Status</span>
+                  <span className="text-emerald-200">OPTIONAL</span>
+               </div>
+               <div className="pt-2">
+                  <Link 
+                    to="/settings"
+                    className="block w-full py-2 bg-white/20 hover:bg-white/30 rounded-xl text-center text-xs font-bold transition-all"
+                  >
+                    Manage Security
+                  </Link>
+               </div>
+            </div>
+          </div>
+
           <div className="bg-white dark:bg-gray-900 rounded-3xl border border-gray-100 dark:border-gray-800 p-6 shadow-sm">
             <div className="flex items-center justify-between mb-6">
               <h3 className="font-bold text-gray-900 dark:text-white flex items-center gap-2">
