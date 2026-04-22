@@ -16,6 +16,7 @@ import { SubscriptionModal } from '../components/SubscriptionModal';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { StudentProfile } from '../components/StudentProfile';
 import { IDCardDesigner } from '../components/IDCardDesigner';
+import * as XLSX from 'xlsx';
 
 interface Student {
   id: string;
@@ -81,65 +82,133 @@ export function Students() {
   const [loadLimit, setLoadLimit] = useState(100);
   const [hasMore, setHasMore] = useState(false);
   const [showImportHelp, setShowImportHelp] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [importData, setImportData] = useState<any[]>([]);
+  const [bulkSettings, setBulkSettings] = useState({
+    batchId: '',
+    isAdmissionPaid: true,
+    isMonthlyPaid: true
+  });
   const importInputRef = React.useRef<HTMLInputElement>(null);
 
   const handleDownloadTemplate = () => {
-    const headers = ['Name', 'Phone', 'Batch', 'RollNo'];
-    const csvContent = headers.join(',') + '\nJohn Doe,017xxxxxxxx,Class 10 - A,101';
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'student_import_template.csv';
-    a.click();
-    window.URL.revokeObjectURL(url);
+    const data = [
+      {
+        'Name': 'John Doe',
+        'GuardianPhone': '01711223344',
+        'Batch': 'Class 10 - Science',
+        'RollNo': '101',
+        'AdmissionFee': 1000,
+        'MonthlyFee': 500,
+        'DateOfBirth': '2005-01-01',
+        'FatherName': 'Robert Doe',
+        'MotherName': 'Jane Doe',
+        'Address': '123 Street, Dhaka'
+      },
+      {
+        'Name': 'Jane Smith',
+        'GuardianPhone': '01822334455',
+        'Batch': 'Class 10 - Arts',
+        'RollNo': '102',
+        'AdmissionFee': 1000,
+        'MonthlyFee': 500,
+        'DateOfBirth': '2006-05-15',
+        'FatherName': 'Michael Smith',
+        'MotherName': 'Sarah Smith',
+        'Address': '456 Lane, Chittagong'
+      }
+    ];
+
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Students');
+    
+    // Save the file
+    XLSX.writeFile(workbook, 'student_import_template.xlsx');
   };
   
-  const handleImportCSV = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !user) return;
 
     const reader = new FileReader();
     reader.onload = async (event) => {
-      const text = event.target?.result as string;
-      const rows = text.split('\n').map(row => row.split(','));
-      // Assume Header: Name, Phone, Batch, RollNo, GuardianName, FatherName, MotherName, Address
-      // Basic validation
-      if (rows.length < 2) {
-        alert('Empty or invalid CSV file');
-        return;
+      try {
+        const data = new Uint8Array(event.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const jsonData = XLSX.utils.sheet_to_json(worksheet) as any[];
+
+        if (jsonData.length === 0) {
+          alert('The Excel file is empty.');
+          return;
+        }
+
+        setImportData(jsonData);
+        setIsImportModalOpen(true);
+      } catch (err) {
+        console.error('File reading failed', err);
+        alert('Failed to read Excel file. Please ensure it is a valid .xlsx or .xls file.');
+      } finally {
+        if (importInputRef.current) importInputRef.current.value = '';
       }
+    };
+    reader.readAsArrayBuffer(file);
+  };
 
-      const headers = rows[0].map(h => h.trim().toLowerCase());
-      const studentRows = rows.slice(1).filter(r => r.length > 1);
+  const processBulkImport = async () => {
+    if (!user || importData.length === 0) return;
 
-      setIsSaving(true);
+    setIsSaving(true);
+    try {
       const firestoreBatch = writeBatch(db);
       const instId = user.institutionId || user.uid;
       let count = 0;
 
-      for (const row of studentRows) {
+      for (const row of importData) {
+        const getVal = (keys: string[]) => {
+          const key = Object.keys(row).find(k => keys.includes(k.trim().toLowerCase()));
+          return key ? row[key] : undefined;
+        };
+
+        const name = getVal(['name', 'student name', 'full name']);
+        const phone = getVal(['guardianphone', 'phone', 'mobile', 'contact', 'guardian phone']);
+        const batchNameStr = getVal(['batch', 'batch name', 'class']);
+        const rollNo = String(getVal(['rollno', 'roll', 'id', 'student id']) || '');
+        const admissionFeeOverride = parseFloat(getVal(['admissionfee', 'admission fee']) || '0');
+        const monthlyFeeOverride = parseFloat(getVal(['monthlyfee', 'monthly fee']) || '0');
+        const dob = getVal(['dateofbirth', 'dob', 'birth date']);
+        const fName = getVal(['fathername', 'father name']);
+        const mName = getVal(['mothername', 'mother name']);
+        const address = getVal(['address', 'location']);
+
+        if (!name) continue;
+
+        // Determine batch
+        let b = null;
+        if (bulkSettings.batchId) {
+          b = batches.find(batch => batch.id === bulkSettings.batchId);
+        } else if (batchNameStr) {
+          b = batches.find(batch => batch.name.toLowerCase() === String(batchNameStr).trim().toLowerCase());
+        }
+
         const studentRef = doc(collection(db, 'students'));
-        const name = row[headers.indexOf('name')] || row[0];
-        const phone = row[headers.indexOf('phone')] || row[1];
-        const batchNameStr = row[headers.indexOf('batch')] || row[2];
-        const rollNo = row[headers.indexOf('rollno')] || row[3] || '';
-        
-        const b = batches.find(batch => batch.name.toLowerCase() === batchNameStr?.trim().toLowerCase());
-
-        if (!name || !batchNameStr) continue;
-
-        const studentData = {
-          name: name.trim(),
-          guardianPhone: phone?.trim() || '',
+        const studentData: any = {
+          name: String(name).trim(),
+          guardianPhone: String(phone || '').trim(),
           batchId: b?.id || '',
-          batchName: b?.name || batchNameStr.trim(),
+          batchName: b?.name || (batchNameStr ? String(batchNameStr).trim() : ''),
           grade: b?.grade || '',
           rollNo: rollNo.trim(),
           status: 'active',
           joinDate: new Date().toISOString().split('T')[0],
-          monthlyFee: b?.monthlyFee || 0,
-          admissionFee: b?.admissionFee || 0,
+          monthlyFee: monthlyFeeOverride || b?.monthlyFee || 0,
+          admissionFee: admissionFeeOverride || b?.admissionFee || 0,
+          dateOfBirth: dob ? String(dob) : '',
+          fatherName: fName ? String(fName) : '',
+          motherName: mName ? String(mName) : '',
+          address: address ? String(address) : '',
           feeType: 'Full Fee',
           institutionId: instId,
           createdBy: user.uid,
@@ -147,20 +216,20 @@ export function Students() {
         };
 
         firestoreBatch.set(studentRef, studentData);
-        
-        // Create Paid Fee Records for Import
-        const admissionFee = b?.admissionFee || 0;
-        const monthlyFee = b?.monthlyFee || 0;
+
+        // Handle Fee Records based on settings
+        const admissionFeeValue = studentData.admissionFee;
+        const monthlyFeeValue = studentData.monthlyFee;
         const now = new Date();
         const currentMonth = MONTHS[now.getMonth()];
         const currentYear = now.getFullYear();
 
-        if (admissionFee > 0) {
+        if (admissionFeeValue > 0 && bulkSettings.isAdmissionPaid) {
           const feeRef = doc(collection(db, 'fees'));
           firestoreBatch.set(feeRef, {
             studentId: studentRef.id,
             studentName: studentData.name,
-            amount: admissionFee,
+            amount: admissionFeeValue,
             date: now.toISOString(),
             month: currentMonth,
             year: currentYear,
@@ -172,12 +241,12 @@ export function Students() {
           });
         }
 
-        if (monthlyFee > 0) {
+        if (monthlyFeeValue > 0 && bulkSettings.isMonthlyPaid) {
           const feeRef = doc(collection(db, 'fees'));
           firestoreBatch.set(feeRef, {
             studentId: studentRef.id,
             studentName: studentData.name,
-            amount: monthlyFee,
+            amount: monthlyFeeValue,
             date: now.toISOString(),
             month: currentMonth,
             year: currentYear,
@@ -188,26 +257,24 @@ export function Students() {
             createdAt: serverTimestamp(),
           });
         }
-        
+
         if (b?.id) {
-          const batchRef = doc(db, 'batches', b.id);
-          firestoreBatch.update(batchRef, { studentCount: increment(1) });
+          const bRef = doc(db, 'batches', b.id);
+          firestoreBatch.update(bRef, { studentCount: increment(1) });
         }
         count++;
       }
 
-      try {
-        await firestoreBatch.commit();
-        alert(`Successfully imported ${count} students`);
-      } catch (err) {
-        console.error('Import failed', err);
-        alert('Failed to import students');
-      } finally {
-        setIsSaving(false);
-        if (importInputRef.current) importInputRef.current.value = '';
-      }
-    };
-    reader.readAsText(file);
+      await firestoreBatch.commit();
+      alert(`Successfully imported ${count} students`);
+      setIsImportModalOpen(false);
+      setImportData([]);
+    } catch (err) {
+      console.error('Import process failed', err);
+      alert('Failed to process bulk import. Please try again.');
+    } finally {
+      setIsSaving(false);
+    }
   };
   
   const [newStudent, setNewStudent] = useState({
@@ -730,8 +797,8 @@ export function Students() {
           <input
             type="file"
             ref={importInputRef}
-            onChange={handleImportCSV}
-            accept=".csv"
+            onChange={handleImportExcel}
+            accept=".xlsx, .xls"
             className="hidden"
           />
           <button
@@ -745,7 +812,7 @@ export function Students() {
             onClick={() => importInputRef.current?.click()}
             disabled={isSaving}
             className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-all shadow-sm"
-            title="CSV Format: Name, Phone, Batch, RollNo"
+            title="Excel Format: Name, Phone, Batch, RollNo"
           >
             <Download className="w-4 h-4 rotate-180" /> {t('common.import', { defaultValue: 'Import' })}
           </button>
@@ -868,6 +935,82 @@ export function Students() {
         </div>
       </div>
 
+      <Modal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        title="Bulk Import Settings"
+        maxWidth="max-w-md"
+      >
+        <div className="space-y-6">
+          <div className="p-4 bg-indigo-50 rounded-2xl border border-indigo-100 italic text-sm text-indigo-700">
+            Customize settings for importing {importData.length} students.
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Target Batch</label>
+            <select
+              value={bulkSettings.batchId}
+              onChange={(e) => setBulkSettings({ ...bulkSettings, batchId: e.target.value })}
+              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-medium"
+            >
+              <option value="">Auto-detect from file (Batch name column)</option>
+              {batches.map(b => (
+                <option key={b.id} value={b.id}>{b.name}</option>
+              ))}
+            </select>
+            <p className="text-[10px] text-gray-400">If you select a specific batch, it will override the "Batch" column in the Excel file.</p>
+          </div>
+
+          <div className="space-y-4 pt-2">
+             <label className="text-xs font-bold text-gray-500 uppercase tracking-widest">Financial Records</label>
+             <div className="grid grid-cols-1 gap-3">
+                <label className="flex items-center gap-3 p-4 bg-emerald-50 border border-emerald-100 rounded-2xl cursor-pointer hover:bg-emerald-100 transition-all">
+                  <input
+                    type="checkbox"
+                    checked={bulkSettings.isAdmissionPaid}
+                    onChange={(e) => setBulkSettings({ ...bulkSettings, isAdmissionPaid: e.target.checked })}
+                    className="w-5 h-5 rounded border-emerald-300 text-emerald-600 focus:ring-emerald-500"
+                  />
+                  <div className="flex flex-col">
+                    <span className="text-sm font-bold text-emerald-900">Record Admission Fee as PAID</span>
+                    <span className="text-[10px] text-emerald-600 font-medium">Create a starting financial record for all students.</span>
+                  </div>
+                </label>
+
+                <label className="flex items-center gap-3 p-4 bg-indigo-50 border border-indigo-100 rounded-2xl cursor-pointer hover:bg-indigo-100 transition-all">
+                  <input
+                    type="checkbox"
+                    checked={bulkSettings.isMonthlyPaid}
+                    onChange={(e) => setBulkSettings({ ...bulkSettings, isMonthlyPaid: e.target.checked })}
+                    className="w-5 h-5 rounded border-indigo-300 text-indigo-600 focus:ring-indigo-500"
+                  />
+                  <div className="flex flex-col">
+                    <span className="text-sm font-bold text-indigo-900">Record Monthly Fee as PAID</span>
+                    <span className="text-[10px] text-indigo-600 font-medium">For the current month ({MONTHS[new Date().getMonth()]})</span>
+                  </div>
+                </label>
+             </div>
+          </div>
+
+          <div className="flex items-center gap-4 pt-4 border-t border-gray-100">
+            <button
+              onClick={() => setIsImportModalOpen(false)}
+              className="flex-1 py-4 bg-gray-100 text-gray-600 rounded-2xl font-bold hover:bg-gray-200 transition-all"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={processBulkImport}
+              disabled={isSaving}
+              className="flex-[2] py-4 bg-indigo-600 text-white rounded-2xl font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
+              Import Students
+            </button>
+          </div>
+        </div>
+      </Modal>
+
       <Modal 
         isOpen={showImportHelp} 
         onClose={() => setShowImportHelp(false)} 
@@ -876,17 +1019,19 @@ export function Students() {
       >
         <div className="space-y-6">
           <div className="p-4 bg-indigo-50 rounded-2xl border border-indigo-100 italic text-sm text-indigo-700">
-            {t('students.importInstructions.description', { defaultValue: 'Follow this exact format to import students. The first row must be the header.' })}
+            {t('students.importInstructions.description', { defaultValue: 'Follow this exact format to import students. The first row must be the header. Support Excel (.xlsx, .xls) and Google Sheets (download as .xlsx).' })}
           </div>
           
           <div className="space-y-3">
-            <h4 className="text-sm font-bold text-gray-900">{t('students.importInstructions.requiredColumns', { defaultValue: 'Required Columns (in order):' })}</h4>
+            <h4 className="text-sm font-bold text-gray-900">{t('students.importInstructions.requiredColumns', { defaultValue: 'Important Columns:' })}</h4>
             <div className="grid grid-cols-2 gap-3">
               {[
                 { name: t('students.addModal.name'), desc: t('students.importInstructions.nameDesc') },
                 { name: t('students.addModal.guardianPhone'), desc: t('students.importInstructions.phoneDesc') },
                 { name: t('students.addModal.batch'), desc: t('students.importInstructions.batchDesc') },
-                { name: t('students.addModal.rollNo'), desc: t('students.importInstructions.rollDesc') }
+                { name: t('students.addModal.rollNo'), desc: t('students.importInstructions.rollDesc') },
+                { name: t('students.addModal.admissionFee'), desc: 'Admission fee amount' },
+                { name: t('students.addModal.monthlyFee'), desc: 'Monthly tuition fee' }
               ].map((col) => (
                 <div key={col.name} className="p-3 bg-gray-50 rounded-xl border border-gray-100">
                   <p className="text-xs font-black text-indigo-600 uppercase tracking-widest">{col.name}</p>
@@ -897,12 +1042,10 @@ export function Students() {
           </div>
 
           <div className="bg-gray-900 p-4 rounded-2xl overflow-x-auto border border-gray-800">
-            <p className="text-[10px] text-gray-500 uppercase font-black mb-2 tracking-widest">Example CSV Content</p>
-            <code className="text-xs text-indigo-300 font-mono whitespace-nowrap">
-              Name,Phone,Batch,RollNo<br />
-              Abir Hasan,01700000000,Science Batch 1,101<br />
-              Samiul Islam,01800000000,Arts Batch A,102
-            </code>
+            <p className="text-[10px] text-gray-500 uppercase font-black mb-2 tracking-widest">Excel Header Format</p>
+            <div className="text-xs text-indigo-300 font-mono whitespace-nowrap border-b border-gray-800 pb-2 mb-2">
+              Name | GuardianPhone | Batch | RollNo | AdmissionFee | MonthlyFee
+            </div>
           </div>
 
           <button
@@ -910,7 +1053,7 @@ export function Students() {
             className="w-full flex items-center justify-center gap-2 py-4 bg-indigo-600 text-white font-bold rounded-2xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200"
           >
             <FileDown className="w-5 h-5" />
-            {t('students.importInstructions.downloadTemplate', { defaultValue: 'Download CSV Template' })}
+            {t('students.importInstructions.downloadTemplate', { defaultValue: 'Download Excel Template' })}
           </button>
         </div>
       </Modal>
