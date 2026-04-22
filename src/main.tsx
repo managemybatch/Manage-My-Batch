@@ -4,6 +4,10 @@ import App from './App.tsx';
 import './index.css';
 import './i18n/config';
 import { ThemeProvider } from './lib/theme';
+import { testConnection } from './firebase';
+
+// Run connection test
+testConnection();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

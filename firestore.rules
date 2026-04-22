@@ -365,6 +365,10 @@ service cloud.firestore {
     // Rules
     // ===============================================================
 
+    match /test/connection {
+      allow read: if true;
+    }
+
     match /users/{userId} {
       allow read: if isAuthenticated();
       allow create: if isOwner(userId) && isValidUser(request.resource.data) && 
