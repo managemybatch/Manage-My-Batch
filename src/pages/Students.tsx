@@ -3,10 +3,10 @@ import { Plus, Search, Filter, MoreVertical, Mail, Phone, Download, Loader2, Lay
 import { Table, TableRow, TableCell } from '../components/Table';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn, formatWhatsAppPhone, formatDate } from '../lib/utils';
-import { collection, onSnapshot, query, addDoc, updateDoc, serverTimestamp, deleteDoc, doc, getDoc, writeBatch, where, orderBy, increment } from 'firebase/firestore';
+import { collection, onSnapshot, query, addDoc, updateDoc, serverTimestamp, deleteDoc, doc, getDoc, writeBatch, where, orderBy, increment, limit } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { useAuth } from '../lib/auth';
-import html2canvas from 'html2canvas';
+import { toPng } from 'html-to-image';
 import { Modal } from '../components/Modal';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { GRADES, SECTIONS, SUBSCRIPTION_PLANS, MONTHS } from '../constants';
@@ -78,6 +78,8 @@ export function Students() {
   const [isSaving, setIsSaving] = useState(false);
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loadLimit, setLoadLimit] = useState(100);
+  const [hasMore, setHasMore] = useState(false);
   const [showImportHelp, setShowImportHelp] = useState(false);
   const importInputRef = React.useRef<HTMLInputElement>(null);
 
@@ -274,7 +276,9 @@ export function Students() {
     // Fetch Students
     const q = query(
       collection(db, 'students'),
-      where('institutionId', '==', instId)
+      where('institutionId', '==', instId),
+      orderBy('createdAt', 'desc'),
+      limit(loadLimit)
     );
     const unsubStudents = onSnapshot(q, (snapshot) => {
       const studentData = snapshot.docs.map(doc => ({
@@ -282,17 +286,12 @@ export function Students() {
         ...doc.data()
       })) as Student[];
 
-      // Sort client-side to avoid index requirements
-      const sortedData = studentData.sort((a, b) => {
-        const dateA = a.createdAt ? (typeof a.createdAt === 'string' ? new Date(a.createdAt).getTime() : (a.createdAt as any).seconds * 1000) : 0;
-        const dateB = b.createdAt ? (typeof b.createdAt === 'string' ? new Date(b.createdAt).getTime() : (b.createdAt as any).seconds * 1000) : 0;
-        return dateB - dateA;
-      });
-
-      setStudents(sortedData);
+      setStudents(studentData);
+      setHasMore(snapshot.docs.length === loadLimit);
       setLoading(false);
     }, (error) => {
       handleFirestoreError(error, OperationType.LIST, 'students');
+      setLoading(false);
     });
 
     // Fetch Applications
@@ -317,7 +316,7 @@ export function Students() {
       unsubStudents();
       unsubApps();
     };
-  }, [user, searchParams]);
+  }, [user, searchParams, loadLimit]);
 
   useEffect(() => {
     if (!user) return;
@@ -688,8 +687,7 @@ export function Students() {
 
         const cardElement = document.getElementById('id-card-temp');
         if (cardElement) {
-          const canvas = await html2canvas(cardElement, { scale: 2, useCORS: true });
-          const imgData = canvas.toDataURL('image/png');
+          const imgData = await toPng(cardElement, { pixelRatio: 2, cacheBust: true });
           pdf.addImage(imgData, 'PNG', 0, 0, 85, 54);
         }
       }
@@ -924,7 +922,8 @@ export function Students() {
       ) : activeTab === 'id-cards' ? (
         <IDCardDesigner students={filteredStudents} institution={institution} />
       ) : (activeTab === 'students' || activeTab === 'inactive') ? (
-        <Table headers={[
+        <>
+          <Table headers={[
           t('students.table.student'),
           t('students.table.whatsapp'),
           t('students.table.batchGrade'),
@@ -1102,7 +1101,22 @@ export function Students() {
             </TableRow>
           ))}
         </Table>
-      ) : (
+
+        {hasMore && (
+          <div className="mt-8 flex justify-center pb-8">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setLoadLimit(prev => prev + 50);
+              }}
+              className="px-6 py-2.5 bg-white border border-gray-100 text-indigo-600 text-sm font-black rounded-xl shadow-sm hover:shadow-md hover:bg-gray-50 transition-all flex items-center gap-2"
+            >
+              <Plus className="w-4 h-4" /> Load More Students
+            </button>
+          </div>
+        )}
+      </>
+    ) : (
         <Table headers={[
           t('students.table.student'),
           t('students.table.contact'),

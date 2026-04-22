@@ -8,7 +8,7 @@ import { useAuth } from '../lib/auth';
 import { Modal } from '../components/Modal';
 import { ConfirmModal } from '../components/ConfirmModal';
 import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
+import { toPng } from 'html-to-image';
 import { useTranslation } from 'react-i18next';
 import { AdmitCardDesigner } from '../components/AdmitCardDesigner';
 
@@ -111,15 +111,14 @@ export function OfflineExams() {
     if (!ref.current) return;
     setIsGeneratingPDF(true);
     try {
-      const canvas = await html2canvas(ref.current, {
-        scale: 3,
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: null,
+      const dataUrl = await toPng(ref.current, {
+        pixelRatio: 3,
+        cacheBust: true,
+        backgroundColor: '#ffffff',
       });
       const link = document.createElement('a');
       link.download = `${filename}.png`;
-      link.href = canvas.toDataURL('image/png');
+      link.href = dataUrl;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -507,22 +506,19 @@ export function OfflineExams() {
       // Wait for images and fonts
       await new Promise(resolve => setTimeout(resolve, 1500));
 
-      const canvas = await html2canvas(clone, {
-        scale: 2,
-        useCORS: true,
-        allowTaint: true,
+      const imgData = await toPng(clone, {
+        pixelRatio: 2,
+        cacheBust: true,
         backgroundColor: '#ffffff',
-        windowWidth: 1200,
-        logging: false,
       });
 
-      const imgData = canvas.toDataURL('image/png', 1.0);
       const pdf = new jsPDF('p', 'mm', 'a4');
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = pdf.internal.pageSize.getHeight();
       
+      const imgProps = pdf.getImageProperties(imgData);
       const imgWidth = pdfWidth;
-      const imgHeight = (canvas.height * pdfWidth) / canvas.width;
+      const imgHeight = (imgProps.height * pdfWidth) / imgProps.width;
       
       let heightLeft = imgHeight;
       let position = 0;
@@ -562,7 +558,7 @@ export function OfflineExams() {
     }));
   };
 
-  const filteredExams = exams.filter(e => {
+  const filteredExams = React.useMemo(() => exams.filter(e => {
     const matchesSearch = e.title.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesTab = viewTab === 'active' ? e.status === 'pending' : e.status === 'completed';
     
@@ -573,7 +569,7 @@ export function OfflineExams() {
     const isWithinRetention = new Date() < retentionDate;
 
     return matchesSearch && matchesTab && isWithinRetention;
-  });
+  }), [exams, searchTerm, viewTab]);
 
   const examStudents = selectedExam ? students.filter(s => s.batchId === selectedExam.batchId) : [];
 
@@ -1305,9 +1301,16 @@ export function OfflineExams() {
         )}
       </Modal>
 
-      <Modal isOpen={isManageModalOpen} onClose={() => setIsManageModalOpen(false)} title={`${t('offlineExams.card.manage')}: ${selectedExam?.title}`} maxWidth="max-w-4xl">
-        <div className="space-y-6">
-          <div className="flex items-center gap-2 p-1 bg-gray-100 rounded-xl overflow-x-auto no-scrollbar">
+      <Modal 
+        isOpen={isManageModalOpen} 
+        onClose={() => setIsManageModalOpen(false)} 
+        title={`${t('offlineExams.card.manage')}: ${selectedExam?.title}`} 
+        maxWidth={manageTab === 'overview' || manageTab === 'results' ? "max-w-4xl" : "max-w-7xl"}
+        fullScreen={manageTab === 'admit-cards' || manageTab === 'seat-plan'}
+        hideHeader={manageTab === 'admit-cards'}
+      >
+        <div className={cn("flex flex-col h-full", (manageTab === 'admit-cards' || manageTab === 'seat-plan') ? "p-0 space-y-0" : "p-6 space-y-6")}>
+          <div className={cn("flex items-center gap-2 p-1 bg-gray-100 rounded-xl overflow-x-auto no-scrollbar shrink-0", (manageTab === 'admit-cards' || manageTab === 'seat-plan') && "m-4")}>
             {['overview', 'seat-plan', 'admit-cards', 'results'].map((tab) => (
               <button
                 key={tab}
@@ -1323,8 +1326,9 @@ export function OfflineExams() {
           </div>
 
           {manageTab === 'overview' && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="bg-gray-50 p-6 rounded-2xl border border-gray-100">
+            <div className="flex-1 overflow-y-auto space-y-6 scrollbar-hide pr-2">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="bg-gray-50 p-6 rounded-2xl border border-gray-100">
                 <div className="flex items-center justify-between mb-4">
                   <h4 className="text-sm font-bold text-gray-900 uppercase tracking-wider">{t('offlineExams.modal.examTitle')}</h4>
                   <div className="flex items-center gap-2">
@@ -1502,10 +1506,12 @@ export function OfflineExams() {
                 </div>
               </div>
             </div>
+          </div>
           )}
 
           {manageTab === 'seat-plan' && (
-            <div className="space-y-6">
+            <div className="flex-1 overflow-hidden">
+              <div className="h-full space-y-6 overflow-y-auto p-4">
               <div className="flex items-center justify-between">
                 <h4 className="text-lg font-bold text-gray-900">{t('offlineExams.manage.seatPlan.title')} - {selectedExam?.batchName}</h4>
                 <button className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 transition-all">{t('offlineExams.manage.seatPlan.download')}</button>
@@ -1520,10 +1526,12 @@ export function OfflineExams() {
                 ))}
               </div>
             </div>
+          </div>
           )}
 
           {manageTab === 'admit-cards' && (
-            <AdmitCardDesigner 
+            <div className="flex-1 overflow-hidden">
+              <AdmitCardDesigner 
               students={examStudents.map(s => ({
                 id: s.id,
                 name: s.name,
@@ -1536,6 +1544,7 @@ export function OfflineExams() {
               institution={instData}
               onClose={() => setManageTab('overview')}
             />
+          </div>
           )}
 
           {manageTab === 'results' && (

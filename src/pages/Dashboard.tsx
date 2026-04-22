@@ -43,7 +43,7 @@ import {
 } from '../constants';
 import { AnimatePresence } from 'motion/react';
 
-import html2canvas from 'html2canvas';
+import { toPng } from 'html-to-image';
 
 export function Dashboard() {
   const { user } = useAuth();
@@ -176,6 +176,11 @@ export function Dashboard() {
 
     const instId = user.institutionId || user.uid;
 
+    if (process.env.NODE_ENV !== 'production') {
+      console.log("[Dashboard] Initializing for Institution:", instId);
+      console.log("[Dashboard] User Role:", user.role);
+    }
+
     // Fetch all fees
     const qFees = query(
       collection(db, 'fees'),
@@ -301,15 +306,14 @@ export function Dashboard() {
     if (!birthdayRef.current) return;
     setIsGenerating(true);
     try {
-      const canvas = await html2canvas(birthdayRef.current, {
-        scale: 3,
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: null,
+      const dataUrl = await toPng(birthdayRef.current, {
+        pixelRatio: 3,
+        cacheBust: true,
+        backgroundColor: '#ffffff',
       });
       const link = document.createElement('a');
       link.download = `Birthday_Card_${selectedStudentForBirthday?.name}.png`;
-      link.href = canvas.toDataURL('image/png');
+      link.href = dataUrl;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -503,6 +507,56 @@ export function Dashboard() {
           </div>
         )}
       </AnimatePresence>
+
+      {/* Getting Started Checklist (Only for new users/empty data) */}
+      {stats.students === 0 && stats.batches === 0 && (
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-white rounded-[2.5rem] p-8 border border-gray-100 shadow-xl shadow-gray-100/50"
+        >
+          <div className="flex items-center gap-4 mb-8">
+            <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center text-white">
+              <Sparkles className="w-6 h-6" />
+            </div>
+            <div>
+              <h2 className="text-2xl font-black text-gray-900 tracking-tight">Getting Started</h2>
+              <p className="text-gray-500 font-medium text-sm italic">Complete these simple steps to see your dashboard come to life.</p>
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <ChecklistCard 
+              step="1" 
+              title="Add Institution" 
+              desc="Enter your coaching details and upload logo."
+              to="/institution"
+              done={!!instData?.name}
+            />
+            <ChecklistCard 
+              step="2" 
+              title="Create Batch" 
+              desc="Set up your first batch/class schedule."
+              to="/batches"
+              done={stats.batches > 0}
+            />
+            <ChecklistCard 
+              step="3" 
+              title="Add Student" 
+              desc="Register your first student to the batch."
+              to="/students"
+              done={stats.students > 0}
+            />
+            <ChecklistCard 
+              step="4" 
+              title="Fee & Attendance" 
+              desc="Start managing records and track growth."
+              to="/attendance"
+              done={stats.totalCollected > 0 || stats.attendanceRate > 0}
+            />
+          </div>
+        </motion.div>
+      )}
 
       {/* Batch Creation & Upgrade Prompt */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -907,6 +961,27 @@ function QuickAction({ title, description, icon: Icon, to, color }: { title: str
         </div>
         <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-indigo-400 transition-colors hidden md:block" />
       </div>
+    </Link>
+  );
+}
+
+function ChecklistCard({ step, title, desc, to, done }: { step: string, title: string, desc: string, to: string, done: boolean }) {
+  return (
+    <Link to={to} className={cn(
+      "p-5 rounded-3xl border-2 transition-all group",
+      done ? "bg-emerald-50 border-emerald-100 opacity-75" : "bg-gray-50 border-transparent hover:border-indigo-200 hover:bg-white"
+    )}>
+      <div className="flex items-center justify-between mb-3">
+        <span className={cn(
+          "w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-black tracking-widest",
+          done ? "bg-emerald-500 text-white" : "bg-gray-200 text-gray-500 group-hover:bg-indigo-600 group-hover:text-white"
+        )}>
+          {done ? <CheckCircle2 className="w-4 h-4" /> : step}
+        </span>
+        {done && <span className="text-[10px] font-black text-emerald-600 uppercase">Completed</span>}
+      </div>
+      <h4 className={cn("font-black text-sm", done ? "text-emerald-900" : "text-gray-900")}>{title}</h4>
+      <p className="text-[10px] text-gray-500 mt-1 font-medium leading-relaxed">{desc}</p>
     </Link>
   );
 }

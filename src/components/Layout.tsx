@@ -3,10 +3,10 @@ import { Sidebar } from './Sidebar';
 import { Navbar } from './Navbar';
 import { BottomNav } from './BottomNav';
 import { motion, AnimatePresence } from 'motion/react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, Outlet } from 'react-router-dom';
 
 interface LayoutProps {
-  children: React.ReactNode;
+  children?: React.ReactNode;
 }
 
 export function Layout({ children }: LayoutProps) {
@@ -26,6 +26,7 @@ export function Layout({ children }: LayoutProps) {
               exit={{ opacity: 0, y: -10 }}
               transition={{ duration: 0.2, ease: "easeOut" }}
             >
+              <Outlet />
               {children}
             </motion.div>
           </AnimatePresence>

@@ -32,6 +32,7 @@ export function Sidebar() {
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = React.useState(false);
   const [birthdayCount, setBirthdayCount] = React.useState(0);
 
+  /* 
   React.useEffect(() => {
     if (!user) return;
     const instId = user.institutionId || user.uid;
@@ -54,6 +55,7 @@ export function Sidebar() {
 
     return () => unsubscribe();
   }, [user]);
+  */
 
   interface NavItem {
     icon: any;

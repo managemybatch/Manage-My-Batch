@@ -54,13 +54,14 @@ export function SuperAdminDashboard() {
   const fetchData = async () => {
     try {
       const [instSnapshot, studentsSnapshot, creditsSnapshot, notifSnapshot] = await Promise.all([
-        getDocs(query(collection(db, 'users'), where('role', '==', 'admin'))),
+        getDocs(collection(db, 'users')),
         getDocs(collection(db, 'students')),
         getDocs(collection(db, 'credits')),
         getDocs(query(collection(db, 'super_notifications'), orderBy('createdAt', 'desc'), limit(3)))
       ]);
 
-      const institutions = instSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const allUsers = instSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const institutions = allUsers.filter((u: any) => u.role === 'admin' || u.role === 'super_admin');
       const activeSubs = institutions.filter((inst: any) => inst.subscriptionPlan && inst.subscriptionPlan !== 'free').length;
       const totalTokens = creditsSnapshot.docs.reduce((acc, doc) => acc + (doc.data().balance || 0), 0);
       const totalStudents = studentsSnapshot.size;

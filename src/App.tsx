@@ -36,20 +36,6 @@ import { AuthProvider, useAuth } from './lib/auth';
 import { ThemeProvider } from './lib/theme';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
-function ComingSoon() {
-  return (
-    <div className="flex flex-col items-center justify-center min-h-[60vh] text-center p-8">
-      <div className="w-20 h-20 bg-indigo-100 dark:bg-indigo-900/40 rounded-3xl flex items-center justify-center mb-6">
-        <Zap className="w-10 h-10 text-indigo-600 dark:text-indigo-400 animate-pulse" />
-      </div>
-      <h2 className="text-3xl font-black text-gray-900 dark:text-white mb-2 tracking-tight">Coming Soon</h2>
-      <p className="text-gray-500 dark:text-gray-400 max-w-md">
-        We're working hard to bring you this feature. Stay tuned for updates!
-      </p>
-    </div>
-  );
-}
-
 function ScrollToTop() {
   const { pathname } = useLocation();
   React.useEffect(() => {
@@ -58,7 +44,7 @@ function ScrollToTop() {
   return null;
 }
 
-function PrivateRoute({ children }: { children: React.ReactNode }) {
+function AuthenticatedLayout() {
   const { user, loading } = useAuth();
 
   if (loading) {
@@ -73,7 +59,7 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
     return <Navigate to="/login" />;
   }
 
-  return <Layout>{children}</Layout>;
+  return <Layout />;
 }
 
 function AppRoutes() {
@@ -92,40 +78,35 @@ function AppRoutes() {
       <Route path="/public/attendance/:batchId/:token" element={<PublicAttendance />} />
       <Route path="/public/exam-result/:examId" element={<PublicExamResult />} />
 
-      {/* Super Admin Routes */}
-      <Route path="/super-admin" element={<PrivateRoute><SuperAdminDashboard /></PrivateRoute>} />
-      <Route path="/super-admin/institutions" element={<PrivateRoute><ManageInstitutions /></PrivateRoute>} />
-      <Route path="/super-admin/notifications" element={<PrivateRoute><SuperNotifications /></PrivateRoute>} />
-      <Route path="/super-admin/support" element={<PrivateRoute><SupportInbox /></PrivateRoute>} />
-      <Route path="/super-admin/faqs" element={<PrivateRoute><ManageFaqs /></PrivateRoute>} />
-      <Route path="/super-admin/staff" element={<PrivateRoute><ManageStaff /></PrivateRoute>} />
-      <Route path="/super-admin/analytics" element={<PrivateRoute><RevenueAnalytics /></PrivateRoute>} />
-      <Route path="/super-admin/health" element={<PrivateRoute><SystemHealth /></PrivateRoute>} />
+      {/* Persistent Authenticated Layout */}
+      <Route element={<AuthenticatedLayout />}>
+        <Route path="/" element={user?.isSuperAdmin ? <SuperAdminDashboard /> : <Dashboard />} />
+        <Route path="/students" element={<Students />} />
+        <Route path="/batches" element={<Batches />} />
+        <Route path="/fees" element={<Fees />} />
+        <Route path="/attendance" element={<Attendance />} />
+        <Route path="/offline-exams" element={<OfflineExams />} />
+        <Route path="/messages" element={<Messages />} />
+        <Route path="/institution" element={<Institution />} />
+        <Route path="/teachers" element={<Teachers />} />
+        <Route path="/marketing" element={<Marketing />} />
+        <Route path="/settings" element={<Settings />} />
+        <Route path="/help" element={<Help />} />
+        <Route path="/support" element={<SupportChat />} />
 
-      {/* Private Routes */}
-      <Route path="/" element={
-        loading ? (
-          <div className="min-h-screen flex items-center justify-center bg-gray-50">
-            <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-          </div>
-        ) : user ? (
-          <Layout>{user.isSuperAdmin ? <SuperAdminDashboard /> : <Dashboard />}</Layout>
-        ) : (
-          <Landing />
-        )
-      } />
-      <Route path="/students" element={<PrivateRoute><Students /></PrivateRoute>} />
-      <Route path="/batches" element={<PrivateRoute><Batches /></PrivateRoute>} />
-      <Route path="/fees" element={<PrivateRoute><Fees /></PrivateRoute>} />
-      <Route path="/attendance" element={<PrivateRoute><Attendance /></PrivateRoute>} />
-      <Route path="/offline-exams" element={<PrivateRoute><OfflineExams /></PrivateRoute>} />
-      <Route path="/messages" element={<PrivateRoute><Messages /></PrivateRoute>} />
-      <Route path="/institution" element={<PrivateRoute><Institution /></PrivateRoute>} />
-      <Route path="/teachers" element={<PrivateRoute><Teachers /></PrivateRoute>} />
-      <Route path="/marketing" element={<PrivateRoute><Marketing /></PrivateRoute>} />
-      <Route path="/settings" element={<PrivateRoute><Settings /></PrivateRoute>} />
-      <Route path="/help" element={<PrivateRoute><Help /></PrivateRoute>} />
-      <Route path="/support" element={<PrivateRoute><SupportChat /></PrivateRoute>} />
+        {/* Super Admin Restricted Routes */}
+        <Route path="/super-admin" element={<SuperAdminDashboard />} />
+        <Route path="/super-admin/institutions" element={<ManageInstitutions />} />
+        <Route path="/super-admin/notifications" element={<SuperNotifications />} />
+        <Route path="/super-admin/support" element={<SupportInbox />} />
+        <Route path="/super-admin/faqs" element={<ManageFaqs />} />
+        <Route path="/super-admin/staff" element={<ManageStaff />} />
+        <Route path="/super-admin/analytics" element={<RevenueAnalytics />} />
+        <Route path="/super-admin/health" element={<SystemHealth />} />
+      </Route>
+
+      {/* Fallback for Landing */}
+      <Route path="*" element={!loading && !user ? <Landing /> : <Navigate to="/" />} />
     </Routes>
   );
 }

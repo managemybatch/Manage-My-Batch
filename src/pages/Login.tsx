@@ -6,17 +6,24 @@ import { useTranslation, Trans } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
 export function Login() {
-  const { loginWithEmail } = useAuth();
+  const { loginWithEmail, authError, clearError } = useAuth();
   const { t } = useTranslation();
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState('');
 
+  React.useEffect(() => {
+    return () => {
+      if (clearError) clearError();
+    };
+  }, []);
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
+    if (clearError) clearError();
     try {
       await loginWithEmail(email, password);
     } catch (err: any) {
@@ -122,10 +129,15 @@ export function Login() {
           </div>
 
           <div className="bg-white p-10 rounded-3xl shadow-xl shadow-gray-200/50 border border-gray-100 space-y-8">
-            {error && (
+            {(error || authError) && (
               <div className="p-4 bg-rose-50 border border-rose-100 rounded-2xl flex items-center gap-3 text-rose-600 text-sm font-bold animate-shake">
                 <ShieldCheck className="w-5 h-5 flex-shrink-0" />
-                <p>{error}</p>
+                <div className="flex-1">
+                  <p>{authError || error}</p>
+                  {authError?.includes('Quota') && (
+                    <p className="mt-1 text-[10px] opacity-70 font-medium">Reset occurs daily. Consider upgrading if this persists.</p>
+                  )}
+                </div>
               </div>
             )}
 

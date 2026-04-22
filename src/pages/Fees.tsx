@@ -11,7 +11,7 @@ import { Modal } from '../components/Modal';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { MONTHS } from '../constants';
 import { useTranslation } from 'react-i18next';
-import html2canvas from 'html2canvas';
+import { toPng } from 'html-to-image';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
@@ -225,14 +225,12 @@ export function Fees() {
     if (!receiptRef.current) return;
     try {
       setIsGeneratingReceipt(true);
-      const canvas = await html2canvas(receiptRef.current, {
-        scale: 2,
-        useCORS: true,
-        logging: false,
+      const imgData = await toPng(receiptRef.current, {
+        pixelRatio: 2,
+        cacheBust: true,
         backgroundColor: '#ffffff'
       });
       
-      const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF({
         orientation: 'portrait',
         unit: 'mm',

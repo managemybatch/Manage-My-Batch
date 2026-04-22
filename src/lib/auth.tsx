@@ -30,10 +30,12 @@ interface UserProfile {
 interface AuthContextType {
   user: UserProfile | null;
   loading: boolean;
+  authError: string | null;
   loginWithEmail: (email: string, pass: string) => Promise<void>;
   signup: (email: string, pass: string, institutionName: string) => Promise<void>;
   createStaffAccount: (email: string, pass: string) => Promise<string>;
   logout: () => Promise<void>;
+  clearError: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -41,6 +43,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   useEffect(() => {
     testConnection();
@@ -51,6 +54,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Listen for user profile changes in Firestore
         unsubscribeDoc = onSnapshot(doc(db, 'users', firebaseUser.uid), async (userDoc) => {
           try {
+            setAuthError(null);
             if (userDoc.exists()) {
               let userData = userDoc.data() as UserProfile;
               
@@ -65,7 +69,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               
               if (shouldBeSuperAdmin && !userData.isSuperAdmin) {
                 await updateDoc(doc(db, 'users', firebaseUser.uid), { isSuperAdmin: true, role: 'super_admin' });
-                // The next snapshot will have the updated data
                 return;
               }
 
@@ -82,7 +85,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 gracePeriodExpiry.setDate(gracePeriodExpiry.getDate() + 5);
                 
                 if (gracePeriodExpiry < new Date()) {
-                  // Revert to free after grace period ends
                   await updateDoc(doc(db, 'users', firebaseUser.uid), { subscriptionPlan: 'free' });
                   return;
                 }
@@ -112,8 +114,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 dismissedNotifications: []
               };
               await setDoc(doc(db, 'users', firebaseUser.uid), newProfile);
-              // We don't set loading to false here; we wait for the next snapshot
-              // which will have the document we just created.
             }
           } catch (err) {
             console.error("Error processing user profile:", err);
@@ -121,12 +121,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
         }, (error) => {
           console.error("Firestore profile snapshot error:", error);
+          if (error.message.includes('Quota exceeded') || error.message.includes('quota')) {
+            setAuthError("Firebase Quota Limit Reached. Your database has hit its daily free read limit. Please wait until tomorrow for it to reset, or upgrade your Firebase plan.");
+          } else {
+            setAuthError(error.message);
+          }
           setLoading(false);
         });
       } else {
         if (unsubscribeDoc) unsubscribeDoc();
         setUser(null);
         setLoading(false);
+        setAuthError(null);
       }
     });
 
@@ -138,15 +144,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const loginWithEmail = async (email: string, pass: string) => {
     try {
+      setAuthError(null);
       await signInWithEmailAndPassword(auth, email, pass);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Email login failed:", error);
+      setAuthError(error.message);
       throw error;
     }
   };
 
   const signup = async (email: string, pass: string, institutionName: string) => {
     try {
+      setAuthError(null);
       const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
       const firebaseUser = userCredential.user;
       
@@ -163,8 +172,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       };
       
       await setDoc(doc(db, 'users', firebaseUser.uid), newProfile);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Signup failed:", error);
+      setAuthError(error.message);
       throw error;
     }
   };
@@ -189,13 +199,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = async () => {
     try {
       await signOut(auth);
+      setAuthError(null);
     } catch (error) {
       console.error("Logout failed:", error);
     }
   };
 
+  const clearError = () => setAuthError(null);
+
   return (
-    <AuthContext.Provider value={{ user, loading, loginWithEmail, signup, createStaffAccount, logout }}>
+    <AuthContext.Provider value={{ user, loading, authError, loginWithEmail, signup, createStaffAccount, logout, clearError }}>
       {children}
     </AuthContext.Provider>
   );

@@ -5,7 +5,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Building, MapPin, Phone, Mail, Globe, Users, Briefcase, Layers, CheckCircle, Loader2, GraduationCap, Calendar, Download, Megaphone, Newspaper, ArrowRight, Clock, Info, FileText, TrendingUp, Star, HelpCircle, Facebook, Youtube, Linkedin, User } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../../lib/utils';
-import html2canvas from 'html2canvas';
+import { toPng } from 'html-to-image';
 
 export function InstitutionProfile() {
   const { id, slug } = useParams();
@@ -141,20 +141,12 @@ export function InstitutionProfile() {
       // Wait a bit for images and styles to settle
       await new Promise(r => setTimeout(r, 500));
 
-      const canvas = await html2canvas(bioRef.current, {
-        scale: 1.5,
-        useCORS: true,
-        logging: true,
-        backgroundColor: '#ffffff',
-        width: 800,
-        height: bioRef.current.scrollHeight
+      const dataUrl = await toPng(bioRef.current, {
+        pixelRatio: 2,
+        cacheBust: true,
+        backgroundColor: '#ffffff'
       });
       
-      if (!canvas || canvas.width === 0) {
-        throw new Error('Canvas generation failed');
-      }
-
-      const imgData = canvas.toDataURL('image/jpeg', 0.8);
       const pdf = new jsPDF('p', 'mm', 'a4');
       
       const pageWidth = pdf.internal.pageSize.getWidth();
@@ -162,18 +154,19 @@ export function InstitutionProfile() {
       
       const margin = 10;
       const imgWidth = pageWidth - (margin * 2);
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      const imgProps = pdf.getImageProperties(dataUrl);
+      const imgHeight = (imgProps.height * imgWidth) / imgProps.width;
       
       let heightLeft = imgHeight;
       let position = margin;
 
-      pdf.addImage(imgData, 'JPEG', margin, position, imgWidth, imgHeight);
+      pdf.addImage(dataUrl, 'PNG', margin, position, imgWidth, imgHeight);
       heightLeft -= (pageHeight - margin * 2);
 
       while (heightLeft >= 0) {
         pdf.addPage();
         position = heightLeft - imgHeight + margin;
-        pdf.addImage(imgData, 'JPEG', margin, position, imgWidth, imgHeight);
+        pdf.addImage(dataUrl, 'PNG', margin, position, imgWidth, imgHeight);
         heightLeft -= pageHeight;
       }
 

@@ -24,7 +24,26 @@
 
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="manifest" href="/manifest.json" />
-    <meta name="theme-color" content="#2563eb" />
+    <meta name="theme-color" content="#4f46e5" />
+
+    <!-- Structured Data for Google -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "name": "Manage My Batch",
+      "alternateName": ["MMB", "ManageMyBatch"],
+      "url": "https://managemybatch.com/",
+      "potentialAction": {
+        "@type": "SearchAction",
+        "target": {
+          "@type": "EntryPoint",
+          "urlTemplate": "https://managemybatch.com/search?q={search_term_string}"
+        },
+        "query-input": "required name=search_term_string"
+      }
+    }
+    </script>
   </head>
   <body>
     <div id="root"></div>

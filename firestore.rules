@@ -375,28 +375,35 @@ service cloud.firestore {
     }
 
     match /students/{studentId} {
-      allow read: if true; // Publicly readable for attendance and results
-      allow write: if isTeacher();
+      allow get: if true; // Publicly readable for results if ID is known
+      allow list: if isTeacher() && (resource.data.institutionId == getInstitutionId() || resource.data.institutionId == request.auth.uid || isAdmin());
+      allow create: if isTeacher() && request.resource.data.institutionId == (getInstitutionId() != null ? getInstitutionId() : request.auth.uid) && isValidStudent(request.resource.data);
+      allow update: if isTeacher() && resource.data.institutionId == (getInstitutionId() != null ? getInstitutionId() : request.auth.uid) && isValidStudent(request.resource.data);
+      allow delete: if isInstitutionAdmin() && resource.data.institutionId == (getInstitutionId() != null ? getInstitutionId() : request.auth.uid);
     }
 
     match /fees/{feeId} {
-      allow read, write: if isTeacher();
+      allow read: if isTeacher() && (resource.data.institutionId == getInstitutionId() || resource.data.institutionId == request.auth.uid || isAdmin());
+      allow write: if isTeacher() && (request.resource.data.institutionId == (getInstitutionId() != null ? getInstitutionId() : request.auth.uid) || resource.data.institutionId == (getInstitutionId() != null ? getInstitutionId() : request.auth.uid)) && isValidFee(request.resource.data);
     }
 
     match /attendance/{attendanceId} {
-      allow read, write: if isTeacher();
+      allow read: if isTeacher() && (resource.data.institutionId == getInstitutionId() || resource.data.institutionId == request.auth.uid || isAdmin());
+      allow write: if isTeacher() && isValidAttendance(request.resource.data);
     }
 
     match /batches/{batchId} {
-      allow read: if true; // Publicly readable for attendance
-      allow write: if isTeacher();
+      allow get: if true; // Publicly readable for profiles
+      allow list: if isTeacher() && (resource.data.institutionId == getInstitutionId() || resource.data.institutionId == request.auth.uid || isAdmin());
+      allow write: if isTeacher() && isValidBatch(request.resource.data);
     }
 
     match /offline_exams/{examId} {
-      allow read: if true; // Publicly readable for results
-      allow create: if isTeacher() && isValidOfflineExam(request.resource.data);
-      allow update: if isTeacher() && isValidOfflineExam(request.resource.data);
-      allow delete: if isTeacher();
+      allow get: if true; // Publicly readable for results
+      allow list: if isTeacher() && (resource.data.institutionId == getInstitutionId() || resource.data.institutionId == request.auth.uid || isAdmin());
+      allow create: if isTeacher() && (request.resource.data.institutionId == (getInstitutionId() != null ? getInstitutionId() : request.auth.uid)) && isValidOfflineExam(request.resource.data);
+      allow update: if isTeacher() && resource.data.institutionId == (getInstitutionId() != null ? getInstitutionId() : request.auth.uid) && isValidOfflineExam(request.resource.data);
+      allow delete: if isTeacher() && resource.data.institutionId == (getInstitutionId() != null ? getInstitutionId() : request.auth.uid);
     }
 
     match /attendance_submissions/{submissionId} {

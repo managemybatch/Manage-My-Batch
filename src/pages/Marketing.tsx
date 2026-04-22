@@ -14,7 +14,7 @@ import { useAuth } from '../lib/auth';
 import { Modal } from '../components/Modal';
 import { cn } from '../lib/utils';
 import { QRCodeSVG } from 'qrcode.react';
-import html2canvas from 'html2canvas';
+import { toPng } from 'html-to-image';
 
 interface InstitutionData {
   name: string;
@@ -126,22 +126,25 @@ export function Marketing() {
     if (!ref.current) return;
     setIsGenerating(true);
     try {
-      const canvas = await html2canvas(ref.current, {
-        scale: 2, // High resolution but avoids memory crashes
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: null,
-        width: 1080,
-        height: 1080
+      // Small delay to ensure all nested assets/styles are settled
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      const dataUrl = await toPng(ref.current, {
+        quality: 1,
+        pixelRatio: 2,
+        skipAutoScale: true,
+        cacheBust: true,
       });
+      
       const link = document.createElement('a');
       link.download = `${filename}.png`;
-      link.href = canvas.toDataURL('image/png');
+      link.href = dataUrl;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
     } catch (error) {
       console.error('Generation Tool Error:', error);
+      alert('Failed to generate image. Please try again.');
     } finally {
       setIsGenerating(false);
     }
@@ -155,10 +158,18 @@ export function Marketing() {
     
     setIsGenerating(true);
     try {
-      const canvas = await html2canvas(ref.current, { scale: 2, useCORS: true, width: 1080, height: 1080 });
-      const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/png'));
-      if (!blob) return;
+      // Small delay to ensure all nested assets/styles are settled
+      await new Promise(resolve => setTimeout(resolve, 500));
 
+      const dataUrl = await toPng(ref.current, {
+        quality: 1,
+        pixelRatio: 2,
+        skipAutoScale: true,
+        cacheBust: true,
+      });
+      
+      const response = await fetch(dataUrl);
+      const blob = await response.blob();
       const file = new File([blob], `${title}.png`, { type: 'image/png' });
       await navigator.share({
         title: title,

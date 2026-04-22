@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
-import html2canvas from 'html2canvas';
+import { toPng } from 'html-to-image';
 import { jsPDF } from 'jspdf';
 import { useTranslation } from 'react-i18next';
 
@@ -31,7 +31,7 @@ interface AdmitCardDesignerProps {
   onClose?: () => void;
 }
 
-type CardDesign = 'modern' | 'classic' | 'islamic' | 'professional' | 'vibrant';
+type CardDesign = 'modern' | 'classic' | 'islamic' | 'professional' | 'vibrant' | 'minimalist' | 'elegant';
 
 interface DesignerConfig {
   design: CardDesign;
@@ -137,6 +137,9 @@ export function AdmitCardDesigner({ students, exam, institution, onClose }: Admi
   const handleDownloadPDF = async () => {
     if (!printRef.current || isGenerating) return;
     setIsGenerating(true);
+    
+    // Wait for DOM to update with the printing area
+    await new Promise(resolve => setTimeout(resolve, 500));
 
     try {
       const pdf = new jsPDF('p', 'mm', 'a4');
@@ -150,8 +153,7 @@ export function AdmitCardDesigner({ students, exam, institution, onClose }: Admi
         const frontId = `admit-front-${students[i].id}`;
         const frontEl = document.getElementById(frontId);
         if (frontEl) {
-          const canvas = await html2canvas(frontEl, { scale: 2, useCORS: true });
-          const imgData = canvas.toDataURL('image/png');
+          const imgData = await toPng(frontEl, { pixelRatio: 2, cacheBust: true });
           pdf.addImage(imgData, 'PNG', 10, 10, 190, 130);
         }
 
@@ -160,8 +162,7 @@ export function AdmitCardDesigner({ students, exam, institution, onClose }: Admi
           const backId = `admit-back-${students[i].id}`;
           const backEl = document.getElementById(backId);
           if (backEl) {
-            const canvas = await html2canvas(backEl, { scale: 2, useCORS: true });
-            const imgData = canvas.toDataURL('image/png');
+            const imgData = await toPng(backEl, { pixelRatio: 2, cacheBust: true });
             pdf.addImage(imgData, 'PNG', 10, 150, 190, 130);
           }
         }
@@ -179,144 +180,232 @@ export function AdmitCardDesigner({ students, exam, institution, onClose }: Admi
     const cardRef = useRef<HTMLDivElement>(null);
     const instName = config.institutionNameOverride || institution?.name || 'INSTITUTION NAME';
 
+    // Design specific classes
+    const designClasses = {
+      modern: "rounded-[2rem] border-t-[10px] bg-white",
+      classic: "border-[10px] border-double rounded-none bg-gray-50/5",
+      islamic: "border-[12px] border-double rounded-2xl bg-[slate-50]",
+      professional: "border-2 border-l-[16px] rounded-lg bg-white",
+      vibrant: "border-0 shadow-xl rounded-[2.5rem] bg-gradient-to-br from-white via-white to-gray-50",
+      minimalist: "border border-gray-200 rounded-none bg-white",
+      elegant: "border-[6px] border-double rounded-3xl bg-[#fffdfa] shadow-lg"
+    };
+
     return (
       <div 
         id={`admit-front-${student.id}`}
         className={cn(
-          "w-full h-[130mm] bg-white border relative overflow-hidden flex flex-col p-8 transition-all print:border-0",
-          config.design === 'modern' && "rounded-[2rem] border-t-[12px]",
-          config.design === 'classic' && "border-[10px] border-double",
-          config.design === 'islamic' && "border-[15px] border-double",
-          config.design === 'professional' && "border-2",
-          config.design === 'vibrant' && "border-0 shadow-xl",
+          "w-full h-[130mm] border relative overflow-hidden flex flex-col p-8 transition-all print:border-0",
+          designClasses[config.design] || designClasses.modern,
           className
         )}
         style={{ 
           borderColor: config.primaryColor,
-          borderTopColor: config.primaryColor 
+          borderTopColor: (config.design === 'modern' || config.design === 'professional') ? config.primaryColor : undefined,
+          borderLeftColor: (config.design === 'professional' || config.design === 'elegant') ? config.primaryColor : undefined,
+          backgroundColor: config.design === 'elegant' ? '#fffdfa' : undefined
         }}
       >
-        {/* Background Decorative patterns */}
-        <div className="absolute inset-0 pointer-events-none opacity-[0.03]" style={{ 
-          backgroundImage: config.design === 'classic' ? `radial-gradient(circle at 1px 1px, ${config.primaryColor} 1px, transparent 0)` : 'none',
-          backgroundSize: '20px 20px'
-        }}></div>
-
-        {/* Header */}
-        <div className="relative z-10 flex items-center justify-between mb-6">
-          <div className="flex items-center gap-4">
-            {institution?.logoURL && (
-              <img src={institution.logoURL} className="w-16 h-16 object-contain rounded-lg shadow-sm" referrerPolicy="no-referrer" />
-            )}
-            <div>
-              <h1 className="text-2xl font-black uppercase tracking-tight" style={{ color: config.institutionNameColor }}>{instName}</h1>
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.3em]">{institution?.address || 'Official Examination Center'}</p>
+        {/* Decorative Seal for Elegant Design */}
+        {config.design === 'elegant' && (
+          <div className="absolute top-10 right-10 w-20 h-20 border border-amber-600/20 rounded-full flex items-center justify-center opacity-30 select-none">
+            <div className="w-16 h-16 border-2 border-double border-amber-600/20 rounded-full flex items-center justify-center">
+               <span className="text-[8px] font-black text-amber-900 whitespace-nowrap overflow-hidden text-center">{instName.slice(0, 10)}</span>
             </div>
           </div>
-          <div className="text-right">
-            <div className="inline-block px-3 py-1 bg-gray-900 text-white text-[9px] font-black uppercase tracking-widest rounded-full mb-1">
+        )}
+        {/* Background Decorative patterns */}
+        <div className="absolute inset-0 pointer-events-none opacity-[0.04]" style={{ 
+          backgroundImage: config.design === 'classic' ? `radial-gradient(circle at 1px 1px, ${config.primaryColor} 1px, transparent 0)` : 
+                         config.design === 'islamic' ? `url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M20 0l5 15h15l-12 9 5 16-13-10-13 10 5-16-12-9h15z' fill='%23${config.primaryColor.replace('#', '')}' fill-opacity='0.1'/%3E%3C/svg%3E")` : 
+                         config.design === 'minimalist' ? 'linear-gradient(to right, #f1f5f9 1px, transparent 1px), linear-gradient(to bottom, #f1f5f9 1px, transparent 1px)' : 'none',
+          backgroundSize: config.design === 'minimalist' ? '40px 40px' : '40px 40px'
+        }}></div>
+
+        {/* Floating elements for Vibrant design */}
+        {config.design === 'vibrant' && (
+          <>
+            <div className="absolute top-[-15%] left-[-5%] w-48 h-48 rounded-full blur-3xl opacity-10" style={{ backgroundColor: config.primaryColor }}></div>
+            <div className="absolute bottom-[-15%] right-[-5%] w-48 h-48 rounded-full blur-3xl opacity-10" style={{ backgroundColor: config.primaryColor }}></div>
+          </>
+        )}
+
+        {/* Header - Balanced Spacing */}
+        <div className={cn(
+          "relative z-10 flex items-center justify-between mb-4 pb-3 border-b border-gray-100",
+          config.design === 'minimalist' && "mb-6 pb-4 border-b-2 border-gray-900",
+          config.design === 'elegant' && "mb-6 pb-4 border-b border-amber-200"
+        )}>
+          <div className="flex items-center gap-4">
+            {institution?.logoURL && (
+              <div className={cn(
+                "p-1 bg-white shadow-sm ring-1 ring-gray-100",
+                config.design === 'modern' ? "rounded-xl" : "rounded-none"
+              )}>
+                <img src={institution.logoURL} className="w-14 h-14 object-contain" referrerPolicy="no-referrer" />
+              </div>
+            )}
+            <div>
+              <h1 className="text-xl font-black uppercase tracking-tight font-bengali leading-none mb-1" style={{ color: config.institutionNameColor }}>{instName}</h1>
+              <p className="text-[9px] font-bold text-gray-400 uppercase tracking-[0.2em]">{institution?.address || 'Official Examination Center'}</p>
+            </div>
+          </div>
+          <div className="text-right flex flex-col items-end">
+            <div 
+              className={cn(
+                "inline-block px-3 py-1 text-white text-[9px] font-black uppercase tracking-[0.2em] mb-1.5",
+                config.design === 'modern' ? "rounded-full" : "rounded-none"
+              )}
+              style={{ backgroundColor: config.primaryColor }}
+            >
               ADMIT CARD
             </div>
             {config.showQR && (
-              <div className="flex justify-end mt-1">
-                <QRCodeSVG value={student.id} size={30} />
+              <div className="p-0.5 bg-white border border-gray-100 rounded-md">
+                <QRCodeSVG value={student.id} size={24} />
               </div>
             )}
           </div>
         </div>
 
-        {/* Watermark Logo */}
-        {institution?.logoURL && (
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.04]">
-            <img src={institution.logoURL} className="w-64 h-64 grayscale object-contain rotate-[-15deg]" />
+        {/* Watermark - Dynamic Center Text */}
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.035] z-0 select-none overflow-hidden">
+          <div className="rotate-[-25deg] flex flex-col items-center">
+            <h1 className="text-7xl font-black uppercase tracking-widest whitespace-nowrap font-bengali">{instName}</h1>
+            <p className="text-sm font-bold uppercase tracking-[0.5em] mt-2">Official Document</p>
           </div>
-        )}
-
-        {/* Exam Title */}
-        <div className="relative z-10 text-center mb-6 py-2 border-y border-dashed border-gray-100">
-          <h2 className="text-xl font-black text-gray-800 uppercase tracking-wide">{config.examTitle}</h2>
-          <p className="text-[10px] font-bold text-gray-500 uppercase tracking-[0.2em]">{config.examSubtitle}</p>
         </div>
 
-        {/* Content Body */}
-        <div className="relative z-10 flex-1 flex gap-8">
+        {/* Exam Title Section */}
+        <div className="relative z-10 text-center mb-6">
+           <div className={cn(
+             "inline-block px-8 py-2 mx-auto",
+             config.design === 'modern' && "bg-gray-50 rounded-xl",
+             config.design === 'classic' && "border-y-2 border-gray-800",
+             config.design === 'minimalist' && "border-2 border-gray-900 rounded-none font-mono",
+             config.design === 'elegant' && "border-y border-amber-600/20 italic"
+           )}>
+             <h2 className="text-lg font-black text-gray-900 leading-none uppercase tracking-wider">{config.examTitle}</h2>
+             <p className="text-[9px] font-bold text-gray-500 uppercase tracking-[0.3em] mt-1.5 opacity-60">{config.examSubtitle}</p>
+           </div>
+        </div>
+
+        {/* Content Body - Rebalanced Grid */}
+        <div className="relative z-10 flex-1 flex gap-8 items-start">
           {/* Info Side */}
-          <div className="flex-1 grid grid-cols-2 gap-y-4 gap-x-6">
-            <div className="col-span-2 border-b pb-1 border-gray-50">
-              <p className="text-[8px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">{config.labelName}</p>
-              <p className="text-lg font-black text-gray-900 uppercase truncate">{student.name}</p>
-            </div>
-            
-            <div>
-              <p className="text-[8px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">{config.labelRoll}</p>
-              <p className="text-base font-black text-indigo-600">{student.rollNo}</p>
-            </div>
-            <div>
-              <p className="text-[8px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">{config.labelId}</p>
-              <p className="text-base font-black text-gray-900">{student.studentId || student.rollNo}</p>
-            </div>
+          <div className="flex-1 space-y-4">
+            {/* Table structure for formal designs */}
+            {(config.design === 'minimalist' || config.design === 'classic' || config.design === 'elegant') ? (
+              <div className={cn(
+                "grid grid-cols-[100px_1fr] gap-0 border border-gray-200 text-[11px]",
+                config.design === 'minimalist' && "border-gray-900 border-2",
+                config.design === 'elegant' && "border-amber-200 rounded-lg overflow-hidden bg-white/50"
+              )}>
+                {[
+                  { label: config.labelName, value: student.name, full: true, font: 'font-bengali text-sm truncate' },
+                  { label: config.labelRoll, value: student.rollNo },
+                  { label: config.labelId, value: student.studentId || student.rollNo },
+                  { label: config.labelClass, value: student.grade || 'N/A' },
+                  { label: config.labelBatch, value: student.batchName || 'N/A' },
+                ].map((item, i) => (
+                  <React.Fragment key={i}>
+                    <div className={cn(
+                      "p-2 bg-gray-50 border-b border-gray-200 font-black uppercase tracking-tighter text-gray-500",
+                      item.full && "col-span-1"
+                    )}>{item.label}</div>
+                    <div className={cn(
+                      "p-2 border-b border-l border-gray-200 font-bold text-gray-900",
+                      item.font,
+                      item.full && "col-span-1"
+                    )}>{item.value}</div>
+                  </React.Fragment>
+                ))}
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-y-4 gap-x-6">
+                <div className="col-span-2 space-y-1">
+                  <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">{config.labelName}</p>
+                  <p className="text-lg font-black text-gray-900 uppercase truncate font-bengali leading-none">{student.name}</p>
+                  <div className="h-0.5 w-full bg-gray-100 rounded-full" />
+                </div>
+                
+                <div className="space-y-0.5">
+                  <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">{config.labelRoll}</p>
+                  <p className="text-base font-black" style={{ color: config.primaryColor }}>{student.rollNo}</p>
+                </div>
+                <div className="space-y-0.5">
+                  <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">{config.labelId}</p>
+                  <p className="text-base font-black text-gray-900">{student.studentId || student.rollNo}</p>
+                </div>
 
-            <div>
-              <p className="text-[8px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">{config.labelClass}</p>
-              <p className="text-sm font-bold text-gray-700">{student.grade || 'N/A'}</p>
-            </div>
-            <div>
-              <p className="text-[8px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">{config.labelBatch}</p>
-              <p className="text-sm font-bold text-gray-700">{student.batchName || 'N/A'}</p>
-            </div>
+                <div className="space-y-0.5">
+                  <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">{config.labelClass}</p>
+                  <p className="text-sm font-black text-gray-700">{student.grade || 'N/A'}</p>
+                </div>
+                <div className="space-y-0.5">
+                  <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">{config.labelBatch}</p>
+                  <p className="text-sm font-black text-gray-700">{student.batchName || 'N/A'}</p>
+                </div>
+              </div>
+            )}
 
-            <div className="mt-2 col-span-2 grid grid-cols-2 gap-4">
-               <div className="flex items-center gap-2 text-[9px] font-bold text-gray-500 uppercase">
+            {/* Time & Date bar */}
+            <div className={cn(
+              "flex items-center gap-6 py-2 px-4 rounded-lg",
+              config.design === 'minimalist' ? "border-2 border-gray-900 bg-white" : "bg-gray-50 border border-gray-100"
+            )}>
+               <div className="flex items-center gap-2 text-[10px] font-black text-gray-600 uppercase">
                   <Clock className="w-3.5 h-3.5 text-gray-400" />
-                  Time: {config.reportingTime}
+                  <span>Time: <span className="text-gray-900">{config.reportingTime}</span></span>
                </div>
-               <div className="flex items-center gap-2 text-[9px] font-bold text-gray-500 uppercase">
+               <div className="flex items-center gap-2 text-[10px] font-black text-gray-600 uppercase">
                   <Calendar className="w-3.5 h-3.5 text-gray-400" />
-                  Date: {config.examDate}
+                  <span>Date: <span className="text-gray-900">{config.examDate}</span></span>
                </div>
             </div>
           </div>
 
-          {/* Photo Side */}
+          {/* Photo Side - More compact */}
           {config.showPhoto && (
             <div className="shrink-0 flex flex-col items-center">
                <div className={cn(
-                 "w-36 h-36 border-4 flex items-center justify-center bg-gray-50 overflow-hidden shadow-inner",
-                 config.design === 'modern' ? "rounded-[2rem]" : "rounded-none"
-               )} style={{ borderColor: config.primaryColor + '20' }}>
+                 "w-32 h-32 border-2 flex items-center justify-center bg-gray-100 overflow-hidden relative z-10",
+                 config.design === 'modern' ? "rounded-xl" : 
+                 config.design === 'vibrant' ? "rounded-full" : 
+                 config.design === 'elegant' ? "rounded-3xl rotate-3" : "rounded-none"
+               )} style={{ borderColor: config.primaryColor }}>
                  {student.photoUrl ? (
                    <img src={student.photoUrl} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                  ) : (
-                   <User className="w-16 h-16 text-gray-200" />
+                   <User className="w-16 h-16 text-gray-300" />
                  )}
                </div>
-               <p className="text-[7px] font-bold text-gray-300 uppercase tracking-[0.3em] mt-2">PHOTO BOX</p>
+               <p className="text-[7px] font-black text-gray-300 uppercase tracking-[0.3em] mt-2">PHOTO BOX</p>
             </div>
           )}
         </div>
 
-        {/* Footer / Signs */}
-        <div className="relative z-10 mt-auto">
-          <div className="grid grid-cols-3 gap-8 mb-4">
-             <div className="text-center pt-2 border-t border-gray-900 border-opacity-20">
-                <p className="text-[8px] font-black uppercase tracking-tighter text-gray-400">{config.authSign1}</p>
-             </div>
-             <div className="text-center pt-2 border-t border-gray-900 border-opacity-20">
-                <p className="text-[8px] font-black uppercase tracking-tighter text-gray-400">{config.authSign2}</p>
-             </div>
-             <div className="text-center pt-2 border-t border-gray-900 border-opacity-20">
-                <p className="text-[8px] font-black uppercase tracking-tighter text-gray-400">{config.authSign3}</p>
-             </div>
+        {/* Footer / Signs - Increased Padding for Balance */}
+        <div className="relative z-10 mt-6 pt-6 border-t border-gray-100">
+          <div className="grid grid-cols-3 gap-8 mb-6 mt-12">
+             {[config.authSign1, config.authSign2, config.authSign3].map((sign, idx) => (
+                <div key={idx} className="text-center pt-2 relative">
+                   <div className="absolute top-0 left-0 right-0 h-px bg-gray-200" />
+                   <p className="text-[9px] font-black uppercase tracking-tight text-gray-400">{sign}</p>
+                </div>
+             ))}
           </div>
-          <div className="bg-gray-50 p-2 rounded-lg border border-gray-100">
-             <p className="text-[8px] text-gray-500 font-medium leading-tight">
-               <strong className="text-rose-500 mr-1">N.B:</strong> {config.nbNote}
+          <div className="bg-gray-50 p-2.5 rounded-xl flex items-start gap-2 border border-gray-100">
+             <AlertCircle className="w-3.5 h-3.5 text-rose-500 shrink-0 mt-0.5" />
+             <p className="text-[9px] text-gray-600 font-bold leading-relaxed">
+               <strong className="text-gray-900 uppercase tracking-tighter mr-1">Note:</strong> {config.nbNote}
              </p>
           </div>
         </div>
-
-        {/* Bottom Branding Bar */}
-        <div className="absolute bottom-0 left-0 right-0 h-1" style={{ backgroundColor: config.primaryColor }}></div>
+        {/* Branding accents */}
+        {config.design === 'islamic' && (
+           <div className="absolute top-0 left-0 w-24 h-24 bg-gray-100 rounded-br-full opacity-50" style={{ backgroundColor: config.primaryColor + '10' }}></div>
+        )}
       </div>
     );
   };
@@ -327,52 +416,62 @@ export function AdmitCardDesigner({ students, exam, institution, onClose }: Admi
       <div 
         id={`admit-back-${student.id}`}
         className={cn(
-          "w-full h-[130mm] bg-white border relative overflow-hidden flex flex-col p-8 transition-all print:border-0",
+          "w-full h-[130mm] bg-white border relative overflow-hidden flex flex-col p-10 transition-all print:border-0",
           config.design === 'modern' && "rounded-[2rem]",
-          config.design === 'classic' && "border-[10px] border-double",
-          config.design === 'islamic' && "border-[15px] border-double",
-          config.design === 'professional' && "border-2",
-          config.design === 'vibrant' && "border-0 shadow-xl",
+          config.design === 'classic' && "border-[10px] border-double rounded-none",
+          config.design === 'islamic' && "border-[15px] border-double rounded-3xl",
+          config.design === 'professional' && "border-2 rounded-xl",
+          config.design === 'vibrant' && "border-0 shadow-xl rounded-[3rem]",
+          config.design === 'minimalist' && "border border-gray-200 rounded-none",
+          config.design === 'elegant' && "border-[6px] border-double rounded-3xl shadow-lg",
           className
         )}
         style={{ borderColor: config.primaryColor }}
       >
         {/* Header Back */}
-        <div className="text-center mb-6">
-           <h3 className="text-sm font-black uppercase tracking-[0.3em]" style={{ color: config.primaryColor }}>Rules & Regulations</h3>
-           <div className="mt-1 h-0.5 w-16 mx-auto rounded-full" style={{ backgroundColor: config.primaryColor }}></div>
+        <div className="text-center mb-8">
+           <h3 className="text-base font-black uppercase tracking-[0.4em]" style={{ color: config.primaryColor }}>Rules & Regulations</h3>
+           <div className="mt-2 h-1 w-20 mx-auto rounded-full" style={{ backgroundColor: config.primaryColor }}></div>
         </div>
 
-        <div className="relative z-10 flex-1 bg-gray-50/50 rounded-2xl p-6 border border-gray-100">
-          <div className="space-y-3">
+        <div className={cn(
+          "relative z-10 flex-1 bg-gray-50/30 rounded-2xl p-8 border border-gray-100",
+          config.design === 'minimalist' && "border-2 border-gray-900 rounded-none bg-white",
+          config.design === 'elegant' && "bg-white/50 border-amber-100"
+        )}>
+          <div className="space-y-4">
              {config.rules.split('\n').map((rule, idx) => (
-                <p key={idx} className="text-[10px] text-gray-600 font-bold leading-relaxed flex items-start gap-2">
-                   <div className="w-1 h-1 rounded-full bg-gray-300 mt-1.5 shrink-0" />
+                <div key={idx} className="text-[11px] text-gray-700 font-bold leading-relaxed flex items-start gap-3">
+                   <div className="w-1.5 h-1.5 rounded-full mt-2 shrink-0" style={{ backgroundColor: config.primaryColor }} />
                    {rule}
-                </p>
+                </div>
              ))}
           </div>
         </div>
 
-        <div className="mt-6 flex items-center justify-between italic text-[8px] text-gray-400 font-medium">
-           <p>{instName} System Document • {new Date().getFullYear()}</p>
-           <p>Printed on: {new Date().toLocaleDateString()}</p>
+        <div className="mt-8 flex items-center justify-between italic text-[9px] text-gray-400 font-bold tracking-tight">
+           <p className="font-bengali uppercase">{instName} Official System Document • {new Date().getFullYear()}</p>
+           <p>Verification Code: {student.id.slice(0, 8).toUpperCase()}</p>
         </div>
 
-        {/* Decorative corner */}
-        <div className="absolute top-0 right-0 w-24 h-24 rotate-45 translate-x-12 -translate-y-12 opacity-5 pointer-events-none" style={{ backgroundColor: config.primaryColor }}></div>
-        <div className="absolute bottom-0 left-0 w-24 h-24 rotate-45 -translate-x-12 translate-y-12 opacity-5 pointer-events-none" style={{ backgroundColor: config.primaryColor }}></div>
+        {/* Decorative elements */}
+        {(config.design === 'classic' || config.design === 'islamic') && (
+          <>
+            <div className="absolute top-0 right-0 w-32 h-32 rotate-45 translate-x-20 -translate-y-20 opacity-10 pointer-events-none" style={{ backgroundColor: config.primaryColor }}></div>
+            <div className="absolute bottom-0 left-0 w-32 h-32 rotate-45 -translate-x-20 translate-y-20 opacity-10 pointer-events-none" style={{ backgroundColor: config.primaryColor }}></div>
+          </>
+        )}
       </div>
     );
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col lg:flex-row bg-gray-900/40 backdrop-blur-sm overflow-hidden">
+    <div className="h-full flex flex-col lg:flex-row bg-white overflow-hidden">
       {/* Sidebar - Options */}
       <motion.div 
         initial={{ x: -100, opacity: 0 }}
         animate={{ x: 0, opacity: 1 }}
-        className="w-full lg:w-96 bg-white border-r h-full flex flex-col shadow-2xl relative z-20"
+        className="w-full lg:w-96 bg-white border-r h-full flex flex-col relative z-20"
       >
         <div className="p-4 lg:p-6 border-b flex items-center justify-between bg-indigo-600">
           <div className="flex items-center gap-3">
@@ -421,7 +520,7 @@ export function AdmitCardDesigner({ students, exam, institution, onClose }: Admi
                          <Layout className="w-3.5 h-3.5" /> Template Layout
                       </label>
                       <div className="grid grid-cols-2 gap-3">
-                         {(['modern', 'classic', 'islamic', 'professional', 'vibrant'] as CardDesign[]).map(d => (
+                         {(['modern', 'classic', 'islamic', 'professional', 'vibrant', 'minimalist', 'elegant'] as CardDesign[]).map(d => (
                             <button
                                key={d}
                                onClick={() => setConfig({...config, design: d})}
@@ -519,6 +618,16 @@ export function AdmitCardDesigner({ students, exam, institution, onClose }: Admi
                    exit={{ opacity: 0, y: -10 }}
                    className="space-y-6"
                 >
+                   <div className="space-y-2">
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Institution / Coaching Name</label>
+                      <input 
+                         type="text" 
+                         value={config.institutionNameOverride}
+                         placeholder={institution?.name || "Enter Coaching Name"}
+                         onChange={(e) => setConfig({...config, institutionNameOverride: e.target.value})}
+                         className="w-full px-4 py-3 bg-gray-50 border border-indigo-100 rounded-xl text-sm font-bold focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                      />
+                   </div>
                    <div className="space-y-2">
                       <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Exam Title</label>
                       <input 
@@ -632,7 +741,7 @@ export function AdmitCardDesigner({ students, exam, institution, onClose }: Admi
       </motion.div>
 
       {/* Preview Area */}
-      <div className="flex-1 overflow-y-auto bg-gray-100/50 flex flex-col items-center">
+      <div className="flex-1 overflow-y-auto bg-gray-100/50 flex flex-col items-center min-h-0">
          <div className="w-full max-w-5xl px-4 lg:px-12 py-8 lg:py-12 space-y-6 lg:space-y-8">
             {/* Preview Controls */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-2">
@@ -660,18 +769,20 @@ export function AdmitCardDesigner({ students, exam, institution, onClose }: Admi
             </div>
 
             {/* Scale Adjuster (for visibility) */}
-            <div className="flex justify-center relative bg-white rounded-[2.5rem] p-8 lg:p-12 border border-gray-100 shadow-xl overflow-hidden min-h-[400px]">
+            <div className="flex justify-center relative bg-white rounded-[2.5rem] p-4 sm:p-8 lg:p-12 border border-gray-100 shadow-xl overflow-x-auto min-h-[500px]">
                <div className="hidden lg:flex absolute top-4 left-4 items-center gap-2 p-3 bg-gray-50 rounded-2xl border border-gray-100 z-10">
                   <Monitor className="w-4 h-4 text-gray-400" />
                   <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Full Quality Preview</span>
                </div>
 
-               <div className="scale-[0.6] sm:scale-[0.8] md:scale-[0.9] lg:scale-[1.0] xl:scale-[1.1] origin-top transition-transform duration-500 flex flex-col items-center">
-                  {showBackPreview ? (
-                    <CardBack student={previewStudent} />
-                  ) : (
-                    <CardFront student={previewStudent} />
-                  )}
+               <div className="scale-[0.55] sm:scale-[0.7] md:scale-[0.8] lg:scale-[1.0] xl:scale-[1.15] origin-top transition-transform duration-500 flex flex-col items-center">
+                  <div className="shadow-2xl shadow-gray-200/50 ring-1 ring-black/5">
+                    {showBackPreview ? (
+                      <CardBack student={previewStudent} />
+                    ) : (
+                      <CardFront student={previewStudent} />
+                    )}
+                  </div>
                </div>
 
                {/* Navigation Buttons */}
@@ -705,15 +816,17 @@ export function AdmitCardDesigner({ students, exam, institution, onClose }: Admi
             </div>
          </div>
 
-         {/* Off-screen actual printing area */}
-         <div className="fixed left-[-9999px] top-0 pointer-events-none p-10 bg-white" ref={printRef}>
-            {students.map((student) => (
-               <React.Fragment key={student.id}>
-                  <CardFront student={student} className="mb-20" />
-                  {config.showBack && <CardBack student={student} className="mb-20" />}
-               </React.Fragment>
-            ))}
-         </div>
+         {/* Off-screen actual printing area - Only render when generating */}
+         {isGenerating && (
+           <div className="fixed left-[-9999px] top-0 pointer-events-none p-10 bg-white" ref={printRef}>
+              {students.map((student) => (
+                 <React.Fragment key={student.id}>
+                    <CardFront student={student} className="mb-20" />
+                    {config.showBack && <CardBack student={student} className="mb-20" />}
+                 </React.Fragment>
+              ))}
+           </div>
+         )}
       </div>
     </div>
   );

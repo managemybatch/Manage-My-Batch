@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
-import html2canvas from 'html2canvas';
+import { toPng } from 'html-to-image';
 import { jsPDF } from 'jspdf';
 
 interface Student {
@@ -168,8 +168,7 @@ export function IDCardDesigner({ students, institution }: IDCardDesignerProps) {
 
         // Capture Front
         if (cardRef.current) {
-          const canvas = await html2canvas(cardRef.current, { scale: 3, useCORS: true });
-          const imgData = canvas.toDataURL('image/png');
+          const imgData = await toPng(cardRef.current, { pixelRatio: 3, cacheBust: true });
           const width = config.size === 'cr80_p' ? 54 : 85.6;
           const height = config.size === 'cr80_p' ? 85.6 : 54;
           pdf.addImage(imgData, 'PNG', 0, 0, width, height);
@@ -178,8 +177,7 @@ export function IDCardDesigner({ students, institution }: IDCardDesignerProps) {
         // Capture Back if enabled
         if (config.showBack && backRef.current) {
           pdf.addPage();
-          const canvasBack = await html2canvas(backRef.current, { scale: 3, useCORS: true });
-          const imgDataBack = canvasBack.toDataURL('image/png');
+          const imgDataBack = await toPng(backRef.current, { pixelRatio: 3, cacheBust: true });
           const width = config.size === 'cr80_p' ? 54 : 85.6;
           const height = config.size === 'cr80_p' ? 85.6 : 54;
           pdf.addImage(imgDataBack, 'PNG', 0, 0, width, height);
@@ -974,7 +972,7 @@ export function IDCardDesigner({ students, institution }: IDCardDesignerProps) {
                   </div>
                </div>
                
-               <div className="bg-gray-900 backdrop-blur-xl rounded-[3rem] p-6 sm:p-16 min-h-[500px] lg:min-h-[600px] flex flex-col items-center justify-center gap-12 shadow-2xl relative overflow-visible group border border-white/5">
+               <div className="bg-gray-900 backdrop-blur-xl rounded-[3rem] p-4 sm:p-16 min-h-[500px] lg:min-h-[600px] flex flex-col items-center justify-center gap-12 shadow-2xl relative overflow-visible group border border-white/5">
                   <div className="absolute inset-0 opacity-[0.03] pointer-events-none rounded-[3rem]" style={{ backgroundImage: 'linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)', backgroundSize: '40px 40px' }} />
                   
                   <div className="space-y-6 w-full flex flex-col items-center">
@@ -986,9 +984,9 @@ export function IDCardDesigner({ students, institution }: IDCardDesignerProps) {
                         opacity: 1 
                       }}
                       className={cn(
-                        "shadow-[0_50px_100px_-30px_rgba(0,0,0,0.7)] relative z-10 shrink-0 transition-all duration-700",
-                        "scale-[0.55] sm:scale-[0.8] md:scale-[0.9] lg:scale-[1.0] xl:scale-[1.1]",
-                        config.size === 'cr80_l' && "scale-[0.5] sm:scale-[0.7] md:scale-[0.8] lg:scale-[0.9] xl:scale-[1.0]"
+                        "shadow-[0_50px_100px_-30px_rgba(0,0,0,0.7)] ring-1 ring-white/10 relative z-10 shrink-0 transition-all duration-700",
+                        "scale-[0.6] sm:scale-[0.85] md:scale-[0.9] lg:scale-[1.0] xl:scale-[1.15]",
+                        config.size === 'cr80_l' && "scale-[0.55] sm:scale-[0.8] md:scale-[0.85] lg:scale-[0.95] xl:scale-[1.1]"
                       )}
                     >
                       {renderCurrentDesign(previewStudent)}
@@ -1004,9 +1002,9 @@ export function IDCardDesigner({ students, institution }: IDCardDesignerProps) {
                           opacity: 1 
                         }}
                         className={cn(
-                          "shadow-[0_50px_100px_-30px_rgba(0,0,0,0.7)] relative z-10 shrink-0 transition-all duration-700",
-                          "scale-[0.55] sm:scale-[0.8] md:scale-[0.9] lg:scale-[1.0] xl:scale-[1.1]",
-                          config.size === 'cr80_l' && "scale-[0.5] sm:scale-[0.7] md:scale-[0.8] lg:scale-[0.9] xl:scale-[1.0]"
+                          "shadow-[0_50px_100px_-30px_rgba(0,0,0,0.7)] ring-1 ring-white/10 relative z-10 shrink-0 transition-all duration-700",
+                          "scale-[0.6] sm:scale-[0.85] md:scale-[0.9] lg:scale-[1.0] xl:scale-[1.15]",
+                          config.size === 'cr80_l' && "scale-[0.55] sm:scale-[0.8] md:scale-[0.85] lg:scale-[0.95] xl:scale-[1.1]"
                         )}
                       >
                         {renderBackDesign()}
