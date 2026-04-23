@@ -420,6 +420,7 @@ const resources = {
         ok: "OK",
         done: "Done",
         sendWhatsApp: "Send WhatsApp",
+        notifications: "Notifications",
         roles: {
           admin: "Administrator",
           teacher: "Teacher"
@@ -1080,6 +1081,7 @@ bn: {
         ok: "ঠিক আছে",
         done: "শেষ",
         sendWhatsApp: "হোয়াটসঅ্যাপ পাঠান",
+        notifications: "নোটিফিকেশন",
         roles: {
           admin: "অ্যাডমিনিস্ট্রেটর",
           teacher: "শিক্ষক"

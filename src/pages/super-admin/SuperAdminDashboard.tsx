@@ -45,7 +45,9 @@ export function SuperAdminDashboard() {
     totalStudents: 0,
     totalTokens: 0,
     activeSubscriptions: 0,
-    totalRevenue: 0
+    totalRevenue: 0,
+    planDistribution: [] as any[],
+    verificationStatus: [] as any[]
   });
   const [performanceData, setPerformanceData] = useState<any[]>([]);
   const [recentInstitutions, setRecentInstitutions] = useState<any[]>([]);
@@ -67,12 +69,36 @@ export function SuperAdminDashboard() {
       const totalTokens = creditsSnapshot.docs.reduce((acc, doc) => acc + (doc.data().balance || 0), 0);
       const totalStudents = studentsSnapshot.size;
 
+      // Plan Distribution
+      const planCounts = {
+        free: institutions.filter((i: any) => i.subscriptionPlan === 'free' || !i.subscriptionPlan).length,
+        basic: institutions.filter((i: any) => i.subscriptionPlan === 'basic').length,
+        standard: institutions.filter((i: any) => i.subscriptionPlan === 'standard').length,
+        advanced: institutions.filter((i: any) => i.subscriptionPlan === 'advanced').length
+      };
+
+      const planDist = [
+        { name: 'Free', value: planCounts.free, color: '#94a3b8' },
+        { name: 'Basic', value: planCounts.basic, color: '#f59e0b' },
+        { name: 'Standard', value: planCounts.standard, color: '#3b82f6' },
+        { name: 'Advanced', value: planCounts.advanced, color: '#8b5cf6' }
+      ];
+
+      // Verification Status
+      const verifiedCount = institutions.filter((i: any) => i.isVerified).length;
+      const verifDist = [
+        { name: 'Verified', value: verifiedCount, color: '#10b981' },
+        { name: 'Unverified', value: institutions.length - verifiedCount, color: '#f43f5e' }
+      ];
+
       setStats({
         totalInstitutions: institutions.length,
         totalStudents,
         totalTokens,
         activeSubscriptions: activeSubs,
-        totalRevenue: activeSubs * 5000 
+        totalRevenue: activeSubs * 5000,
+        planDistribution: planDist,
+        verificationStatus: verifDist
       });
 
       // Performance data for charts
@@ -163,6 +189,103 @@ export function SuperAdminDashboard() {
           icon={TrendingUp} 
           color="rose" 
         />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Subscription Distribution */}
+        <div className="bg-white dark:bg-gray-900 p-8 rounded-[2.5rem] border border-gray-100 dark:border-gray-800 shadow-sm relative overflow-hidden group">
+          <div className="flex items-center justify-between mb-8">
+            <div>
+              <h3 className="font-black text-gray-900 dark:text-white flex items-center gap-2 text-xl">
+                <PieChartIcon className="w-6 h-6 text-indigo-600" /> Subscription Distribution
+              </h3>
+              <p className="text-xs text-gray-400 font-bold uppercase tracking-widest mt-1">Plan breakdown of all institutions</p>
+            </div>
+          </div>
+          <div className="flex flex-col md:flex-row items-center gap-8">
+            <div className="w-full h-48 md:w-1/2">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={stats.planDistribution}
+                    innerRadius={60}
+                    outerRadius={80}
+                    paddingAngle={5}
+                    dataKey="value"
+                  >
+                    {stats.planDistribution.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="flex-1 w-full space-y-4">
+              {stats.planDistribution.map((item) => (
+                <div key={item.name} className="flex items-center justify-between p-3 rounded-2xl bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 transition-colors">
+                  <div className="flex items-center gap-3">
+                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
+                    <span className="text-sm font-bold text-gray-600 dark:text-gray-400">{item.name}</span>
+                  </div>
+                  <span className="text-sm font-black text-gray-900 dark:text-white">
+                    {item.value} ({Math.round((item.value / stats.totalInstitutions) * 100) || 0}%)
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Verification Status */}
+        <div className="bg-white dark:bg-gray-900 p-8 rounded-[2.5rem] border border-gray-100 dark:border-gray-800 shadow-sm relative overflow-hidden group">
+          <div className="flex items-center justify-between mb-8">
+            <div>
+              <h3 className="font-black text-gray-900 dark:text-white flex items-center gap-2 text-xl">
+                <ShieldCheck className="w-6 h-6 text-emerald-600" /> Account Trust Level
+              </h3>
+              <p className="text-xs text-gray-400 font-bold uppercase tracking-widest mt-1">Verified vs Unverified Institutions</p>
+            </div>
+          </div>
+          <div className="flex flex-col md:flex-row items-center gap-8">
+            <div className="flex-1 w-full space-y-4 order-2 md:order-1">
+              {stats.verificationStatus.map((item) => (
+                <div key={item.name} className="flex items-center justify-between p-3 rounded-2xl bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 transition-colors">
+                  <div className="flex items-center gap-3">
+                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
+                    <span className="text-sm font-bold text-gray-600 dark:text-gray-400">{item.name}</span>
+                  </div>
+                  <span className="text-sm font-black text-gray-900 dark:text-white">
+                    {item.value} Users
+                  </span>
+                </div>
+              ))}
+              <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-2xl border border-blue-100 dark:border-blue-800 mt-4">
+                <p className="text-[10px] text-blue-700 dark:text-blue-400 font-medium leading-relaxed italic">
+                  Tip: Verified institutions represent low-risk accounts with confirmed identity.
+                </p>
+              </div>
+            </div>
+            <div className="w-full h-48 md:w-1/2 order-1 md:order-2">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={stats.verificationStatus}
+                    innerRadius={60}
+                    outerRadius={80}
+                    paddingAngle={5}
+                    dataKey="value"
+                  >
+                    {stats.verificationStatus.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

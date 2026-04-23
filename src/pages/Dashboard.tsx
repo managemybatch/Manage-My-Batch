@@ -56,6 +56,7 @@ export function Dashboard() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [systemNotifications, setSystemNotifications] = useState<any[]>([]);
   const [expiryNotification, setExpiryNotification] = useState<any | null>(null);
+  const [selectedNotification, setSelectedNotification] = useState<any | null>(null);
   const [smsBalance, setSmsBalance] = useState(0);
 
   useEffect(() => {
@@ -79,9 +80,17 @@ export function Dashboard() {
         return dateB - dateA;
       });
 
-      // Filter out dismissed notifications
+      // Filter out dismissed and scheduled-for-later notifications
+      const now = new Date();
       const dismissed = user.dismissedNotifications || [];
-      setSystemNotifications(sortedNotifs.filter(n => !dismissed.includes(n.id)));
+      const visibleNotifs = sortedNotifs.filter(n => {
+        const isDismissed = dismissed.includes(n.id);
+        const scheduledDate = n.scheduledAt ? new Date(n.scheduledAt) : new Date(n.createdAt);
+        const isReady = scheduledDate <= now;
+        return !isDismissed && isReady;
+      });
+
+      setSystemNotifications(visibleNotifs);
     }, (error) => {
       console.error("Error fetching system notifications:", error);
     });
@@ -447,23 +456,23 @@ export function Dashboard() {
             <h3 className="text-sm font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2 px-2">
               <Bell className="w-4 h-4" /> {t('common.notifications')}
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {expiryNotification && (
                 <motion.div 
                   initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
-                  className="bg-rose-600 p-4 rounded-2xl border border-rose-500 shadow-lg shadow-rose-200 text-white flex gap-3 relative overflow-hidden md:col-span-1"
+                  className="bg-rose-600 p-6 rounded-3xl border border-rose-500 shadow-xl shadow-rose-200 text-white flex gap-4 relative overflow-hidden"
                 >
-                  <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full blur-2xl -mr-12 -mt-12" />
-                  <div className="p-2 rounded-xl bg-white/20 h-fit">
-                    <AlertTriangle className="w-5 h-5 text-white" />
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-3xl -mr-16 -mt-16" />
+                  <div className="p-3 rounded-2xl bg-white/20 h-fit">
+                    <AlertTriangle className="w-6 h-6 text-white" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h4 className="text-sm font-black text-white truncate">{expiryNotification.title}</h4>
-                    <p className="text-xs text-rose-50 opacity-90 line-clamp-2 mt-1">{expiryNotification.message}</p>
+                    <h4 className="text-lg font-black text-white truncate">{expiryNotification.title}</h4>
+                    <p className="text-sm text-rose-50 opacity-90 line-clamp-3 mt-1 font-medium">{expiryNotification.message}</p>
                     <button 
                       onClick={() => setIsUpgradeModalOpen(true)}
-                      className="mt-2 text-[10px] font-black uppercase tracking-widest bg-white text-rose-600 px-3 py-1 rounded-lg hover:bg-rose-50 transition-colors"
+                      className="mt-4 text-xs font-black uppercase tracking-widest bg-white text-rose-600 px-6 py-2 rounded-xl hover:bg-rose-50 transition-all shadow-md active:scale-95"
                     >
                       Renew Now
                     </button>
@@ -475,31 +484,39 @@ export function Dashboard() {
                   key={notif.id}
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="bg-white dark:bg-gray-900 p-4 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm flex gap-3 group relative overflow-hidden"
+                  className="bg-white dark:bg-gray-900 p-6 rounded-3xl border-2 border-gray-100 dark:border-gray-800 shadow-md flex gap-4 group relative overflow-hidden transition-all hover:border-indigo-100 dark:hover:border-indigo-900/50"
                 >
-                  <div className={`p-2 rounded-xl flex-shrink-0 h-fit ${
+                  <div className={`p-3 rounded-2xl flex-shrink-0 h-fit ${
                     notif.type === 'info' ? 'bg-blue-50 text-blue-600' :
                     notif.type === 'warning' ? 'bg-amber-50 text-amber-600' :
                     notif.type === 'success' ? 'bg-emerald-50 text-emerald-600' :
                     'bg-rose-50 text-rose-600'
                   }`}>
-                    {notif.type === 'info' && <Info className="w-4 h-4" />}
-                    {notif.type === 'warning' && <AlertTriangle className="w-4 h-4" />}
-                    {notif.type === 'success' && <CheckCircle2 className="w-4 h-4" />}
-                    {notif.type === 'error' && <XCircle className="w-4 h-4" />}
+                    {notif.type === 'info' && <Info className="w-6 h-6" />}
+                    {notif.type === 'warning' && <AlertTriangle className="w-6 h-6" />}
+                    {notif.type === 'success' && <CheckCircle2 className="w-6 h-6" />}
+                    {notif.type === 'error' && <XCircle className="w-6 h-6" />}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-2">
-                      <h4 className="text-sm font-bold text-gray-900 dark:text-white truncate pr-4">{notif.title}</h4>
+                    <div className="flex items-start justify-between gap-4">
+                      <h4 className="text-base font-black text-gray-900 dark:text-white line-clamp-1">{notif.title}</h4>
                       <button 
                         onClick={() => dismissNotification(notif.id)}
-                        className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+                        className="p-1.5 text-gray-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg transition-all"
                         title="Dismiss"
                       >
-                        <XCircle className="w-3.5 h-3.5" />
+                        <XCircle className="w-5 h-5" />
                       </button>
                     </div>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2 mt-1">{notif.message}</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 line-clamp-2 mt-2 font-medium leading-relaxed">
+                      {notif.message}
+                    </p>
+                    <button 
+                      onClick={() => setSelectedNotification(notif)}
+                      className="mt-4 text-[10px] font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-400 flex items-center gap-1.5 hover:gap-2 transition-all"
+                    >
+                      {i18n.language === 'en' ? 'Read Full Message' : 'বিস্তারিত দেখুন'} <ChevronRight className="w-3 h-3" />
+                    </button>
                     <p className="text-[10px] text-gray-400 mt-2">{new Date(notif.createdAt).toLocaleDateString()}</p>
                   </div>
                 </motion.div>
@@ -846,6 +863,50 @@ export function Dashboard() {
         isOpen={isUpgradeModalOpen} 
         onClose={() => setIsUpgradeModalOpen(false)} 
       />
+
+      {/* Notification Detail Modal */}
+      <Modal
+        isOpen={!!selectedNotification}
+        onClose={() => setSelectedNotification(null)}
+        title={selectedNotification?.title || t('common.notifications')}
+        maxWidth="max-w-2xl"
+      >
+        <div className="space-y-6">
+          <div className={cn(
+            "p-8 rounded-[2rem] flex flex-col items-center justify-center text-center gap-4",
+            selectedNotification?.type === 'info' ? 'bg-blue-50 text-blue-600' :
+            selectedNotification?.type === 'warning' ? 'bg-amber-50 text-amber-600' :
+            selectedNotification?.type === 'success' ? 'bg-emerald-50 text-emerald-600' :
+            'bg-rose-50 text-rose-600'
+          )}>
+            <div className="w-20 h-20 bg-white rounded-3xl flex items-center justify-center shadow-sm">
+              {selectedNotification?.type === 'info' && <Info className="w-10 h-10" />}
+              {selectedNotification?.type === 'warning' && <AlertTriangle className="w-10 h-10" />}
+              {selectedNotification?.type === 'success' && <CheckCircle2 className="w-10 h-10" />}
+              {selectedNotification?.type === 'error' && <XCircle className="w-10 h-10" />}
+            </div>
+            <div>
+              <h3 className="text-2xl font-black text-gray-900">{selectedNotification?.title}</h3>
+              <p className="text-xs font-bold uppercase tracking-widest opacity-60 mt-2">
+                {selectedNotification?.createdAt ? new Date(selectedNotification.createdAt).toLocaleDateString(i18n.language === 'bn' ? 'bn-BD' : 'en-US', { day: 'numeric', month: 'long', year: 'numeric' }) : ''}
+              </p>
+            </div>
+          </div>
+
+          <div className="bg-gray-50 dark:bg-gray-800/50 rounded-[2rem] p-8 border border-gray-100 dark:border-gray-700">
+            <p className="text-lg text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap font-medium">
+              {selectedNotification?.message}
+            </p>
+          </div>
+
+          <button
+            onClick={() => setSelectedNotification(null)}
+            className="w-full py-5 bg-indigo-600 text-white rounded-2xl font-black hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-100 dark:shadow-none flex items-center justify-center gap-2 active:scale-[0.98]"
+          >
+             {t('common.done')}
+          </button>
+        </div>
+      </Modal>
 
       <Modal isOpen={isBirthdayModalOpen} onClose={() => setIsBirthdayModalOpen(false)} title="Birthday Card Generator" maxWidth="max-w-4xl">
         <div className="flex flex-col lg:flex-row gap-8 py-4">

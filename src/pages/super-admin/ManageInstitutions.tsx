@@ -94,9 +94,9 @@ export function ManageInstitutions() {
           
           // Get counts
           const [studentsSnapshot, batchesSnapshot, teachersSnapshot] = await Promise.all([
-            getDocs(query(collection(db, 'students'), where('institutionId', '==', user.uid))),
-            getDocs(query(collection(db, 'batches'), where('institutionId', '==', user.uid))),
-            getDocs(query(collection(db, 'teachers'), where('institutionId', '==', user.uid)))
+            getDocs(query(collection(db, 'students'), where('institutionId', '==', user.uid), limit(1000))),
+            getDocs(query(collection(db, 'batches'), where('institutionId', '==', user.uid), limit(100))),
+            getDocs(query(collection(db, 'teachers'), where('institutionId', '==', user.uid), limit(50)))
           ]);
 
           const studentCount = studentsSnapshot.size;
@@ -168,7 +168,9 @@ export function ManageInstitutions() {
       // Update user profile
       await updateDoc(doc(db, 'users', selectedInst.id), {
         subscriptionPlan: selectedInst.subscriptionPlan,
-        subscriptionExpiry: selectedInst.subscriptionExpiry || null
+        subscriptionExpiry: selectedInst.subscriptionExpiry || null,
+        superAdminNote: selectedInst.superAdminNote || '',
+        isVerified: selectedInst.isVerified || false
       });
 
       // Update credits
@@ -240,12 +242,32 @@ export function ManageInstitutions() {
   const handleDeleteInstitution = async () => {
     if (!instToDelete) return;
     try {
+      setLoading(true);
+      
+      // Collections to clean up
+      const collectionsToClean = [
+        'students',
+        'batches',
+        'fees',
+        'teachers',
+        'offline_exams',
+        'attendance',
+        'institutions'
+      ];
+
+      // Delete associated data in batches (approximate client-side cleanup)
+      for (const coll of collectionsToClean) {
+        const q = query(collection(db, coll), where('institutionId', '==', instToDelete), limit(100));
+        const snapshot = await getDocs(q);
+        const deletePromises = snapshot.docs.map(d => deleteDoc(d.ref));
+        await Promise.all(deletePromises);
+      }
+
       await deleteDoc(doc(db, 'users', instToDelete));
-      // Delete associated credits
       await deleteDoc(doc(db, 'credits', instToDelete));
       
       setToast({
-        message: "Institution data deleted successfully",
+        message: "Institution and basic linked data deleted successfully",
         type: 'success',
         isVisible: true
       });
@@ -255,10 +277,12 @@ export function ManageInstitutions() {
     } catch (error: any) {
       console.error("Error deleting institution:", error);
       setToast({
-        message: "Error deleting institution",
+        message: "Error deleting institution. Some data might remain.",
         type: 'error',
         isVisible: true
       });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -659,6 +683,41 @@ export function ManageInstitutions() {
                       </div>
                     </div>
 
+                    <div className="space-y-4 pt-4 border-t border-gray-100 dark:border-gray-800">
+                      <div className="flex items-center justify-between p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-2xl border border-indigo-100 dark:border-indigo-800/50">
+                        <div className="flex items-center gap-3">
+                          <ShieldCheck className={cn("w-6 h-6", selectedInst.isVerified ? "text-indigo-600" : "text-gray-400")} />
+                          <div>
+                            <p className="text-xs font-black text-gray-900 dark:text-white uppercase tracking-tight">Super Admin Status</p>
+                            <p className="text-[10px] text-gray-500 font-medium italic">Mark as verified institution</p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedInst({ ...selectedInst, isVerified: !selectedInst.isVerified })}
+                          className={cn(
+                            "px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all",
+                            selectedInst.isVerified 
+                              ? "bg-indigo-600 text-white shadow-md" 
+                              : "bg-gray-200 dark:bg-gray-700 text-gray-500 hover:bg-gray-300"
+                          )}
+                        >
+                          {selectedInst.isVerified ? 'Verified' : 'Unverified'}
+                        </button>
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-2">Internal Notes (Private)</label>
+                        <textarea 
+                          value={selectedInst.superAdminNote || ''}
+                          onChange={(e) => setSelectedInst({ ...selectedInst, superAdminNote: e.target.value })}
+                          placeholder="Add private notes about this institution..."
+                          className="w-full px-5 py-4 bg-gray-50 dark:bg-gray-800 border-2 border-transparent rounded-2xl focus:border-indigo-500 focus:bg-white dark:focus:bg-gray-900 outline-none transition-all font-medium text-sm text-gray-900 dark:text-white resize-none"
+                          rows={3}
+                        />
+                      </div>
+                    </div>
+
                     <div className="p-5 bg-indigo-50 dark:bg-indigo-900/20 rounded-2xl border border-indigo-100 dark:border-indigo-800 space-y-3">
                       <div className="flex items-center gap-2 text-indigo-700 dark:text-indigo-400 uppercase tracking-widest text-[10px] font-black">
                         <Activity className="w-4 h-4" /> Account Tools
@@ -758,13 +817,13 @@ export function ManageInstitutions() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-gray-50/50 dark:bg-gray-800/50">
-                <th className="px-6 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Institution</th>
-                <th className="px-6 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest text-center">Resources</th>
-                <th className="px-6 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Performance</th>
-                <th className="px-6 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Plan & Expiry</th>
-                <th className="px-6 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">SMS Tokens</th>
-                <th className="px-6 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest text-center">Activity</th>
-                <th className="px-6 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Actions</th>
+                <th className="px-6 py-4 text-[11px] font-black text-gray-400 uppercase tracking-widest leading-none">Institution</th>
+                <th className="px-6 py-4 text-[11px] font-black text-gray-400 uppercase tracking-widest leading-none text-center">Summary</th>
+                <th className="px-6 py-4 text-[11px] font-black text-gray-400 uppercase tracking-widest leading-none">Activity</th>
+                <th className="px-6 py-4 text-[11px] font-black text-gray-400 uppercase tracking-widest leading-none">Subscription</th>
+                <th className="px-6 py-4 text-[11px] font-black text-gray-400 uppercase tracking-widest leading-none">SMS</th>
+                <th className="px-6 py-4 text-[11px] font-black text-gray-400 uppercase tracking-widest leading-none">Last Active</th>
+                <th className="px-6 py-4 text-[11px] font-black text-gray-400 uppercase tracking-widest leading-none">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
@@ -778,17 +837,32 @@ export function ManageInstitutions() {
                 <tr key={inst.id} className="hover:bg-gray-50/50 dark:hover:bg-gray-800/50 transition-colors">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-indigo-100 dark:bg-indigo-900/40 rounded-xl flex items-center justify-center text-indigo-600 dark:text-indigo-400 font-bold">
+                      <div className="w-10 h-10 bg-indigo-100 dark:bg-indigo-900/40 rounded-xl flex items-center justify-center text-indigo-600 dark:text-indigo-400 font-bold shrink-0 relative">
                         {inst.displayName?.charAt(0)}
+                        {inst.isVerified && (
+                          <div className="absolute -top-1 -right-1 bg-white dark:bg-gray-900 rounded-full p-0.5 shadow-sm">
+                            <ShieldCheck className="w-3.5 h-3.5 text-indigo-600 fill-indigo-50" />
+                          </div>
+                        )}
                       </div>
-                      <div>
-                        <button 
-                          onClick={() => fetchInstDetails(inst)}
-                          className="text-sm font-bold text-gray-900 dark:text-white hover:text-indigo-600 transition-colors text-left block"
-                        >
-                          {inst.displayName}
-                        </button>
-                        <p className="text-xs text-gray-500">{inst.email}</p>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <button 
+                            onClick={() => fetchInstDetails(inst)}
+                            className="text-sm font-bold text-gray-900 dark:text-white hover:text-indigo-600 transition-colors text-left truncate"
+                          >
+                            {inst.displayName}
+                          </button>
+                          {inst.superAdminNote && (
+                            <div className="group relative">
+                              <Info className="w-3 h-3 text-amber-500 cursor-help" />
+                              <div className="absolute left-0 bottom-full mb-2 w-48 p-2 bg-gray-900 text-white text-[10px] rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-all z-20">
+                                {inst.superAdminNote}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        <p className="text-xs text-gray-400 truncate">{inst.email}</p>
                       </div>
                     </div>
                   </td>
@@ -801,10 +875,6 @@ export function ManageInstitutions() {
                       <div className="text-center" title="Batches">
                         <p className="text-xs font-black text-gray-900 dark:text-white">{inst.batchCount || 0}</p>
                         <Layers className="w-3 h-3 text-gray-400 mx-auto mt-0.5" />
-                      </div>
-                      <div className="text-center" title="Teachers">
-                        <p className="text-xs font-black text-gray-900 dark:text-white">{inst.teacherCount || 0}</p>
-                        <Briefcase className="w-3 h-3 text-gray-400 mx-auto mt-0.5" />
                       </div>
                     </div>
                   </td>
@@ -825,13 +895,6 @@ export function ManageInstitutions() {
                           )}
                         />
                       </div>
-                      <p className={cn(
-                        "text-[9px] font-bold uppercase tracking-widest",
-                        inst.behavior === 'Excellent' ? "text-emerald-600" :
-                        inst.behavior === 'Normal' ? "text-indigo-600" : "text-amber-600"
-                      )}>
-                        {inst.behavior}
-                      </p>
                     </div>
                   </td>
                   <td className="px-6 py-4">
@@ -854,7 +917,7 @@ export function ManageInstitutions() {
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
-                      <MessageSquare className="w-4 h-4 text-emerald-500" />
+                      <Zap className="w-4 h-4 text-emerald-500 fill-emerald-50" />
                       <span className="text-sm font-bold text-gray-900 dark:text-white">{inst.smsBalance}</span>
                     </div>
                   </td>
@@ -864,7 +927,7 @@ export function ManageInstitutions() {
                         "text-[10px] font-bold",
                         inst.lastLogin ? "text-gray-900 dark:text-gray-100" : "text-gray-400 italic"
                       )}>
-                        {inst.lastLogin ? formatDate(inst.lastLogin) : 'Never Logged In'}
+                        {inst.lastLogin ? formatDate(inst.lastLogin) : 'Never'}
                       </span>
                       {inst.lastLogin && (
                         <span className="text-[9px] text-gray-400 font-medium">
@@ -1089,13 +1152,71 @@ export function ManageInstitutions() {
         )}
       </AnimatePresence>
 
-      <ConfirmModal
-        isOpen={isDeleteModalOpen}
-        onClose={() => setIsDeleteModalOpen(false)}
-        onConfirm={handleDeleteInstitution}
-        title="Delete Institution"
-        message="Are you sure you want to delete this institution? This will permanently delete their account and all associated credits. This action cannot be undone."
-      />
+      <AnimatePresence>
+        {isDeleteModalOpen && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="bg-white dark:bg-gray-900 rounded-[2.5rem] w-full max-w-md overflow-hidden shadow-2xl p-8 border-4 border-rose-100 dark:border-rose-900/30"
+            >
+              <div className="flex flex-col items-center text-center gap-4 mb-8">
+                <div className="w-20 h-20 bg-rose-50 dark:bg-rose-900/20 rounded-3xl flex items-center justify-center text-rose-600">
+                  <AlertTriangle className="w-10 h-10 animate-bounce" />
+                </div>
+                <div>
+                  <h3 className="text-2xl font-black text-gray-900 dark:text-white">Critical Confirmation</h3>
+                  <p className="text-gray-500 dark:text-gray-400 mt-2 font-medium">
+                    You are about to delete an entire institution and all its students, batches, and records. This is permanent.
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <p className="text-xs font-black text-gray-400 uppercase tracking-widest text-center">
+                  To confirm, type the word <span className="text-rose-600">DELETE</span> below
+                </p>
+                <input 
+                  type="text"
+                  placeholder="Type DELETE to proceed"
+                  className="w-full px-6 py-4 bg-gray-50 dark:bg-gray-800 border-2 border-transparent focus:border-rose-500 rounded-2xl outline-none text-center font-black text-rose-600 uppercase tracking-widest transition-all"
+                  onChange={(e) => {
+                    if (e.target.value === 'DELETE') {
+                      // We can just keep it in state or use a local variable
+                    }
+                  }}
+                  id="confirm-delete-input"
+                />
+              </div>
+
+              <div className="flex gap-3 mt-8">
+                <button 
+                  onClick={() => setIsDeleteModalOpen(false)}
+                  className="flex-1 py-4 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 rounded-2xl font-bold hover:bg-gray-200 transition-all"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={() => {
+                    const input = document.getElementById('confirm-delete-input') as HTMLInputElement;
+                    if (input?.value === 'DELETE') {
+                      handleDeleteInstitution();
+                    } else {
+                      setToast({ message: "Please type DELETE correctly", type: 'error', isVisible: true });
+                    }
+                  }}
+                  disabled={loading}
+                  className="flex-1 py-4 bg-rose-600 text-white rounded-2xl font-black hover:bg-rose-700 transition-all shadow-lg shadow-rose-100 dark:shadow-none flex items-center justify-center gap-2"
+                >
+                  {loading ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Trash2 className="w-5 h-5" />}
+                  Confirm Delete
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       <Toast 
         message={toast.message}

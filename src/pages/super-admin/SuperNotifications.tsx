@@ -33,7 +33,8 @@ export function SuperNotifications() {
   const [newNotif, setNewNotif] = useState({
     title: '',
     message: '',
-    type: 'info' as 'info' | 'warning' | 'success' | 'error'
+    type: 'info' as 'info' | 'warning' | 'success' | 'error',
+    scheduledAt: ''
   });
 
   useEffect(() => {
@@ -63,12 +64,13 @@ export function SuperNotifications() {
     try {
       await addDoc(collection(db, 'super_notifications'), {
         ...newNotif,
+        scheduledAt: newNotif.scheduledAt || new Date().toISOString(),
         createdAt: new Date().toISOString(),
         createdBy: user?.uid,
         createdByName: user?.displayName
       });
       
-      setNewNotif({ title: '', message: '', type: 'info' });
+      setNewNotif({ title: '', message: '', type: 'info', scheduledAt: '' });
       setToast({
         message: "Notification broadcasted successfully",
         type: 'success',
@@ -135,21 +137,31 @@ export function SuperNotifications() {
 
               <div className="space-y-2">
                 <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">Type</label>
-                <div className="grid grid-cols-2 gap-2">
-                  {['info', 'warning', 'success', 'error'].map((t) => (
-                    <button
-                      key={t}
-                      type="button"
-                      onClick={() => setNewNotif({ ...newNotif, type: t as any })}
-                      className={`px-3 py-2 rounded-lg text-xs font-bold capitalize transition-all ${
-                        newNotif.type === t 
-                          ? 'bg-indigo-600 text-white shadow-md' 
-                          : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-200'
-                      }`}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-gray-400 uppercase tracking-widest px-1">Type</label>
+                    <select
+                      value={newNotif.type}
+                      onChange={(e) => setNewNotif({ ...newNotif, type: e.target.value as any })}
+                      className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-800 border-none rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-xs"
                     >
-                      {t}
-                    </button>
-                  ))}
+                      <option value="info">Info</option>
+                      <option value="success">Feature</option>
+                      <option value="warning">Alert</option>
+                      <option value="error">Critical</option>
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-gray-400 uppercase tracking-widest px-1 flex items-center gap-1.5 leading-none">
+                      <Clock className="w-3 h-3" /> Schedule
+                    </label>
+                    <input
+                      type="datetime-local"
+                      value={newNotif.scheduledAt}
+                      onChange={(e) => setNewNotif({ ...newNotif, scheduledAt: e.target.value })}
+                      className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border-none rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-[11px]"
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -210,10 +222,15 @@ export function SuperNotifications() {
                     {notif.type === 'error' && <XCircle className="w-6 h-6" />}
                   </div>
                   <div className="flex-1 min-w-0 pr-10">
-                    <div className="flex items-center gap-2 mb-1">
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
                       <h4 className="font-bold text-gray-900 dark:text-white">{notif.title}</h4>
+                      {notif.scheduledAt && new Date(notif.scheduledAt) > new Date() && (
+                        <span className="px-2 py-0.5 bg-amber-100 text-amber-600 rounded-full text-[9px] font-black uppercase tracking-widest animate-pulse flex items-center gap-1">
+                          <Clock className="w-2.5 h-2.5" /> Scheduled: {new Date(notif.scheduledAt).toLocaleString()}
+                        </span>
+                      )}
                       <span className="text-[10px] text-gray-400 font-medium">
-                        {new Date(notif.createdAt).toLocaleString()}
+                        (Created: {new Date(notif.createdAt).toLocaleString()})
                       </span>
                     </div>
                     <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">

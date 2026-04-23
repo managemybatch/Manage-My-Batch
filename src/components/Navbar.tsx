@@ -82,7 +82,7 @@ export function Navbar() {
         >
           <Bell className="w-5 h-5" />
           {hasNotifications && (
-            <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-white dark:border-gray-900 animate-pulse"></span>
+            <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-600 text-white text-[10px] font-bold rounded-full flex items-center justify-center border-2 border-white dark:border-gray-900 shadow-lg animate-bounce">1</span>
           )}
         </button>
         
