@@ -65,7 +65,7 @@ export function Sidebar() {
   }
 
   const regularItems: NavItem[] = [
-    { icon: LayoutDashboard, label: t('nav.dashboard'), path: '/' },
+    { icon: LayoutDashboard, label: t('nav.dashboard'), path: '/dashboard' },
     { icon: Layers, label: t('nav.batches'), path: '/batches' },
     { icon: Users, label: t('nav.students'), path: '/students' },
     { icon: ClipboardCheck, label: t('nav.attendance'), path: '/attendance' },
@@ -80,7 +80,7 @@ export function Sidebar() {
   ];
 
   const superAdminItems: NavItem[] = [
-    { icon: LayoutDashboard, label: 'Super Admin', path: '/' },
+    { icon: LayoutDashboard, label: 'Super Admin', path: '/dashboard' },
     { icon: Building2, label: 'Institutions', path: '/super-admin/institutions' },
     { icon: MessageSquare, label: 'Support Inbox', path: '/super-admin/support' },
     { icon: HelpCircle, label: 'Manage FAQs', path: '/super-admin/faqs' },

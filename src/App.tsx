@@ -70,10 +70,11 @@ function AppRoutes() {
 
   return (
     <Routes>
-      <Route path="/login" element={user ? <Navigate to="/" /> : <Login />} />
-      <Route path="/signup" element={user ? <Navigate to="/" /> : <Signup />} />
+      <Route path="/login" element={user ? <Navigate to="/dashboard" /> : <Login />} />
+      <Route path="/signup" element={user ? <Navigate to="/dashboard" /> : <Signup />} />
       
       {/* Public Routes */}
+      <Route path="/" element={<Landing />} />
       <Route path="/i/:slug" element={<InstitutionProfile />} />
       <Route path="/public/institution/:id" element={<InstitutionProfile />} />
       <Route path="/public/admission/:id" element={<AdmissionForm />} />
@@ -85,7 +86,7 @@ function AppRoutes() {
 
       {/* Persistent Authenticated Layout */}
       <Route element={<AuthenticatedLayout />}>
-        <Route path="/" element={user?.isSuperAdmin ? <SuperAdminDashboard /> : <Dashboard />} />
+        <Route path="/dashboard" element={user?.isSuperAdmin ? <SuperAdminDashboard /> : <Dashboard />} />
         <Route path="/students" element={<Students />} />
         <Route path="/batches" element={<Batches />} />
         <Route path="/fees" element={<Fees />} />
@@ -112,7 +113,7 @@ function AppRoutes() {
       </Route>
 
       {/* Fallback for Landing */}
-      <Route path="*" element={!loading && !user ? <Landing /> : <Navigate to="/" />} />
+      <Route path="*" element={<Navigate to="/" />} />
     </Routes>
   );
 }

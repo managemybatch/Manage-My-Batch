@@ -25,6 +25,7 @@ import { cn } from '../lib/utils';
 import { SUBSCRIPTION_PLANS } from '../constants';
 import { collection, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
+import { useAuth } from '../lib/auth';
 
 const features = [
   {
@@ -93,6 +94,7 @@ const reviews = [
 ];
 
 export function Landing() {
+  const { user } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
   const [latestBlogs, setLatestBlogs] = React.useState<any[]>([]);
   const navigate = useNavigate();
@@ -136,18 +138,29 @@ export function Landing() {
               <a href="#reviews" className="text-gray-600 hover:text-blue-600 font-medium transition-colors">মতামত</a>
               <Link to="/login" className="text-gray-600 hover:text-blue-600 font-medium transition-colors">সাহায্য</Link>
               <div className="flex items-center gap-4 border-l border-gray-100 pl-8">
-                <Link 
-                  to="/login"
-                  className="text-gray-900 font-semibold hover:text-blue-600 transition-colors cursor-pointer"
-                >
-                  লগইন
-                </Link>
-                <Link 
-                  to="/signup"
-                  className="bg-blue-600 text-white px-6 py-2.5 rounded-full font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-200 cursor-pointer"
-                >
-                  রেজিস্ট্রেশন
-                </Link>
+                {user ? (
+                  <Link 
+                    to="/dashboard"
+                    className="bg-blue-600 text-white px-6 py-2.5 rounded-full font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-200 cursor-pointer flex items-center gap-2"
+                  >
+                    ড্যাশবোর্ড <ArrowRight className="w-4 h-4" />
+                  </Link>
+                ) : (
+                  <>
+                    <Link 
+                      to="/login"
+                      className="text-gray-900 font-semibold hover:text-blue-600 transition-colors cursor-pointer"
+                    >
+                      লগইন
+                    </Link>
+                    <Link 
+                      to="/signup"
+                      className="bg-blue-600 text-white px-6 py-2.5 rounded-full font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-200 cursor-pointer"
+                    >
+                      রেজিস্ট্রেশন
+                    </Link>
+                  </>
+                )}
               </div>
             </nav>
 
@@ -170,20 +183,32 @@ export function Landing() {
             <a href="#reviews" className="block text-gray-600 font-medium" onClick={() => setIsMenuOpen(false)}>মতামত</a>
             <Link to="/login" className="block text-gray-600 font-medium" onClick={() => setIsMenuOpen(false)}>সাহায্য</Link>
             <div className="pt-4 flex flex-col gap-3">
-              <Link 
-                to="/login"
-                onClick={() => setIsMenuOpen(false)}
-                className="text-center py-3 font-semibold text-gray-900 border border-gray-200 rounded-xl cursor-pointer"
-              >
-                লগইন
-              </Link>
-              <Link 
-                to="/signup"
-                onClick={() => setIsMenuOpen(false)}
-                className="text-center py-3 font-bold text-white bg-blue-600 rounded-xl shadow-lg shadow-blue-200 cursor-pointer"
-              >
-                রেজিস্ট্রেশন
-              </Link>
+              {user ? (
+                <Link 
+                  to="/dashboard"
+                  onClick={() => setIsMenuOpen(false)}
+                  className="text-center py-3 font-bold text-white bg-blue-600 rounded-xl shadow-lg shadow-blue-200 cursor-pointer"
+                >
+                  ড্যাশবোর্ড
+                </Link>
+              ) : (
+                <>
+                  <Link 
+                    to="/login"
+                    onClick={() => setIsMenuOpen(false)}
+                    className="text-center py-3 font-semibold text-gray-900 border border-gray-200 rounded-xl cursor-pointer"
+                  >
+                    লগইন
+                  </Link>
+                  <Link 
+                    to="/signup"
+                    onClick={() => setIsMenuOpen(false)}
+                    className="text-center py-3 font-bold text-white bg-blue-600 rounded-xl shadow-lg shadow-blue-200 cursor-pointer"
+                  >
+                    রেজিস্ট্রেশন
+                  </Link>
+                </>
+              )}
             </div>
           </div>
         )}

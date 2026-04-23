@@ -25,7 +25,7 @@ export function Signup() {
     setError('');
     try {
       await signup(email, password, institutionName);
-      navigate('/');
+      navigate('/dashboard');
     } catch (err: any) {
       console.error("Signup error:", err);
       if (err.code === 'auth/email-already-in-use') {

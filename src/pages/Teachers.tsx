@@ -60,6 +60,7 @@ interface JobApplication {
   createdAt: any;
   aiScore?: number;
   aiFeedback?: string;
+  attachments?: any[];
 }
 
 export function Teachers() {

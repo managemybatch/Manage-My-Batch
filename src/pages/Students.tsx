@@ -42,6 +42,9 @@ interface Student {
   subjectGroup?: string;
   feeType?: string;
   status: 'active' | 'inactive';
+  isAdmissionFeePaid?: boolean;
+  isMonthlyFeePaid?: boolean;
+  applicationId?: string;
   createdAt: any;
 }
 
@@ -51,6 +54,7 @@ interface Batch {
   admissionFee: number;
   monthlyFee: number;
   grade: string;
+  section?: string;
 }
 
 export function Students() {
@@ -294,6 +298,7 @@ export function Students() {
     grade: '',
     section: '',
     batchId: '',
+    batchName: '',
     joinDate: new Date().toISOString().split('T')[0],
     monthlyFee: 0,
     admissionFee: 0,
@@ -302,7 +307,7 @@ export function Students() {
     isAdmissionFeePaid: true,
     isMonthlyFeePaid: true,
     status: 'active' as const,
-    applicationId: null as string | null,
+    applicationId: '' as string,
   });
 
   useEffect(() => {
@@ -559,12 +564,16 @@ export function Students() {
         grade: '',
         section: '',
         batchId: '',
+        batchName: '',
         joinDate: new Date().toISOString().split('T')[0],
         monthlyFee: 0,
         admissionFee: 0,
         subjectGroup: 'Science',
         feeType: 'Full Fee',
         status: 'active',
+        isAdmissionFeePaid: false,
+        isMonthlyFeePaid: false,
+        applicationId: ''
       });
     } catch (error: any) {
       console.error('Error in handleAddStudent:', error);

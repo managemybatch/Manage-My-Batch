@@ -314,12 +314,14 @@ export function OfflineExams() {
         title: '',
         batchId: batches[0]?.id || '',
         date: new Date().toISOString().split('T')[0],
+        time: '10:00 AM',
         totalMarks: 100,
         examFee: 0,
         hasSubSections: false,
         subSections: [{ name: '', totalMarks: 50 }],
-        subjects: [{ name: '', totalMarks: 100, date: new Date().toISOString().split('T')[0], hasSubSections: false, subSections: [{ name: '', totalMarks: 50 }] }],
+        subjects: [{ name: '', totalMarks: 100, date: new Date().toISOString().split('T')[0], time: '10:00 AM', hasSubSections: false, subSections: [{ name: '', totalMarks: 50 }] }],
         institutionName: '',
+        linkedExams: [],
       });
     } catch (error) {
       handleFirestoreError(error, OperationType.CREATE, 'offline_exams');

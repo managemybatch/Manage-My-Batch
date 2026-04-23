@@ -23,7 +23,7 @@ export function Navbar() {
     return () => unsubscribe();
   }, []);
 
-  const isDashboard = location.pathname === '/';
+  const isDashboard = location.pathname === '/dashboard';
 
   const toggleLanguage = () => {
     const nextLang = i18n.language === 'en' ? 'bn' : 'en';
@@ -77,7 +77,7 @@ export function Navbar() {
         </button>
 
         <button 
-          onClick={() => navigate('/')}
+          onClick={() => navigate('/dashboard')}
           className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-gray-800 rounded-full transition-all relative"
         >
           <Bell className="w-5 h-5" />

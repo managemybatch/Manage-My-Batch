@@ -25,6 +25,9 @@ interface UserProfile {
   subscriptionExpiry?: string;
   lastLogin?: string;
   dismissedNotifications?: string[];
+  phone?: string;
+  institutionName?: string;
+  monthlySmsSent?: number;
 }
 
 interface AuthContextType {

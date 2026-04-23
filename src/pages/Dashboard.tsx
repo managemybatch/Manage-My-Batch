@@ -425,7 +425,7 @@ export function Dashboard() {
               <h2 className="text-xl font-black text-rose-900">{t('dashboard.dueNotice')}</h2>
               <p className="text-rose-600 font-medium text-sm">
                 <Trans i18nKey="dashboard.dueNoticeDesc" count={studentsWithDues.length}>
-                  Currently <span className="font-black underline">{{count: studentsWithDues.length}} students</span> have monthly fees due. Take action quickly.
+                  Currently <span className="font-black underline">{studentsWithDues.length}</span> students have monthly fees due. Take action quickly.
                 </Trans>
               </p>
             </div>
