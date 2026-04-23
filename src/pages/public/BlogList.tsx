@@ -22,10 +22,10 @@ export function BlogList() {
   const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
-    document.title = "Resource Center & Blog | Manage My Batch";
+    document.title = "রিসোর্স সেন্টার এবং ব্লগ | Manage My Batch";
     const metaDesc = document.querySelector('meta[name="description"]');
     if (metaDesc) {
-      metaDesc.setAttribute("content", "Expert coaching management tips, study resources, and career guidance for administrators and students.");
+      metaDesc.setAttribute("content", "প্রশাসক এবং শিক্ষার্থীদের জন্য বিশেষজ্ঞ কোচিং ম্যানেজমেন্ট টিপস, অধ্যয়ন সংস্থান এবং ক্যারিয়ার নির্দেশিকা।");
     }
     
     const q = query(
@@ -63,10 +63,10 @@ export function BlogList() {
             className="flex flex-col items-center gap-4"
           >
             <span className="px-4 py-1.5 bg-white/20 backdrop-blur-md rounded-full text-[10px] font-black text-white uppercase tracking-widest border border-white/20">
-              Knowledge Hub
+              জ্ঞান কেন্দ্র
             </span>
-            <h1 className="text-4xl md:text-6xl font-black text-white tracking-tight">Resource Center & Blog</h1>
-            <p className="text-indigo-100 text-lg max-w-2xl font-medium">Expert insights, study tips, and guidance for students and coaching center administrators.</p>
+            <h1 className="text-4xl md:text-6xl font-black text-white tracking-tight">রিসোর্স সেন্টার এবং ব্লগ</h1>
+            <p className="text-indigo-100 text-lg max-w-2xl font-medium">শিক্ষার্থী এবং কোচিং সেন্টার প্রশাসকদের জন্য বিশেষজ্ঞ অন্তর্দৃষ্টি, অধ্যয়নের টিপস এবং নির্দেশিকা।</p>
           </motion.div>
         </div>
       </div>
@@ -79,7 +79,7 @@ export function BlogList() {
           </div>
           <input
             type="text"
-            placeholder="Search articles, tips, or tags..."
+            placeholder="নিবন্ধ, টিপস বা ট্যাগ খুঁজুন..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="block w-full pl-14 pr-6 py-6 bg-white border-none rounded-3xl shadow-xl shadow-indigo-100 focus:ring-4 focus:ring-indigo-500/20 transition-all text-lg font-medium"
@@ -101,8 +101,8 @@ export function BlogList() {
         ) : filteredBlogs.length === 0 ? (
           <div className="text-center py-20 bg-white rounded-3xl border border-dashed border-gray-200">
             <BookOpen className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-2xl font-black text-gray-900">No Articles Found</h3>
-            <p className="text-gray-500 font-medium">Try searching for something else or check back later.</p>
+            <h3 className="text-2xl font-black text-gray-900">কোন নিবন্ধ পাওয়া যায়নি</h3>
+            <p className="text-gray-500 font-medium">অন্য কিছু খুঁজার চেষ্টা করুন অথবা পরে আবার চেক করুন।</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -157,7 +157,7 @@ export function BlogList() {
                       to={`/blog/${blog.slug}`}
                       className="flex items-center gap-2 text-sm font-black text-indigo-600 hover:gap-4 transition-all"
                     >
-                      Read Full Story <ArrowRight className="w-4 h-4" />
+                      পুরো গল্পটি পড়ুন <ArrowRight className="w-4 h-4" />
                     </Link>
                   </div>
                 </div>
@@ -172,16 +172,16 @@ export function BlogList() {
         <div className="bg-gray-900 rounded-[3rem] p-12 md:p-20 text-center relative overflow-hidden">
           <div className="absolute top-0 left-0 w-64 h-64 bg-indigo-500/20 rounded-full blur-3xl -translate-y-1/2 -translate-x-1/2" />
           <div className="max-w-2xl mx-auto relative z-10">
-            <h2 className="text-3xl md:text-5xl font-black text-white mb-6 tracking-tight italic">Never miss an update from our experts.</h2>
-            <p className="text-gray-400 font-medium mb-10">Get the latest study tips and management strategies delivered directly to your inbox every week.</p>
+            <h2 className="text-3xl md:text-5xl font-black text-white mb-6 tracking-tight italic">আমাদের বিশেষজ্ঞদের কাছ থেকে আপডেট মিস করবেন না।</h2>
+            <p className="text-gray-400 font-medium mb-10">প্রতি সপ্তাহে আপনার ইনবক্সে সরাসরি সর্বশেষ অধ্যয়নের টিপস এবং ম্যানেজমেন্ট কৌশলগুলি পান।</p>
             <div className="flex flex-col sm:flex-row gap-4">
               <input 
                 type="email" 
-                placeholder="Enter your email address"
+                placeholder="আপনার ইমেল ঠিকানা লিখুন"
                 className="flex-1 px-8 py-5 bg-white/10 border border-white/10 rounded-2xl text-white font-medium focus:ring-4 focus:ring-indigo-500/20 transition-all"
               />
               <button className="px-10 py-5 bg-indigo-600 text-white font-black rounded-2xl hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-900/20 uppercase tracking-widest text-sm">
-                Subscribe Now
+                এখনই সাবস্ক্রাইব করুন
               </button>
             </div>
           </div>
