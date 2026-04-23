@@ -134,6 +134,7 @@ export function Landing() {
             <nav className="hidden md:flex items-center gap-8">
               <a href="#features" className="text-gray-600 hover:text-blue-600 font-medium transition-colors">বৈশিষ্ট্যসমূহ</a>
               <Link to="/blog" className="text-gray-600 hover:text-blue-600 font-medium transition-colors">রিসোর্স সেন্টার</Link>
+              <a href="https://docs.google.com/document/d/1lc9cOIxt5PhfOI7F_RGsnAt9xju5xFbrDYQheQOkmMk/edit?usp=sharing" target="_blank" rel="noopener noreferrer" className="text-gray-600 hover:text-blue-600 font-medium transition-colors">কিভাবে ব্যবহার করবেন?</a>
               <a href="#about" className="text-gray-600 hover:text-blue-600 font-medium transition-colors">আমাদের সম্পর্কে</a>
               <a href="#reviews" className="text-gray-600 hover:text-blue-600 font-medium transition-colors">মতামত</a>
               <Link to="/login" className="text-gray-600 hover:text-blue-600 font-medium transition-colors">সাহায্য</Link>
@@ -179,6 +180,7 @@ export function Landing() {
           <div className="md:hidden bg-white border-b border-gray-100 p-4 space-y-4">
             <a href="#features" className="block text-gray-600 font-medium" onClick={() => setIsMenuOpen(false)}>বৈশিষ্ট্যসমূহ</a>
             <Link to="/blog" className="block text-gray-600 font-medium" onClick={() => setIsMenuOpen(false)}>রিসোর্স সেন্টার</Link>
+            <a href="https://docs.google.com/document/d/1lc9cOIxt5PhfOI7F_RGsnAt9xju5xFbrDYQheQOkmMk/edit?usp=sharing" target="_blank" rel="noopener noreferrer" className="block text-gray-600 font-medium" onClick={() => setIsMenuOpen(false)}>কিভাবে ব্যবহার করবেন?</a>
             <a href="#about" className="block text-gray-600 font-medium" onClick={() => setIsMenuOpen(false)}>আমাদের সম্পর্কে</a>
             <a href="#reviews" className="block text-gray-600 font-medium" onClick={() => setIsMenuOpen(false)}>মতামত</a>
             <Link to="/login" className="block text-gray-600 font-medium" onClick={() => setIsMenuOpen(false)}>সাহায্য</Link>

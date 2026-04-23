@@ -1,5 +1,5 @@
 import React from 'react';
-import { GraduationCap, Sparkles, UserPlus, ShieldCheck, Zap, Globe } from 'lucide-react';
+import { GraduationCap, Sparkles, UserPlus, ShieldCheck, Zap, Globe, ArrowLeft } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useAuth } from '../lib/auth';
 import { useTranslation } from 'react-i18next';
@@ -49,6 +49,12 @@ export function Signup() {
         <div className="absolute top-0 right-0 w-96 h-96 bg-indigo-500 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 opacity-50" />
         <div className="absolute bottom-0 left-0 w-96 h-96 bg-indigo-700 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2 opacity-50" />
         
+        <div className="relative z-20 mb-8">
+           <Link to="/" className="inline-flex items-center gap-2 px-6 py-3 bg-white/10 hover:bg-white/20 backdrop-blur-md rounded-2xl text-white font-black text-sm uppercase tracking-widest transition-all border border-white/10">
+              <ArrowLeft className="w-5 h-5" /> মূল পাতায় যান
+           </Link>
+        </div>
+
         <div className="relative z-10 flex items-center gap-3">
           <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-xl shadow-indigo-900/20 overflow-hidden">
             <img 

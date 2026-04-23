@@ -11,7 +11,8 @@ import {
   HelpCircle,
   ExternalLink,
   Loader2,
-  BookOpen
+  BookOpen,
+  FileText
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'motion/react';
@@ -73,6 +74,7 @@ export function Help() {
     { icon: Youtube, label: "YouTube", value: "Tutorial Channel", color: "bg-red-500", link: "https://www.youtube.com/@ManageMyBatch" },
     { icon: Facebook, label: "Facebook", value: "Official Page", color: "bg-blue-600", link: "https://www.facebook.com/profile.php?id=61575426041014" },
     { icon: BookOpen, label: t('common.resources', { defaultValue: 'রিসোর্স' }), value: t('common.knowledgeHub', { defaultValue: 'জ্ঞান কেন্দ্র' }), color: "bg-indigo-600", link: "/blog", isInternal: true },
+    { icon: FileText, label: "ডকুমেন্টেশন", value: "কিভাবে ব্যবহার করবেন?", color: "bg-amber-500", link: "https://docs.google.com/document/d/1lc9cOIxt5PhfOI7F_RGsnAt9xju5xFbrDYQheQOkmMk/edit?usp=sharing", isInternal: false },
   ];
 
   return (

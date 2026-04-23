@@ -150,9 +150,14 @@ export function BlogPost() {
       {/* Navigation Breadcrumb */}
       <div className="bg-gray-50 border-b border-gray-100 py-4 px-6 sticky top-0 z-50 backdrop-blur-md bg-white/80">
         <div className="max-w-4xl mx-auto flex items-center justify-between">
-          <Link to="/blog" className="flex items-center gap-2 text-gray-500 hover:text-indigo-600 transition-colors text-sm font-black uppercase tracking-widest">
-            <ArrowLeft className="w-4 h-4" /> ব্লগে ফিরে যান
-          </Link>
+          <div className="flex items-center gap-4">
+            <Link to="/" className="flex items-center gap-2 text-gray-400 hover:text-indigo-600 transition-colors text-sm font-black uppercase tracking-widest border-r border-gray-200 pr-4">
+              মূল পাতা
+            </Link>
+            <Link to="/blog" className="flex items-center gap-2 text-gray-500 hover:text-indigo-600 transition-colors text-sm font-black uppercase tracking-widest">
+              <ArrowLeft className="w-4 h-4" /> ব্লগে ফিরে যান
+            </Link>
+          </div>
           <div className="hidden md:flex items-center gap-3">
              <button onClick={() => window.open(`https://twitter.com/intent/tweet?url=${shareUrl}`, '_blank')} className="p-2 text-gray-400 hover:text-[#1DA1F2] transition-colors"><Twitter className="w-4 h-4" /></button>
              <button onClick={() => window.open(`https://www.facebook.com/sharer/sharer.php?u=${shareUrl}`, '_blank')} className="p-2 text-gray-400 hover:text-[#4267B2] transition-colors"><Facebook className="w-4 h-4" /></button>

@@ -3,7 +3,7 @@ import { collection, query, where, orderBy, onSnapshot } from 'firebase/firestor
 import { db } from '../../firebase';
 import { motion } from 'motion/react';
 import { Link } from 'react-router-dom';
-import { Search, Calendar, User, ArrowRight, BookOpen, Tag } from 'lucide-react';
+import { Search, Calendar, User, ArrowRight, BookOpen, Tag, ArrowLeft } from 'lucide-react';
 
 interface BlogPost {
   id: string;
@@ -56,6 +56,14 @@ export function BlogList() {
       {/* Hero Section */}
       <div className="bg-indigo-600 py-20 px-6 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-96 h-96 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
+        
+        {/* Back to Home Button */}
+        <div className="max-w-7xl mx-auto relative z-20 mb-8">
+           <Link to="/" className="inline-flex items-center gap-2 px-6 py-3 bg-white/10 hover:bg-white/20 backdrop-blur-md rounded-2xl text-white font-black text-sm uppercase tracking-widest transition-all border border-white/10">
+              <ArrowLeft className="w-5 h-5" /> মূল পাতায় যান
+           </Link>
+        </div>
+
         <div className="max-w-7xl mx-auto relative z-10 text-center">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
