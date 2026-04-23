@@ -10,7 +10,7 @@ import { useAuth } from '../lib/auth';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { cn, compressImage } from '../lib/utils';
-import { db, handleFirestoreError, OperationType } from '../firebase';
+import { db, handleFirestoreError, OperationType, safeStringify } from '../firebase';
 import { collection, doc, getDoc, setDoc, updateDoc, query, where, getDocs, onSnapshot, orderBy, limit, addDoc, deleteDoc } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
 import { Modal } from '../components/Modal';
@@ -472,7 +472,7 @@ export function Institution() {
       photoUrl: (app as any).photoUrl || (app.formData as any)?.photoUrl || (app.formData as any)?.photo,
       ...app.formData
     };
-    const encodedData = encodeURIComponent(JSON.stringify(prefillData));
+    const encodedData = encodeURIComponent(safeStringify(prefillData));
     navigate(`/students?prefill=${encodedData}`);
   };
 

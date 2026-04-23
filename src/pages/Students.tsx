@@ -411,24 +411,6 @@ export function Students() {
       return;
     }
 
-    // Special logic for free plan
-    if (user.subscriptionPlan === 'free') {
-      const batchStudents = students.filter(s => s.batchId === newStudent.batchId);
-      const batchCount = batches.length;
-      
-      if (batchCount === 1) {
-        if (batchStudents.length >= 15) {
-          setIsUpgradeModalOpen(true);
-          return;
-        }
-      } else if (batchCount === 2) {
-        if (batchStudents.length >= 10) {
-          setIsUpgradeModalOpen(true);
-          return;
-        }
-      }
-    }
-
     setIsSaving(true);
     try {
       setError(null);

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { collection, query, where, getDocs, limit } from 'firebase/firestore';
-import { db } from '../../firebase';
+import { db, safeStringify } from '../../firebase';
 import { motion } from 'motion/react';
 import ReactMarkdown from 'react-markdown';
 import { Calendar, User, ArrowLeft, Share2, Tag, ChevronRight, Clock, BookOpen, Twitter, Facebook, Link as LinkIcon } from 'lucide-react';
@@ -99,7 +99,7 @@ export function BlogPost() {
           script.type = 'application/ld+json';
           document.head.appendChild(script);
         }
-        script.text = JSON.stringify(schema);
+        script.text = safeStringify(schema);
 
         // Fetch related posts (simple logic: same tags or just latest)
         const relatedQ = query(

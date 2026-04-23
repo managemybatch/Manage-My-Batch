@@ -12,6 +12,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { toPng } from 'html-to-image';
 import { jsPDF } from 'jspdf';
+import { safeStringify } from '../firebase';
 
 interface Student {
   id: string;
@@ -113,7 +114,7 @@ export function IDCardDesigner({ students, institution }: IDCardDesignerProps) {
 
   useEffect(() => {
     if (institution?.id) {
-      localStorage.setItem(`id_designer_config_${institution.id}`, JSON.stringify(config));
+      localStorage.setItem(`id_designer_config_${institution.id}`, safeStringify(config));
     }
   }, [config, institution?.id]);
 

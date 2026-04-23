@@ -155,6 +155,7 @@ export function Dashboard() {
       console.error("Error dismissing notification:", error);
     }
   };
+  const currentPlan = SUBSCRIPTION_PLANS.find(p => p.id === user?.subscriptionPlan) || SUBSCRIPTION_PLANS[0];
   const [stats, setStats] = useState({
     students: 0,
     batches: 0,
@@ -650,19 +651,19 @@ export function Dashboard() {
             <div className="flex justify-between items-end">
               <div>
                 <p className="text-sm font-bold text-gray-900">{t('Student Limit')}</p>
-                <p className="text-xs text-gray-500 font-medium">{stats.students} / {SUBSCRIPTION_PLANS.find(p => p.id === user?.subscriptionPlan)?.studentLimit || 15} {t('Students')}</p>
+                <p className="text-xs text-gray-500 font-medium">{stats.students} / {currentPlan.studentLimit} {t('Students')}</p>
               </div>
               <p className="text-sm font-black text-indigo-600">
-                {Math.round((stats.students / (SUBSCRIPTION_PLANS.find(p => p.id === user?.subscriptionPlan)?.studentLimit || 15)) * 100)}%
+                {Math.round((stats.students / currentPlan.studentLimit) * 100)}%
               </p>
             </div>
             <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
               <motion.div 
                 initial={{ width: 0 }}
-                animate={{ width: `${Math.min(100, (stats.students / (SUBSCRIPTION_PLANS.find(p => p.id === user?.subscriptionPlan)?.studentLimit || 15)) * 100)}%` }}
+                animate={{ width: `${Math.min(100, (stats.students / currentPlan.studentLimit) * 100)}%` }}
                 className={cn(
                   "h-full transition-all duration-1000",
-                  (stats.students / (SUBSCRIPTION_PLANS.find(p => p.id === user?.subscriptionPlan)?.studentLimit || 15)) > 0.9 ? "bg-rose-500" : "bg-indigo-600"
+                  (stats.students / currentPlan.studentLimit) > 0.9 ? "bg-rose-500" : "bg-indigo-600"
                 )}
               />
             </div>
@@ -673,19 +674,19 @@ export function Dashboard() {
             <div className="flex justify-between items-end">
               <div>
                 <p className="text-sm font-bold text-gray-900">{t('Batch Limit')}</p>
-                <p className="text-xs text-gray-500 font-medium">{stats.batches} / {SUBSCRIPTION_PLANS.find(p => p.id === user?.subscriptionPlan)?.batchLimit || 2} {t('Batches')}</p>
+                <p className="text-xs text-gray-500 font-medium">{stats.batches} / {currentPlan.batchLimit} {t('Batches')}</p>
               </div>
               <p className="text-sm font-black text-emerald-600">
-                {Math.round((stats.batches / (SUBSCRIPTION_PLANS.find(p => p.id === user?.subscriptionPlan)?.batchLimit || 2)) * 100)}%
+                {Math.round((stats.batches / currentPlan.batchLimit) * 100)}%
               </p>
             </div>
             <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
               <motion.div 
                 initial={{ width: 0 }}
-                animate={{ width: `${Math.min(100, (stats.batches / (SUBSCRIPTION_PLANS.find(p => p.id === user?.subscriptionPlan)?.batchLimit || 2)) * 100)}%` }}
+                animate={{ width: `${Math.min(100, (stats.batches / currentPlan.batchLimit) * 100)}%` }}
                 className={cn(
                   "h-full transition-all duration-1000",
-                  (stats.batches / (SUBSCRIPTION_PLANS.find(p => p.id === user?.subscriptionPlan)?.batchLimit || 2)) > 0.9 ? "bg-rose-500" : "bg-emerald-600"
+                  (stats.batches / currentPlan.batchLimit) > 0.9 ? "bg-rose-500" : "bg-emerald-600"
                 )}
               />
             </div>

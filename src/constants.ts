@@ -17,23 +17,23 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
     id: 'free',
     name: 'Free',
     price: '৳0',
-    studentLimit: 15,
-    batchLimit: 2,
+    studentLimit: 50,
+    batchLimit: 3,
     features: [
-      'Up to 15 students (1 batch)',
-      'Up to 20 students (2 batches, 10 each)',
+      'Up to 50 students',
+      'Up to 3 batches',
       'Basic student management',
-      'No premium message tokens'
+      'Public profile & Admission form'
     ]
   },
   {
     id: 'basic',
     name: 'Basic',
     price: '৳399',
-    studentLimit: 100,
+    studentLimit: 150,
     batchLimit: 10,
     features: [
-      'Up to 100 students',
+      'Up to 150 students',
       'Up to 10 batches',
       'Premium message token support',
       'Advanced reporting'
@@ -43,10 +43,10 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
     id: 'standard',
     name: 'Standard',
     price: '৳999',
-    studentLimit: 300,
+    studentLimit: 450,
     batchLimit: 30,
     features: [
-      'Up to 300 students',
+      'Up to 450 students',
       'Up to 30 batches',
       'Priority support',
       'Full messaging features'
@@ -56,11 +56,11 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
     id: 'advanced',
     name: 'Advanced',
     price: '৳1999',
-    studentLimit: 800,
-    batchLimit: 80,
+    studentLimit: 1000,
+    batchLimit: 50,
     features: [
-      'Up to 800+ students',
-      'Unlimited batches',
+      'Up to 1000 students',
+      'Up to 50 batches',
       'Dedicated account manager',
       'Custom features'
     ]

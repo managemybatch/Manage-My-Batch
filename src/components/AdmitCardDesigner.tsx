@@ -13,6 +13,7 @@ import { cn } from '../lib/utils';
 import { toPng } from 'html-to-image';
 import { jsPDF } from 'jspdf';
 import { useTranslation } from 'react-i18next';
+import { safeStringify } from '../firebase';
 
 interface Student {
   id: string;
@@ -129,7 +130,7 @@ export function AdmitCardDesigner({ students, exam, institution, onClose }: Admi
   const printRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    localStorage.setItem(`admit_designer_config_${institution?.id || 'default'}`, JSON.stringify(config));
+    localStorage.setItem(`admit_designer_config_${institution?.id || 'default'}`, safeStringify(config));
   }, [config, institution?.id]);
 
   const previewStudent = students[previewStudentIdx] || students[0];
