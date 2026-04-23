@@ -99,6 +99,17 @@ export function BlogPost() {
           script.type = 'application/ld+json';
           document.head.appendChild(script);
         }
+        // Add canonical link
+        const canonicalId = 'blog-canonical';
+        let canonical = document.querySelector(`link[id="${canonicalId}"]`) as HTMLLinkElement;
+        if (!canonical) {
+          canonical = document.createElement('link');
+          canonical.id = canonicalId;
+          canonical.rel = 'canonical';
+          document.head.appendChild(canonical);
+        }
+        canonical.href = window.location.href;
+
         script.text = safeStringify(schema);
 
         // Fetch related posts (simple logic: same tags or just latest)
