@@ -1,0 +1,31 @@
+{
+  "entities": {
+    "blog": {
+      "title": "Blog Post",
+      "description": "A blog post for the system-wide blog",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "description": "The title of the blog post" },
+        "slug": { "type": "string", "description": "The URL-friendly slug of the post" },
+        "content": { "type": "string", "description": "The full content of the post in Markdown" },
+        "excerpt": { "type": "string", "description": "A short summary of the post" },
+        "coverImage": { "type": "string", "description": "URL to the cover image" },
+        "metaTitle": { "type": "string", "description": "SEO meta title" },
+        "metaDescription": { "type": "string", "description": "SEO meta description" },
+        "status": { "type": "string", "enum": ["draft", "published"], "description": "Publishing status" },
+        "authorId": { "type": "string", "description": "UID of the author" },
+        "authorName": { "type": "string", "description": "Name of the author" },
+        "tags": { "type": "array", "description": "List of tags for the post" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Creation timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Last update timestamp" }
+      },
+      "required": ["title", "slug", "content", "status", "authorId", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/blogs/{blogId}": {
+      "schema": "blog",
+      "description": "Collection of system-wide blog posts"
+    }
+  }
+}

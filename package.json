@@ -13,6 +13,7 @@
   "dependencies": {
     "@google/genai": "^1.48.0",
     "@hookform/resolvers": "^5.2.2",
+    "@tailwindcss/typography": "^0.5.19",
     "@tailwindcss/vite": "^4.1.14",
     "@vitejs/plugin-react": "^5.0.4",
     "clsx": "^2.1.1",
@@ -32,6 +33,7 @@
     "react-dom": "^19.0.0",
     "react-hook-form": "^7.72.0",
     "react-i18next": "^17.0.2",
+    "react-markdown": "^10.1.0",
     "react-router-dom": "^7.13.2",
     "recharts": "^3.8.1",
     "tailwind-merge": "^3.5.0",

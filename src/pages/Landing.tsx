@@ -16,10 +16,15 @@ import {
   Star,
   Quote,
   Clock,
-  AlertTriangle
+  AlertTriangle,
+  BookOpen,
+  User as UserIcon,
+  ArrowRight as ArrowRightIcon
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { SUBSCRIPTION_PLANS } from '../constants';
+import { collection, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
+import { db } from '../firebase';
 
 const features = [
   {
@@ -89,7 +94,26 @@ const reviews = [
 
 export function Landing() {
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
+  const [latestBlogs, setLatestBlogs] = React.useState<any[]>([]);
   const navigate = useNavigate();
+
+  React.useEffect(() => {
+    const fetchLatestBlogs = async () => {
+      try {
+        const q = query(
+          collection(db, 'blogs'),
+          where('status', '==', 'published'),
+          orderBy('createdAt', 'desc'),
+          limit(3)
+        );
+        const snapshot = await getDocs(q);
+        setLatestBlogs(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      } catch (error) {
+        console.error("Error fetching blogs:", error);
+      }
+    };
+    fetchLatestBlogs();
+  }, []);
 
   return (
     <div className="min-h-screen bg-white font-sans">
@@ -107,6 +131,7 @@ export function Landing() {
             {/* Desktop Menu */}
             <nav className="hidden md:flex items-center gap-8">
               <a href="#features" className="text-gray-600 hover:text-blue-600 font-medium transition-colors">বৈশিষ্ট্যসমূহ</a>
+              <Link to="/blog" className="text-gray-600 hover:text-blue-600 font-medium transition-colors">রিসোর্স সেন্টার</Link>
               <a href="#about" className="text-gray-600 hover:text-blue-600 font-medium transition-colors">আমাদের সম্পর্কে</a>
               <a href="#reviews" className="text-gray-600 hover:text-blue-600 font-medium transition-colors">মতামত</a>
               <Link to="/login" className="text-gray-600 hover:text-blue-600 font-medium transition-colors">সাহায্য</Link>
@@ -140,6 +165,7 @@ export function Landing() {
         {isMenuOpen && (
           <div className="md:hidden bg-white border-b border-gray-100 p-4 space-y-4">
             <a href="#features" className="block text-gray-600 font-medium" onClick={() => setIsMenuOpen(false)}>বৈশিষ্ট্যসমূহ</a>
+            <Link to="/blog" className="block text-gray-600 font-medium" onClick={() => setIsMenuOpen(false)}>রিসোর্স সেন্টার</Link>
             <a href="#about" className="block text-gray-600 font-medium" onClick={() => setIsMenuOpen(false)}>আমাদের সম্পর্কে</a>
             <a href="#reviews" className="block text-gray-600 font-medium" onClick={() => setIsMenuOpen(false)}>মতামত</a>
             <Link to="/login" className="block text-gray-600 font-medium" onClick={() => setIsMenuOpen(false)}>সাহায্য</Link>
@@ -402,6 +428,68 @@ export function Landing() {
         </div>
       </section>
 
+      {/* Latest Insights Section */}
+      {latestBlogs.length > 0 && (
+        <section className="py-24 px-4 bg-white relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-96 h-96 bg-blue-50 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 opacity-50" />
+          <div className="max-w-7xl mx-auto relative z-10">
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-16">
+              <div className="max-w-2xl">
+                <span className="px-4 py-1.5 bg-blue-100 text-blue-700 text-[10px] font-black uppercase tracking-widest rounded-full mb-4 inline-block">
+                  Resource Center
+                </span>
+                <h2 className="text-3xl md:text-5xl font-black text-gray-900 tracking-tight leading-tight">
+                  শিক্ষক ও প্রতিষ্ঠান পরিচালকদের জন্য <span className="text-blue-600">সেরা পরামর্শ</span>
+                </h2>
+              </div>
+              <Link to="/blog" className="flex items-center gap-2 text-blue-600 font-black uppercase tracking-widest text-sm hover:gap-4 transition-all pb-2">
+                সবগুলো পড়ুন <ArrowRightIcon className="w-5 h-5" />
+              </Link>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              {latestBlogs.map((blog) => (
+                <Link 
+                  key={blog.id} 
+                  to={`/blog/${blog.slug}`}
+                  className="group flex flex-col bg-white rounded-[2rem] border border-gray-100 overflow-hidden hover:shadow-2xl hover:-translate-y-2 transition-all"
+                >
+                  <div className="relative h-52 overflow-hidden bg-gray-50 flex items-center justify-center">
+                    {blog.coverImage ? (
+                      <img src={blog.coverImage} alt={blog.title} className="w-full h-full object-cover transition-transform group-hover:scale-110" referrerPolicy="no-referrer" />
+                    ) : (
+                      <BookOpen className="w-12 h-12 text-blue-100" />
+                    )}
+                    <div className="absolute top-4 left-4">
+                      {blog.tags?.[0] && (
+                        <span className="px-3 py-1 bg-white/90 backdrop-blur-sm text-[9px] font-black uppercase tracking-widest text-blue-600 rounded-full shadow-sm">
+                          {blog.tags[0]}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="p-8">
+                    <div className="flex items-center gap-2 text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">
+                      <Calendar className="w-3 h-3" />
+                      {new Date(blog.createdAt?.seconds * 1000).toLocaleDateString()}
+                    </div>
+                    <h3 className="text-lg font-black text-gray-900 mb-3 group-hover:text-blue-600 transition-colors line-clamp-2 leading-snug">
+                      {blog.title}
+                    </h3>
+                    <p className="text-gray-500 text-sm font-medium line-clamp-2 mb-6 leading-relaxed">
+                      {blog.excerpt}
+                    </p>
+                    <div className="pt-6 border-t border-gray-50 flex items-center gap-2 text-xs font-black text-blue-600 group-hover:gap-3 transition-all">
+                      Read Article <ArrowRightIcon className="w-4 h-4" />
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* Reviews Section */}
       <section id="reviews" className="py-24 px-4 bg-blue-600">
         <div className="max-w-7xl mx-auto">
@@ -478,6 +566,7 @@ export function Landing() {
               <h4 className="font-bold text-gray-900 mb-6">লিঙ্কসমূহ</h4>
               <ul className="space-y-4 text-gray-500">
                 <li><a href="#features" className="hover:text-blue-600 transition-colors">বৈশিষ্ট্যসমূহ</a></li>
+                <li><Link to="/blog" className="hover:text-blue-600 transition-colors">রিসোর্স সেন্টার</Link></li>
                 <li><a href="#about" className="hover:text-blue-600 transition-colors">আমাদের সম্পর্কে</a></li>
                 <li><a href="#reviews" className="hover:text-blue-600 transition-colors">মতামত</a></li>
                 <li><Link to="/login" className="hover:text-blue-600 transition-colors">প্রাইসিং</Link></li>

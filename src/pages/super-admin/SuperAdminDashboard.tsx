@@ -17,7 +17,8 @@ import {
   AlertTriangle,
   Activity,
   BarChart3,
-  PieChart as PieChartIcon
+  PieChart as PieChartIcon,
+  FileText
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Link } from 'react-router-dom';
@@ -283,6 +284,7 @@ export function SuperAdminDashboard() {
               <QuickActionButton icon={MessageSquare} label="Support Inbox" to="/super-admin/support" />
               <QuickActionButton icon={TrendingUp} label="Revenue Analytics" to="/super-admin/analytics" />
               <QuickActionButton icon={Activity} label="System Health" to="/super-admin/health" />
+              <QuickActionButton icon={FileText} label="Manage Blogs" to="/super-admin/blogs" />
             </div>
           </div>
 

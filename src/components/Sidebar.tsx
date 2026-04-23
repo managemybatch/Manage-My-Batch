@@ -84,6 +84,7 @@ export function Sidebar() {
     { icon: Building2, label: 'Institutions', path: '/super-admin/institutions' },
     { icon: MessageSquare, label: 'Support Inbox', path: '/super-admin/support' },
     { icon: HelpCircle, label: 'Manage FAQs', path: '/super-admin/faqs' },
+    { icon: FileText, label: 'Manage Blogs', path: '/super-admin/blogs' },
     { icon: Bell, label: 'Notifications', path: '/super-admin/notifications' },
     { icon: ShieldCheck, label: 'System Health', path: '/super-admin/health' },
     { icon: Settings, label: t('nav.settings'), path: '/settings' },

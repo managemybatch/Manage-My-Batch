@@ -22,6 +22,7 @@ import { ManageFaqs } from './pages/super-admin/ManageFaqs';
 import { ManageStaff } from './pages/super-admin/ManageStaff';
 import { RevenueAnalytics } from './pages/super-admin/RevenueAnalytics';
 import { SystemHealth } from './pages/super-admin/SystemHealth';
+import { ManageBlogs } from './pages/super-admin/ManageBlogs';
 import { SupportChat } from './pages/SupportChat';
 import { Help } from './pages/Help';
 import { InstitutionProfile } from './pages/public/InstitutionProfile';
@@ -29,6 +30,8 @@ import { AdmissionForm } from './pages/public/AdmissionForm';
 import { JobCircular } from './pages/public/JobCircular';
 import { PublicAttendance } from './pages/public/PublicAttendance';
 import { PublicExamResult } from './pages/public/PublicExamResult';
+import { BlogList } from './pages/public/BlogList';
+import { BlogPost } from './pages/public/BlogPost';
 import { Login } from './pages/Login';
 import { Signup } from './pages/Signup';
 import { Landing } from './pages/Landing';
@@ -77,6 +80,8 @@ function AppRoutes() {
       <Route path="/public/circular/:id" element={<JobCircular />} />
       <Route path="/public/attendance/:batchId/:token" element={<PublicAttendance />} />
       <Route path="/public/exam-result/:examId" element={<PublicExamResult />} />
+      <Route path="/blog" element={<BlogList />} />
+      <Route path="/blog/:slug" element={<BlogPost />} />
 
       {/* Persistent Authenticated Layout */}
       <Route element={<AuthenticatedLayout />}>
@@ -103,6 +108,7 @@ function AppRoutes() {
         <Route path="/super-admin/staff" element={<ManageStaff />} />
         <Route path="/super-admin/analytics" element={<RevenueAnalytics />} />
         <Route path="/super-admin/health" element={<SystemHealth />} />
+        <Route path="/super-admin/blogs" element={<ManageBlogs />} />
       </Route>
 
       {/* Fallback for Landing */}
