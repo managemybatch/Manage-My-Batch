@@ -47,7 +47,7 @@ import { toPng } from 'html-to-image';
 
 export function Dashboard() {
   const { user } = useAuth();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
   const [isBirthdayModalOpen, setIsBirthdayModalOpen] = useState(false);
   const birthdayRef = useRef<HTMLDivElement>(null);
