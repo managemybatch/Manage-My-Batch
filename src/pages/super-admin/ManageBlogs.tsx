@@ -78,7 +78,8 @@ export function ManageBlogs() {
 
     const q = query(
       collection(db, 'blogs'),
-      orderBy('createdAt', 'desc')
+      orderBy('createdAt', 'desc'),
+      limit(50)
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {

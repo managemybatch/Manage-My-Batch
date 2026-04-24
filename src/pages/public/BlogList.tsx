@@ -31,7 +31,8 @@ export function BlogList() {
     const q = query(
       collection(db, 'blogs'),
       where('status', '==', 'published'),
-      orderBy('createdAt', 'desc')
+      orderBy('createdAt', 'desc'),
+      limit(20)
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {

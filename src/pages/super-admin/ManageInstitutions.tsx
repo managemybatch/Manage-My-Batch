@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { auth, db, handleFirestoreError, OperationType } from '../../firebase';
 import { sendPasswordResetEmail } from 'firebase/auth';
-import { collection, query, where, getDocs, updateDoc, doc, setDoc, getDoc, limit, count, deleteDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, updateDoc, doc, setDoc, getDoc, limit, count, deleteDoc, getCountFromServer } from 'firebase/firestore';
 import { useTranslation } from 'react-i18next';
 import { 
   Search, 
@@ -82,47 +82,24 @@ export function ManageInstitutions() {
   const fetchInstitutions = async () => {
     setLoading(true);
     try {
-      const usersQuery = query(collection(db, 'users'), where('role', '==', 'admin'));
+      const usersQuery = query(
+        collection(db, 'users'), 
+        where('role', '==', 'admin'),
+        orderBy('createdAt', 'desc'),
+        limit(50)
+      );
       const usersSnapshot = await getDocs(usersQuery);
-      const users = usersSnapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() }));
-
-      const insts = await Promise.all(users.map(async (user: any) => {
-        try {
-          // Get credits
-          const creditDoc = await getDoc(doc(db, 'credits', user.uid));
-          const creditData = creditDoc.exists() ? creditDoc.data() : null;
-          
-          // Get counts
-          const [studentsSnapshot, batchesSnapshot, teachersSnapshot] = await Promise.all([
-            getDocs(query(collection(db, 'students'), where('institutionId', '==', user.uid), limit(1000))),
-            getDocs(query(collection(db, 'batches'), where('institutionId', '==', user.uid), limit(100))),
-            getDocs(query(collection(db, 'teachers'), where('institutionId', '==', user.uid), limit(50)))
-          ]);
-
-          const studentCount = studentsSnapshot.size;
-          const batchCount = batchesSnapshot.size;
-          const teacherCount = teachersSnapshot.size;
-
-          // Calculate activity score (simulated based on counts)
-          const activityScore = Math.min(100, (studentCount * 2) + (batchCount * 5) + (teacherCount * 10));
-          const behavior = activityScore > 80 ? 'Excellent' : activityScore > 40 ? 'Normal' : 'Low Activity';
-
-          return { 
-            id: user.uid, 
-            ...user, 
-            smsBalance: creditData?.balance || 0,
-            studentCount,
-            batchCount,
-            teacherCount,
-            activityScore,
-            behavior
-          };
-        } catch (err) {
-          console.error(`Error fetching data for ${user.uid}:`, err);
-          return { id: user.uid, ...user, smsBalance: 0, studentCount: 0, batchCount: 0, teacherCount: 0, activityScore: 0, behavior: 'Unknown' };
-        }
+      const users = usersSnapshot.docs.map(doc => ({ 
+        id: doc.id, 
+        ...doc.data(),
+        // Initialize placeholders for lazy data
+        studentCount: null,
+        batchCount: null,
+        smsBalance: 0,
+        activityScore: 0
       }));
-      setInstitutions(insts);
+
+      setInstitutions(users);
     } catch (error) {
       handleFirestoreError(error, OperationType.LIST, 'users');
     } finally {
@@ -130,31 +107,78 @@ export function ManageInstitutions() {
     }
   };
 
-  const fetchInstDetails = async (inst: any) => {
-    setLoadingInstData(true);
-    setSelectedInst(inst);
-    setView('details');
+  const fetchInstStats = async (instId: string) => {
     try {
-      const [studentsSnapshot, batchesSnapshot, teachersSnapshot, feesSnapshot] = await Promise.all([
-        getDocs(query(collection(db, 'students'), where('institutionId', '==', inst.id))),
-        getDocs(query(collection(db, 'batches'), where('institutionId', '==', inst.id))),
-        getDocs(query(collection(db, 'teachers'), where('institutionId', '==', inst.id))),
-        getDocs(query(collection(db, 'fees'), where('institutionId', '==', inst.id)))
+      const [studentsCount, batchesCount, creditsDoc] = await Promise.all([
+        getCountFromServer(query(collection(db, 'students'), where('institutionId', '==', instId))),
+        getCountFromServer(query(collection(db, 'batches'), where('institutionId', '==', instId))),
+        getDoc(doc(db, 'credits', instId))
       ]);
 
-      const fees = feesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      const totalRevenue = fees.filter((f: any) => f.status === 'paid').reduce((sum: number, f: any) => sum + (f.amount || 0), 0);
+      const studentCount = studentsCount.data().count;
+      const batchCount = batchesCount.data().count;
+      const smsBalance = creditsDoc.exists() ? creditsDoc.data().balance || 0 : 0;
+      const activityScore = Math.min(100, (studentCount * 2) + (batchCount * 5));
 
-      setSelectedInst((prev: any) => ({ ...prev, totalRevenue }));
+      setInstitutions(prev => prev.map(inst => 
+        inst.id === instId 
+          ? { ...inst, studentCount, batchCount, smsBalance, activityScore } 
+          : inst
+      ));
+    } catch (err) {
+      console.error("Error fetching stats:", err);
+    }
+  };
 
-      setInstData({
-        students: studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })),
-        batches: batchesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })),
-        teachers: teachersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })),
-        fees: fees
-      });
+  const fetchInstDetails = async (inst: any) => {
+    setSelectedInst(inst);
+    setView('details');
+    setActiveTab('overview');
+    // Clear old data
+    setInstData({ students: [], batches: [], teachers: [], fees: [] });
+  };
+
+  useEffect(() => {
+    if (view === 'details' && selectedInst?.id) {
+      loadTabData();
+    }
+  }, [selectedInst?.id, activeTab, view]);
+
+  const loadTabData = async () => {
+    if (!selectedInst?.id) return;
+    setLoadingInstData(true);
+    try {
+      if (activeTab === 'overview') {
+        // Just get basic stats for overview if needed
+        const [studentsCount, batchesCount, creditsDoc] = await Promise.all([
+          getCountFromServer(query(collection(db, 'students'), where('institutionId', '==', selectedInst.id))),
+          getCountFromServer(query(collection(db, 'batches'), where('institutionId', '==', selectedInst.id))),
+          getDoc(doc(db, 'credits', selectedInst.id))
+        ]);
+        setSelectedInst((prev: any) => ({
+          ...prev,
+          studentCount: studentsCount.data().count,
+          batchCount: batchesCount.data().count,
+          smsBalance: creditsDoc.exists() ? creditsDoc.data().balance || 0 : 0
+        }));
+      } else if (activeTab === 'students') {
+        const snap = await getDocs(query(collection(db, 'students'), where('institutionId', '==', selectedInst.id), limit(200)));
+        setInstData(prev => ({ ...prev, students: snap.docs.map(d => ({ id: d.id, ...d.data() })) }));
+      } else if (activeTab === 'batches') {
+        const snap = await getDocs(query(collection(db, 'batches'), where('institutionId', '==', selectedInst.id)));
+        setInstData(prev => ({ ...prev, batches: snap.docs.map(d => ({ id: d.id, ...d.data() })) }));
+      } else if (activeTab === 'teachers') {
+        const snap = await getDocs(query(collection(db, 'teachers'), where('institutionId', '==', selectedInst.id)));
+        setInstData(prev => ({ ...prev, teachers: snap.docs.map(d => ({ id: d.id, ...d.data() })) }));
+      } else if (activeTab === 'fees') {
+        const snap = await getDocs(query(collection(db, 'fees'), where('institutionId', '==', selectedInst.id), orderBy('date', 'desc'), limit(100)));
+        const fees = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        const totalRevenue = fees.filter((f: any) => f.status === 'paid').reduce((sum: number, f: any) => sum + (f.amount || 0), 0);
+        setSelectedInst((prev: any) => ({ ...prev, totalRevenue }));
+        setInstData(prev => ({ ...prev, fees }));
+      }
     } catch (error) {
-      console.error("Error fetching institution details:", error);
+      console.error("Error loading tab data:", error);
     } finally {
       setLoadingInstData(false);
     }
@@ -868,14 +892,28 @@ export function ManageInstitutions() {
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center justify-center gap-4">
-                      <div className="text-center" title="Students">
-                        <p className="text-xs font-black text-gray-900 dark:text-white">{inst.studentCount || 0}</p>
-                        <Users className="w-3 h-3 text-gray-400 mx-auto mt-0.5" />
-                      </div>
-                      <div className="text-center" title="Batches">
-                        <p className="text-xs font-black text-gray-900 dark:text-white">{inst.batchCount || 0}</p>
-                        <Layers className="w-3 h-3 text-gray-400 mx-auto mt-0.5" />
-                      </div>
+                      {inst.studentCount === null ? (
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            fetchInstStats(inst.id);
+                          }}
+                          className="px-3 py-1 bg-gray-100 hover:bg-gray-200 text-gray-500 rounded-lg text-[10px] font-bold uppercase transition-all"
+                        >
+                          Load Stats
+                        </button>
+                      ) : (
+                        <>
+                          <div className="text-center" title="Students">
+                            <p className="text-xs font-black text-gray-900 dark:text-white">{inst.studentCount || 0}</p>
+                            <Users className="w-3 h-3 text-gray-400 mx-auto mt-0.5" />
+                          </div>
+                          <div className="text-center" title="Batches">
+                            <p className="text-xs font-black text-gray-900 dark:text-white">{inst.batchCount || 0}</p>
+                            <Layers className="w-3 h-3 text-gray-400 mx-auto mt-0.5" />
+                          </div>
+                        </>
+                      )}
                     </div>
                   </td>
                   <td className="px-6 py-4">

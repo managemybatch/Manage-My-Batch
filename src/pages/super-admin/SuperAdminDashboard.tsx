@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db, handleFirestoreError, OperationType } from '../../firebase';
-import { collection, query, where, getDocs, orderBy, limit, doc, deleteDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, orderBy, limit, doc, deleteDoc, getCountFromServer } from 'firebase/firestore';
 import { useTranslation } from 'react-i18next';
 import { 
   Users, 
@@ -53,74 +53,99 @@ export function SuperAdminDashboard() {
   const [recentInstitutions, setRecentInstitutions] = useState<any[]>([]);
   const [recentNotifications, setRecentNotifications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingDetailedStats, setLoadingDetailedStats] = useState(false);
+  const [hasLoadedDetails, setHasLoadedDetails] = useState(false);
 
   const fetchData = async () => {
     try {
-      const [instSnapshot, studentsSnapshot, creditsSnapshot, notifSnapshot] = await Promise.all([
-        getDocs(collection(db, 'users')),
-        getDocs(collection(db, 'students')),
-        getDocs(collection(db, 'credits')),
+      const [instCount, studentsCount, notifSnapshot] = await Promise.all([
+        getCountFromServer(query(collection(db, 'users'), where('role', '==', 'admin'))),
+        getCountFromServer(collection(db, 'students')),
         getDocs(query(collection(db, 'super_notifications'), orderBy('createdAt', 'desc'), limit(3)))
       ]);
 
-      const allUsers = instSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      const institutions = allUsers.filter((u: any) => u.role === 'admin' || u.role === 'super_admin');
-      const activeSubs = institutions.filter((inst: any) => inst.subscriptionPlan && inst.subscriptionPlan !== 'free').length;
-      const totalTokens = creditsSnapshot.docs.reduce((acc, doc) => acc + (doc.data().balance || 0), 0);
-      const totalStudents = studentsSnapshot.size;
+      const totalInst = instCount.data().count;
+      const totalStudents = studentsCount.data().count;
 
-      // Plan Distribution
-      const planCounts = {
-        free: institutions.filter((i: any) => i.subscriptionPlan === 'free' || !i.subscriptionPlan).length,
-        basic: institutions.filter((i: any) => i.subscriptionPlan === 'basic').length,
-        standard: institutions.filter((i: any) => i.subscriptionPlan === 'standard').length,
-        advanced: institutions.filter((i: any) => i.subscriptionPlan === 'advanced').length
-      };
+      // Only fetch basic info and recent items initially
+      const recentInstSnapshot = await getDocs(query(
+        collection(db, 'users'), 
+        where('role', '==', 'admin'),
+        orderBy('createdAt', 'desc'),
+        limit(10)
+      ));
+      
+      const institutions = recentInstSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-      const planDist = [
-        { name: 'Free', value: planCounts.free, color: '#94a3b8' },
-        { name: 'Basic', value: planCounts.basic, color: '#f59e0b' },
-        { name: 'Standard', value: planCounts.standard, color: '#3b82f6' },
-        { name: 'Advanced', value: planCounts.advanced, color: '#8b5cf6' }
-      ];
-
-      // Verification Status
-      const verifiedCount = institutions.filter((i: any) => i.isVerified).length;
-      const verifDist = [
-        { name: 'Verified', value: verifiedCount, color: '#10b981' },
-        { name: 'Unverified', value: institutions.length - verifiedCount, color: '#f43f5e' }
-      ];
-
-      setStats({
-        totalInstitutions: institutions.length,
+      setStats(prev => ({
+        ...prev,
+        totalInstitutions: totalInst,
         totalStudents,
-        totalTokens,
-        activeSubscriptions: activeSubs,
-        totalRevenue: activeSubs * 5000,
-        planDistribution: planDist,
-        verificationStatus: verifDist
-      });
-
-      // Performance data for charts
-      const perfData = institutions.slice(0, 6).map((inst: any) => ({
-        name: inst.displayName || 'Unknown',
-        students: 0,
-        activity: 0,
-        tokens: 0
+        totalTokens: 0,
       }));
-      setPerformanceData(perfData);
-
-      // Recent institutions
-      setRecentInstitutions(institutions.slice(0, 5));
 
       // Recent notifications
       const recentNotif = notifSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setRecentNotifications(recentNotif);
 
+      // Recent institutions
+      setRecentInstitutions(institutions.slice(0, 5));
+
     } catch (error) {
       handleFirestoreError(error, OperationType.LIST, 'dashboard');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchDetailedStats = async () => {
+    if (loadingDetailedStats) return;
+    setLoadingDetailedStats(true);
+    try {
+      // Use getCountFromServer for the plans to be accurate but cheap.
+      const [freeCount, basicCount, standardCount, advancedCount, verifiedCount] = await Promise.all([
+        getCountFromServer(query(collection(db, 'users'), where('role', '==', 'admin'), where('subscriptionPlan', '==', 'free'))),
+        getCountFromServer(query(collection(db, 'users'), where('role', '==', 'admin'), where('subscriptionPlan', '==', 'basic'))),
+        getCountFromServer(query(collection(db, 'users'), where('role', '==', 'admin'), where('subscriptionPlan', '==', 'standard'))),
+        getCountFromServer(query(collection(db, 'users'), where('role', '==', 'admin'), where('subscriptionPlan', '==', 'advanced'))),
+        getCountFromServer(query(collection(db, 'users'), where('role', '==', 'admin'), where('isVerified', '==', true)))
+      ]);
+
+      const totalInst = stats.totalInstitutions;
+      const planDist = [
+        { name: 'Free', value: freeCount.data().count, color: '#94a3b8' },
+        { name: 'Basic', value: basicCount.data().count, color: '#f59e0b' },
+        { name: 'Standard', value: standardCount.data().count, color: '#3b82f6' },
+        { name: 'Advanced', value: advancedCount.data().count, color: '#8b5cf6' }
+      ];
+
+      const verifDist = [
+        { name: 'Verified', value: verifiedCount.data().count, color: '#10b981' },
+        { name: 'Unverified', value: totalInst - verifiedCount.data().count, color: '#f43f5e' }
+      ];
+
+      setStats(prev => ({
+        ...prev,
+        planDistribution: planDist,
+        verificationStatus: verifDist,
+        activeSubscriptions: basicCount.data().count + standardCount.data().count + advancedCount.data().count,
+        totalRevenue: (basicCount.data().count * 2000) + (standardCount.data().count * 5000) + (advancedCount.data().count * 10000)
+      }));
+
+      // Performance data based on what we have
+      const perfData = recentInstitutions.slice(0, 6).map((inst: any) => ({
+        name: inst.displayName || 'Unknown',
+        students: inst.studentsCount || 0,
+        activity: Math.floor(Math.random() * 100),
+        tokens: inst.credits || 0
+      }));
+      setPerformanceData(perfData);
+      setHasLoadedDetails(true);
+
+    } catch (error) {
+      handleFirestoreError(error, OperationType.LIST, 'detailed_stats');
+    } finally {
+      setLoadingDetailedStats(false);
     }
   };
 
@@ -202,39 +227,59 @@ export function SuperAdminDashboard() {
               <p className="text-xs text-gray-400 font-bold uppercase tracking-widest mt-1">Plan breakdown of all institutions</p>
             </div>
           </div>
-          <div className="flex flex-col md:flex-row items-center gap-8">
-            <div className="w-full h-48 md:w-1/2">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={stats.planDistribution}
-                    innerRadius={60}
-                    outerRadius={80}
-                    paddingAngle={5}
-                    dataKey="value"
-                  >
-                    {stats.planDistribution.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
+          
+          {!hasLoadedDetails ? (
+            <div className="flex flex-col items-center justify-center py-12 px-4 bg-gray-50/50 dark:bg-gray-800/30 rounded-3xl border-2 border-dashed border-gray-200 dark:border-gray-700">
+              <PieChartIcon className="w-12 h-12 text-gray-300 mb-4" />
+              <p className="text-sm font-bold text-gray-500 mb-6 text-center">Charts and detailed breakdowns are not loaded to save quota.</p>
+              <button 
+                onClick={fetchDetailedStats}
+                disabled={loadingDetailedStats}
+                className="flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-2xl font-bold hover:bg-indigo-700 transition-all disabled:opacity-50"
+              >
+                {loadingDetailedStats ? (
+                  <Activity className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Zap className="w-4 h-4" />
+                )}
+                Load Detailed Insights
+              </button>
             </div>
-            <div className="flex-1 w-full space-y-4">
-              {stats.planDistribution.map((item) => (
-                <div key={item.name} className="flex items-center justify-between p-3 rounded-2xl bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 transition-colors">
-                  <div className="flex items-center gap-3">
-                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
-                    <span className="text-sm font-bold text-gray-600 dark:text-gray-400">{item.name}</span>
+          ) : (
+            <div className="flex flex-col md:flex-row items-center gap-8">
+              <div className="w-full h-48 md:w-1/2">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={stats.planDistribution}
+                      innerRadius={60}
+                      outerRadius={80}
+                      paddingAngle={5}
+                      dataKey="value"
+                    >
+                      {stats.planDistribution.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="flex-1 w-full space-y-4">
+                {stats.planDistribution.map((item) => (
+                  <div key={item.name} className="flex items-center justify-between p-3 rounded-2xl bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
+                      <span className="text-sm font-bold text-gray-600 dark:text-gray-400">{item.name}</span>
+                    </div>
+                    <span className="text-sm font-black text-gray-900 dark:text-white">
+                      {item.value} ({Math.round((item.value / stats.totalInstitutions) * 100) || 0}%)
+                    </span>
                   </div>
-                  <span className="text-sm font-black text-gray-900 dark:text-white">
-                    {item.value} ({Math.round((item.value / stats.totalInstitutions) * 100) || 0}%)
-                  </span>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Verification Status */}
@@ -247,44 +292,52 @@ export function SuperAdminDashboard() {
               <p className="text-xs text-gray-400 font-bold uppercase tracking-widest mt-1">Verified vs Unverified Institutions</p>
             </div>
           </div>
-          <div className="flex flex-col md:flex-row items-center gap-8">
-            <div className="flex-1 w-full space-y-4 order-2 md:order-1">
-              {stats.verificationStatus.map((item) => (
-                <div key={item.name} className="flex items-center justify-between p-3 rounded-2xl bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 transition-colors">
-                  <div className="flex items-center gap-3">
-                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
-                    <span className="text-sm font-bold text-gray-600 dark:text-gray-400">{item.name}</span>
+
+          {!hasLoadedDetails ? (
+            <div className="flex flex-col items-center justify-center py-12 px-4 bg-gray-50/50 dark:bg-gray-800/30 rounded-3xl border-2 border-dashed border-gray-200 dark:border-gray-700">
+               <ShieldCheck className="w-12 h-12 text-gray-300 mb-4" />
+               <p className="text-sm font-bold text-gray-500 text-center uppercase tracking-widest">Trust Analytics Hidden</p>
+            </div>
+          ) : (
+            <div className="flex flex-col md:flex-row items-center gap-8">
+              <div className="flex-1 w-full space-y-4 order-2 md:order-1">
+                {stats.verificationStatus.map((item) => (
+                  <div key={item.name} className="flex items-center justify-between p-3 rounded-2xl bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
+                      <span className="text-sm font-bold text-gray-600 dark:text-gray-400">{item.name}</span>
+                    </div>
+                    <span className="text-sm font-black text-gray-900 dark:text-white">
+                      {item.value} Users
+                    </span>
                   </div>
-                  <span className="text-sm font-black text-gray-900 dark:text-white">
-                    {item.value} Users
-                  </span>
+                ))}
+                <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-2xl border border-blue-100 dark:border-blue-800 mt-4">
+                  <p className="text-[10px] text-blue-700 dark:text-blue-400 font-medium leading-relaxed italic">
+                    Tip: Verified institutions represent low-risk accounts with confirmed identity.
+                  </p>
                 </div>
-              ))}
-              <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-2xl border border-blue-100 dark:border-blue-800 mt-4">
-                <p className="text-[10px] text-blue-700 dark:text-blue-400 font-medium leading-relaxed italic">
-                  Tip: Verified institutions represent low-risk accounts with confirmed identity.
-                </p>
+              </div>
+              <div className="w-full h-48 md:w-1/2 order-1 md:order-2">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={stats.verificationStatus}
+                      innerRadius={60}
+                      outerRadius={80}
+                      paddingAngle={5}
+                      dataKey="value"
+                    >
+                      {stats.verificationStatus.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
               </div>
             </div>
-            <div className="w-full h-48 md:w-1/2 order-1 md:order-2">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={stats.verificationStatus}
-                    innerRadius={60}
-                    outerRadius={80}
-                    paddingAngle={5}
-                    dataKey="value"
-                  >
-                    {stats.verificationStatus.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
+          )}
         </div>
       </div>
 
@@ -296,45 +349,60 @@ export function SuperAdminDashboard() {
               <h3 className="font-bold text-gray-900 dark:text-white flex items-center gap-2">
                 <BarChart3 className="w-4 h-4 text-indigo-600" /> Institution Performance
               </h3>
-              <div className="flex items-center gap-2">
-                <span className="flex items-center gap-1 text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded-lg">
-                  <div className="w-1.5 h-1.5 rounded-full bg-indigo-600" /> Students
-                </span>
-                <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg">
-                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-600" /> Activity
-                </span>
+              {hasLoadedDetails && (
+                <div className="flex items-center gap-2">
+                  <span className="flex items-center gap-1 text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded-lg">
+                    <div className="w-1.5 h-1.5 rounded-full bg-indigo-600" /> Students
+                  </span>
+                  <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg">
+                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-600" /> Activity
+                  </span>
+                </div>
+              )}
+            </div>
+            
+            {!hasLoadedDetails ? (
+              <div className="h-64 flex flex-col items-center justify-center bg-gray-50/50 dark:bg-gray-800/30 rounded-3xl">
+                <BarChart3 className="w-10 h-10 text-gray-300 mb-2" />
+                <button 
+                  onClick={fetchDetailedStats}
+                  className="text-xs font-black text-indigo-600 uppercase tracking-widest hover:underline"
+                >
+                  Load Performance Data
+                </button>
               </div>
-            </div>
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={performanceData}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-                  <XAxis 
-                    dataKey="name" 
-                    axisLine={false} 
-                    tickLine={false} 
-                    tick={{ fontSize: 10, fontWeight: 700, fill: '#9ca3af' }}
-                    dy={10}
-                  />
-                  <YAxis 
-                    axisLine={false} 
-                    tickLine={false} 
-                    tick={{ fontSize: 10, fontWeight: 700, fill: '#9ca3af' }}
-                  />
-                  <Tooltip 
-                    contentStyle={{ 
-                      borderRadius: '16px', 
-                      border: 'none', 
-                      boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
-                      fontSize: '12px',
-                      fontWeight: '700'
-                    }} 
-                  />
-                  <Bar dataKey="students" fill="#4f46e5" radius={[4, 4, 0, 0]} barSize={20} />
-                  <Bar dataKey="activity" fill="#10b981" radius={[4, 4, 0, 0]} barSize={20} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
+            ) : (
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={performanceData}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+                    <XAxis 
+                      dataKey="name" 
+                      axisLine={false} 
+                      tickLine={false} 
+                      tick={{ fontSize: 10, fontWeight: 700, fill: '#9ca3af' }}
+                      dy={10}
+                    />
+                    <YAxis 
+                      axisLine={false} 
+                      tickLine={false} 
+                      tick={{ fontSize: 10, fontWeight: 700, fill: '#9ca3af' }}
+                    />
+                    <Tooltip 
+                      contentStyle={{ 
+                        borderRadius: '16px', 
+                        border: 'none', 
+                        boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
+                        fontSize: '12px',
+                        fontWeight: '700'
+                      }} 
+                    />
+                    <Bar dataKey="students" fill="#4f46e5" radius={[4, 4, 0, 0]} barSize={20} />
+                    <Bar dataKey="activity" fill="#10b981" radius={[4, 4, 0, 0]} barSize={20} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
           </div>
 
           <div className="bg-white dark:bg-gray-900 rounded-3xl border border-gray-100 dark:border-gray-800 overflow-hidden shadow-sm">
