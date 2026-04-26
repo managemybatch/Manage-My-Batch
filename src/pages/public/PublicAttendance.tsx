@@ -20,12 +20,40 @@ interface Batch {
   institutionId: string;
 }
 
+interface DelayInputProps {
+  value: number;
+  onSave: (val: number) => void;
+}
+
+function DelayInput({ value, onSave }: DelayInputProps) {
+  const [localVal, setLocalVal] = useState(value);
+
+  useEffect(() => {
+    setLocalVal(value);
+  }, [value]);
+
+  return (
+    <div className="flex items-center gap-2 mt-1 px-4 py-2 bg-amber-50 rounded-2xl border border-amber-200">
+      <span className="text-[10px] font-black text-amber-600 uppercase tracking-widest">Delay:</span>
+      <input 
+        type="number" 
+        value={localVal === 0 ? '' : localVal}
+        onChange={(e) => setLocalVal(parseInt(e.target.value) || 0)}
+        onBlur={() => onSave(localVal)}
+        className="w-16 px-2 py-1 bg-white border border-amber-300 rounded-xl text-center text-sm font-bold text-amber-700 outline-none focus:ring-2 focus:ring-amber-500/20"
+        placeholder="Min"
+      />
+      <span className="text-[10px] font-bold text-amber-500 uppercase">Minutes</span>
+    </div>
+  );
+}
+
 export function PublicAttendance() {
   const { t } = useTranslation();
   const { batchId, token } = useParams<{ batchId: string; token: string }>();
   const [batch, setBatch] = useState<Batch | null>(null);
   const [students, setStudents] = useState<Student[]>([]);
-  const [attendance, setAttendance] = useState<Record<string, 'present' | 'absent' | 'late'>>({});
+  const [attendance, setAttendance] = useState<Record<string, { status: 'present' | 'absent' | 'late', delay?: number }>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -61,9 +89,9 @@ export function PublicAttendance() {
         setStudents(studentData);
 
         // Initialize attendance with 'present' by default
-        const initialAttendance: Record<string, 'present' | 'absent' | 'late'> = {};
+        const initialAttendance: Record<string, { status: 'present' | 'absent' | 'late', delay?: number }> = {};
         studentData.forEach(s => {
-          initialAttendance[s.id] = 'present';
+          initialAttendance[s.id] = { status: 'present' };
         });
         setAttendance(initialAttendance);
       } catch (err) {
@@ -78,7 +106,23 @@ export function PublicAttendance() {
   }, [batchId]);
 
   const handleMark = (studentId: string, status: 'present' | 'absent' | 'late') => {
-    setAttendance(prev => ({ ...prev, [studentId]: status }));
+    setAttendance(prev => ({ 
+      ...prev, 
+      [studentId]: { 
+        status, 
+        delay: status === 'late' ? (prev[studentId]?.delay || 5) : undefined 
+      } 
+    }));
+  };
+
+  const handleUpdateDelay = (studentId: string, delay: number) => {
+    setAttendance(prev => ({
+      ...prev,
+      [studentId]: {
+        ...prev[studentId],
+        delay
+      }
+    }));
   };
 
   const handleSubmit = async () => {
@@ -186,43 +230,51 @@ export function PublicAttendance() {
                       </span>
                     </td>
                     <td className="px-6 py-4">
-                      <div className="flex items-center justify-center gap-3">
-                        <button 
-                          onClick={() => handleMark(student.id, 'present')}
-                          className={cn(
-                            "p-2.5 rounded-xl transition-all border-2",
-                            attendance[student.id] === 'present' 
-                              ? "bg-emerald-50 border-emerald-500 text-emerald-600 shadow-md shadow-emerald-100" 
-                              : "border-transparent text-gray-300 hover:bg-emerald-50 hover:text-emerald-400"
-                          )}
-                          title="Present"
-                        >
-                          <CheckCircle2 className="w-6 h-6" />
-                        </button>
-                        <button 
-                          onClick={() => handleMark(student.id, 'absent')}
-                          className={cn(
-                            "p-2.5 rounded-xl transition-all border-2",
-                            attendance[student.id] === 'absent' 
-                              ? "bg-rose-50 border-rose-500 text-rose-600 shadow-md shadow-rose-100" 
-                              : "border-transparent text-gray-300 hover:bg-rose-50 hover:text-rose-400"
-                          )}
-                          title="Absent"
-                        >
-                          <XCircle className="w-6 h-6" />
-                        </button>
-                        <button 
-                          onClick={() => handleMark(student.id, 'late')}
-                          className={cn(
-                            "p-2.5 rounded-xl transition-all border-2",
-                            attendance[student.id] === 'late' 
-                              ? "bg-amber-50 border-amber-500 text-amber-600 shadow-md shadow-amber-100" 
-                              : "border-transparent text-gray-300 hover:bg-amber-50 hover:text-amber-400"
-                          )}
-                          title="Late"
-                        >
-                          <Clock className="w-6 h-6" />
-                        </button>
+                      <div className="flex flex-col items-center gap-2">
+                        <div className="flex items-center justify-center gap-3">
+                          <button 
+                            onClick={() => handleMark(student.id, 'present')}
+                            className={cn(
+                              "p-2.5 rounded-xl transition-all border-2",
+                              attendance[student.id]?.status === 'present' 
+                                ? "bg-emerald-50 border-emerald-500 text-emerald-600 shadow-md shadow-emerald-100" 
+                                : "border-transparent text-gray-300 hover:bg-emerald-50 hover:text-emerald-400"
+                            )}
+                            title="Present"
+                          >
+                            <CheckCircle2 className="w-6 h-6" />
+                          </button>
+                          <button 
+                            onClick={() => handleMark(student.id, 'absent')}
+                            className={cn(
+                              "p-2.5 rounded-xl transition-all border-2",
+                              attendance[student.id]?.status === 'absent' 
+                                ? "bg-rose-50 border-rose-500 text-rose-600 shadow-md shadow-rose-100" 
+                                : "border-transparent text-gray-300 hover:bg-rose-50 hover:text-rose-400"
+                            )}
+                            title="Absent"
+                          >
+                            <XCircle className="w-6 h-6" />
+                          </button>
+                          <button 
+                            onClick={() => handleMark(student.id, 'late')}
+                            className={cn(
+                              "p-2.5 rounded-xl transition-all border-2",
+                              attendance[student.id]?.status === 'late' 
+                                ? "bg-amber-50 border-amber-500 text-amber-600 shadow-md shadow-amber-100" 
+                                : "border-transparent text-gray-300 hover:bg-amber-50 hover:text-amber-400"
+                            )}
+                            title="Late"
+                          >
+                            <Clock className="w-6 h-6" />
+                          </button>
+                        </div>
+                        {attendance[student.id]?.status === 'late' && (
+                          <DelayInput 
+                            value={attendance[student.id]?.delay || 5} 
+                            onSave={(val) => handleUpdateDelay(student.id, val)} 
+                          />
+                        )}
                       </div>
                     </td>
                   </tr>

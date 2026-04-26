@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { Briefcase, Plus, Search, Filter, Download, Calendar, CheckCircle, Clock, Share2, ExternalLink, Loader2, Trash2, Edit2, UserPlus, Mail, Phone, MapPin, ChevronDown, MessageSquare, CheckCircle2, AlertCircle, Info, X, Globe } from 'lucide-react';
+import { Briefcase, Plus, Search, Filter, Download, Calendar, CheckCircle, Clock, Share2, ExternalLink, Loader2, Trash2, Edit2, UserPlus, Mail, Phone, MapPin, ChevronDown, MessageSquare, CheckCircle2, AlertCircle, Info, X, Globe, ClipboardCheck, XCircle, FileText, Save } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '../lib/utils';
 import { db, handleFirestoreError, OperationType } from '../firebase';
-import { collection, query, where, orderBy, getDocs, onSnapshot, addDoc, serverTimestamp, doc, updateDoc, deleteDoc, setDoc } from 'firebase/firestore';
+import { collection, query, where, orderBy, getDocs, onSnapshot, addDoc, serverTimestamp, doc, updateDoc, deleteDoc, setDoc, writeBatch } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
 import { Modal } from '../components/Modal';
 import { ConfirmModal } from '../components/ConfirmModal';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 interface Teacher {
   id: string;
@@ -63,16 +65,54 @@ interface JobApplication {
   attachments?: any[];
 }
 
+interface TeacherAttendance {
+  id: string;
+  teacherId: string;
+  teacherName: string;
+  date: string;
+  status: 'present' | 'absent' | 'late' | 'leave';
+  delay?: number;
+}
+
+interface DelayInputProps {
+  value: number;
+  onSave: (val: number) => void;
+}
+
+function DelayInput({ value, onSave }: DelayInputProps) {
+  const [localVal, setLocalVal] = useState(value);
+
+  useEffect(() => {
+    setLocalVal(value);
+  }, [value]);
+
+  return (
+    <div className="flex items-center gap-1">
+      <input 
+        type="number" 
+        value={localVal === 0 ? '' : localVal}
+        onChange={(e) => setLocalVal(parseInt(e.target.value) || 0)}
+        onBlur={() => onSave(localVal)}
+        className="w-12 px-1.5 py-0.5 bg-amber-50 border border-amber-200 rounded text-xs font-bold text-amber-700 focus:outline-none focus:ring-1 focus:ring-amber-500"
+      />
+      <span className="text-[10px] font-bold text-amber-600">min</span>
+    </div>
+  );
+}
+
 export function Teachers() {
   const { user, createStaffAccount } = useAuth();
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'list' | 'schedules' | 'hiring'>('list');
+  const [activeTab, setActiveTab] = useState<'list' | 'schedules' | 'hiring' | 'attendance'>('list');
   const [loading, setLoading] = useState(true);
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [circulars, setCirculars] = useState<Circular[]>([]);
   const [applications, setApplications] = useState<JobApplication[]>([]);
+  const [teacherAttendance, setTeacherAttendance] = useState<Record<string, TeacherAttendance>>({});
+  const [attendanceDate, setAttendanceDate] = useState(new Date().toISOString().split('T')[0]);
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [editingTeacher, setEditingTeacher] = useState<Teacher | null>(null);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
@@ -302,14 +342,32 @@ export function Teachers() {
       setBatches(snapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name })));
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'batches'));
 
+    const unsubAttendance = onSnapshot(
+      query(
+        collection(db, 'teacher_attendance'), 
+        where('institutionId', '==', instId),
+        where('date', '==', attendanceDate)
+      ),
+      (snapshot) => {
+        const attData: Record<string, TeacherAttendance> = {};
+        snapshot.docs.forEach(doc => {
+          const data = doc.data() as TeacherAttendance;
+          attData[data.teacherId] = { id: doc.id, ...data };
+        });
+        setTeacherAttendance(attData);
+      },
+      (error) => handleFirestoreError(error, OperationType.LIST, 'teacher_attendance')
+    );
+
     return () => {
       unsubTeachers();
       unsubSchedules();
       unsubCirculars();
       unsubApps();
       unsubBatches();
+      unsubAttendance();
     };
-  }, [user]);
+  }, [user, attendanceDate]);
 
   const handleAddTeacher = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -462,6 +520,101 @@ export function Teachers() {
     }
   };
 
+  const handleMarkAttendance = async (teacherId: string, teacherName: string, status: 'present' | 'absent' | 'late' | 'leave', delay?: number) => {
+    if (!user) return;
+    const instId = user.institutionId || user.uid;
+    const existing = teacherAttendance[teacherId];
+
+    try {
+      if (existing) {
+        await updateDoc(doc(db, 'teacher_attendance', existing.id), {
+          status,
+          delay: status === 'late' ? (delay ?? (existing.delay || 5)) : undefined,
+          updatedAt: serverTimestamp()
+        });
+      } else {
+        await addDoc(collection(db, 'teacher_attendance'), {
+          teacherId,
+          teacherName,
+          date: attendanceDate,
+          status,
+          delay: status === 'late' ? (delay || 5) : undefined,
+          institutionId: instId,
+          markedBy: user.uid,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        });
+      }
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, 'teacher_attendance');
+    }
+  };
+
+  const downloadMonthlyReport = async () => {
+    if (!user) return;
+    setIsGeneratingReport(true);
+    try {
+      const instId = user.institutionId || user.uid;
+      const [year, month] = attendanceDate.split('-');
+      const firstDay = `${year}-${month}-01`;
+      const lastDay = new Date(Number(year), Number(month), 0).toISOString().split('T')[0];
+
+      const q = query(
+        collection(db, 'teacher_attendance'),
+        where('institutionId', '==', instId),
+        where('date', '>=', firstDay),
+        where('date', '<=', lastDay)
+      );
+
+      const snapshot = await getDocs(q);
+      const records = snapshot.docs.map(d => d.data() as TeacherAttendance);
+
+      if (records.length === 0) {
+        setToast({ message: 'No attendance records found for this month.', type: 'error' });
+        return;
+      }
+
+      const uniqueDates = Array.from(new Set(records.map(r => r.date))).sort();
+      const teacherData: Record<string, Record<string, string>> = {};
+      const teacherNames: Record<string, string> = {};
+
+      records.forEach(r => {
+        if (!teacherData[r.teacherId]) teacherData[r.teacherId] = {};
+        teacherData[r.teacherId][r.date] = r.status.charAt(0).toUpperCase() + (r.status === 'late' && r.delay ? ` (${r.delay}m)` : '');
+        teacherNames[r.teacherId] = r.teacherName;
+      });
+
+      const doc = new jsPDF('l', 'mm', 'a4');
+      doc.setFontSize(18);
+      doc.text(`${user.institutionName || 'Institution'} - Teacher Attendance Report`, 14, 20);
+      doc.setFontSize(12);
+      doc.text(`Month: ${month}/${year}`, 14, 28);
+
+      const headers = [['Teacher Name', ...uniqueDates]];
+      const body = Object.entries(teacherData).map(([id, dates]) => [
+        teacherNames[id],
+        ...uniqueDates.map(date => dates[date] || '-')
+      ]);
+
+      autoTable(doc, {
+        startY: 35,
+        head: headers,
+        body: body,
+        theme: 'grid',
+        styles: { fontSize: 7, halign: 'center' },
+        columnStyles: { 0: { halign: 'left', fontStyle: 'bold', minCellWidth: 30 } }
+      });
+
+      doc.save(`Teacher_Attendance_${year}_${month}.pdf`);
+      setToast({ message: 'Report downloaded successfully!', type: 'success' });
+    } catch (error) {
+      console.error('Report error:', error);
+      setToast({ message: 'Failed to generate report.', type: 'error' });
+    } finally {
+      setIsGeneratingReport(false);
+    }
+  };
+
   const shareCircular = (circularId: string) => {
     const url = `${window.location.origin}/public/circular/${circularId}`;
     navigator.clipboard.writeText(url);
@@ -497,7 +650,7 @@ export function Teachers() {
       </div>
 
       <div className="flex items-center gap-2 p-1 bg-gray-100 rounded-2xl w-fit">
-        {(['list', 'schedules', 'hiring'] as const).map((tab) => (
+        {(['list', 'schedules', 'attendance', 'hiring'] as const).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -508,7 +661,7 @@ export function Teachers() {
                 : "text-gray-500 hover:text-gray-700"
             )}
           >
-            {t(`teachers.tabs.${tab}`)}
+            {tab === 'attendance' ? 'Attendance' : t(`teachers.tabs.${tab}`)}
           </button>
         ))}
       </div>
@@ -852,6 +1005,160 @@ export function Teachers() {
                 </div>
               )}
             </AnimatePresence>
+          </motion.div>
+        )}
+
+        {activeTab === 'attendance' && (
+          <motion.div
+            key="attendance"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="space-y-6"
+          >
+            <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <div className="relative">
+                  <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+                  <input 
+                    type="date" 
+                    value={attendanceDate}
+                    onChange={(e) => setAttendanceDate(e.target.value)}
+                    className="pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none"
+                  />
+                </div>
+                <div className="h-8 w-px bg-gray-100 hidden md:block" />
+                <p className="text-sm font-bold text-gray-500">
+                  Marking attendance for <span className="text-indigo-600">{attendanceDate === new Date().toISOString().split('T')[0] ? 'Today' : attendanceDate}</span>
+                </p>
+              </div>
+              <button 
+                onClick={downloadMonthlyReport}
+                className="flex items-center gap-2 px-6 py-2.5 bg-indigo-600 text-white rounded-xl font-bold text-sm hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100"
+              >
+                {isGeneratingReport ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                Monthly Report
+              </button>
+            </div>
+
+            <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Teacher</th>
+                      <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
+                      <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {teachers.map((teacher) => {
+                      const record = teacherAttendance[teacher.id];
+                      return (
+                        <tr key={teacher.id} className="hover:bg-gray-50/50 transition-colors">
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center text-indigo-600 font-bold">
+                                {teacher.name.charAt(0)}
+                              </div>
+                              <div>
+                                <p className="font-bold text-gray-900">{teacher.name}</p>
+                                <p className="text-xs text-gray-500">{teacher.subject}</p>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            {record ? (
+                              <div className={cn(
+                                "flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider w-fit",
+                                record.status === 'present' ? "bg-emerald-50 text-emerald-600" : 
+                                record.status === 'late' ? "bg-amber-50 text-amber-600" :
+                                record.status === 'leave' ? "bg-blue-50 text-blue-600" :
+                                "bg-rose-50 text-rose-600"
+                              )}>
+                                {record.status === 'present' && <CheckCircle2 className="w-3 h-3" />}
+                                {record.status === 'absent' && <XCircle className="w-3 h-3" />}
+                                {record.status === 'late' && <Clock className="w-3 h-3" />}
+                                {record.status === 'leave' && <Calendar className="w-3 h-3" />}
+                                {record.status} {record.status === 'late' && record.delay && `(${record.delay}m)`}
+                              </div>
+                            ) : (
+                              <span className="text-xs text-gray-400 italic">Not marked</span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex items-center justify-end gap-2">
+                              <button 
+                                onClick={() => handleMarkAttendance(teacher.id, teacher.name, 'present')}
+                                className={cn(
+                                  "p-2 rounded-lg transition-all",
+                                  record?.status === 'present' ? "bg-emerald-600 text-white" : "text-gray-300 hover:bg-emerald-50 hover:text-emerald-600"
+                                )}
+                                title="Present"
+                              >
+                                <CheckCircle2 className="w-5 h-5" />
+                              </button>
+                              <button 
+                                onClick={() => handleMarkAttendance(teacher.id, teacher.name, 'absent')}
+                                className={cn(
+                                  "p-2 rounded-lg transition-all",
+                                  record?.status === 'absent' ? "bg-rose-600 text-white" : "text-gray-300 hover:bg-rose-50 hover:text-rose-600"
+                                )}
+                                title="Absent"
+                              >
+                                <XCircle className="w-5 h-5" />
+                              </button>
+                              <div className="flex items-center gap-2">
+                                <button 
+                                  onClick={() => handleMarkAttendance(teacher.id, teacher.name, 'late')}
+                                  className={cn(
+                                    "p-2 rounded-lg transition-all",
+                                    record?.status === 'late' ? "bg-amber-600 text-white" : "text-gray-300 hover:bg-amber-50 hover:text-amber-600"
+                                  )}
+                                  title="Late"
+                                >
+                                  <Clock className="w-5 h-5" />
+                                </button>
+                                {record?.status === 'late' && (
+                                  <DelayInput 
+                                    value={record.delay || 5} 
+                                    onSave={(val) => handleMarkAttendance(teacher.id, teacher.name, 'late', val)} 
+                                  />
+                                )}
+                              </div>
+                              <button 
+                                onClick={() => handleMarkAttendance(teacher.id, teacher.name, 'leave')}
+                                className={cn(
+                                  "p-2 rounded-lg transition-all",
+                                  record?.status === 'leave' ? "bg-blue-600 text-white" : "text-gray-300 hover:bg-blue-50 hover:text-blue-600"
+                                )}
+                                title="Leave"
+                              >
+                                <Calendar className="w-5 h-5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              {[
+                { label: 'Present', count: Object.values(teacherAttendance).filter(r => r.status === 'present').length, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+                { label: 'Late', count: Object.values(teacherAttendance).filter(r => r.status === 'late').length, color: 'text-amber-600', bg: 'bg-amber-50' },
+                { label: 'Absent', count: Object.values(teacherAttendance).filter(r => r.status === 'absent').length, color: 'text-rose-600', bg: 'bg-rose-50' },
+                { label: 'Leave', count: Object.values(teacherAttendance).filter(r => r.status === 'leave').length, color: 'text-blue-600', bg: 'bg-blue-50' },
+              ].map((stat, idx) => (
+                <div key={idx} className={cn("p-4 rounded-2xl border border-gray-100 flex items-center justify-between", stat.bg)}>
+                  <span className={cn("text-xs font-bold uppercase tracking-wider", stat.color)}>{stat.label}</span>
+                  <span className="text-xl font-black text-gray-900">{stat.count}</span>
+                </div>
+              ))}
+            </div>
           </motion.div>
         )}
 

@@ -216,9 +216,16 @@ service cloud.firestore {
     }
 
     function getInstitutionId() {
-      return exists(/databases/$(database)/documents/users/$(request.auth.uid)) 
-        ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.institutionId 
-        : null;
+      let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
+      return (userDoc != null && 'institutionId' in userDoc.data) ? userDoc.data.institutionId : null;
+    }
+
+    function isMemberOf(institutionId) {
+      return isAuthenticated() && (
+        getInstitutionId() == institutionId || 
+        request.auth.uid == institutionId || 
+        isAdmin()
+      );
     }
 
     function isTeacher() {
@@ -258,62 +265,61 @@ service cloud.firestore {
     }
 
     function isValidStudent(data) {
-      return hasRequiredFields(['name', 'rollNo', 'guardianPhone', 'batchId', 'joinDate', 'monthlyFee', 'status', 'createdBy']) &&
-        data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+      return hasRequiredFields(['name', 'rollNo', 'guardianPhone', 'batchId', 'joinDate', 'monthlyFee', 'status', 'createdBy', 'institutionId']) &&
+        data.name is string && data.name.size() > 0 &&
         data.rollNo is string &&
         data.guardianPhone is string &&
         data.batchId is string &&
         data.joinDate is string &&
         data.monthlyFee is number && data.monthlyFee >= 0 &&
         data.status in ['active', 'inactive'] &&
-        (data.createdBy == request.auth.uid || isAdmin()) &&
-        (data.email == null || isValidEmail(data.email)) &&
-        (data.phone == null || data.phone is string) &&
-        (data.guardianName == null || data.guardianName is string) &&
-        (data.fatherName == null || data.fatherName is string) &&
-        (data.motherName == null || data.motherName is string) &&
-        (data.dateOfBirth == null || data.dateOfBirth is string) &&
-        (data.birthCertificateNo == null || data.birthCertificateNo is string) &&
-        (data.nidNumber == null || data.nidNumber is string) &&
-        (data.address == null || data.address is string) &&
-        (data.photoUrl == null || isValidUrl(data.photoUrl)) &&
-        (data.grade == null || data.grade is string) &&
-        (data.section == null || data.section is string) &&
-        (data.batchName == null || data.batchName is string) &&
-        (data.subjectGroup == null || data.subjectGroup is string) &&
-        (data.feeType == null || data.feeType is string);
+        data.institutionId is string &&
+        (data.createdBy == request.auth.uid || isMemberOf(data.institutionId));
     }
 
     function isValidFee(data) {
       return hasRequiredFields(['studentId', 'amount', 'date', 'month', 'year', 'status', 'type', 'institutionId', 'createdBy']) &&
         data.studentId is string &&
         data.amount is number && data.amount >= 0 &&
-        data.status in ['paid', 'pending'] &&
         data.institutionId is string &&
-        (data.institutionId == request.auth.uid || data.institutionId == getInstitutionId()) &&
+        isMemberOf(data.institutionId) &&
         data.createdBy == request.auth.uid;
     }
 
     function isValidAttendance(data) {
-      return hasRequiredFields(['studentId', 'date', 'status', 'grade', 'section', 'markedBy']) &&
+      return hasRequiredFields(['studentId', 'date', 'status', 'batchId', 'markedBy']) &&
         data.studentId is string &&
         data.status in ['present', 'absent', 'late'] &&
-        data.markedBy == request.auth.uid;
+        data.markedBy == request.auth.uid &&
+        (!('delay' in data) || (data.delay is number));
+    }
+
+    function isValidTeacherAttendance(data) {
+      return hasRequiredFields(['teacherId', 'date', 'status', 'institutionId', 'markedBy', 'createdAt']) &&
+        data.teacherId is string &&
+        data.status in ['present', 'absent', 'late', 'leave'] &&
+        data.markedBy == request.auth.uid &&
+        (!('delay' in data) || (data.delay is number));
     }
 
     function isValidBatch(data) {
-      return hasRequiredFields(['name', 'grade', 'createdBy', 'createdAt']) &&
-        data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+      return hasRequiredFields(['name', 'grade', 'createdBy', 'createdAt', 'institutionId']) &&
+        data.name is string && data.name.size() > 0 &&
         data.grade is string &&
         (!('admissionFee' in data) || (data.admissionFee is number && data.admissionFee >= 0)) &&
         (!('monthlyFee' in data) || (data.monthlyFee is number && data.monthlyFee >= 0)) &&
+        (data.institutionId == request.auth.uid || isMemberOf(data.institutionId));
+    }
+
+    function isValidBatchContent(data) {
+      return hasRequiredFields(['batchId', 'institutionId', 'title', 'contentType', 'publishDate', 'createdAt']) &&
+        data.batchId is string &&
+        data.institutionId is string &&
+        data.title is string &&
+        data.contentType in ['homework', 'progress', 'material', 'notice'] &&
+        data.publishDate is string &&
         (data.description == null || data.description is string) &&
-        (data.color == null || data.color is string) &&
-        (data.batchTime == null || data.batchTime is string) &&
-        (data.duration == null || data.duration is string) &&
-        (data.subjects == null || data.subjects is list) &&
-        (data.weeklyDays == null || data.weeklyDays is list) &&
-        (data.createdBy == request.auth.uid || isAdmin() || (isTeacher() && data.institutionId == getInstitutionId()));
+        (data.attachments == null || data.attachments is list);
     }
 
     function isValidOfflineExam(data) {
@@ -379,11 +385,11 @@ service cloud.firestore {
     }
 
     match /students/{studentId} {
-      allow get: if true; // Publicly readable for results if ID is known
-      allow list: if isTeacher() && (resource.data.institutionId == getInstitutionId() || resource.data.institutionId == request.auth.uid || isAdmin());
-      allow create: if isTeacher() && request.resource.data.institutionId == (getInstitutionId() != null ? getInstitutionId() : request.auth.uid) && isValidStudent(request.resource.data);
-      allow update: if isTeacher() && resource.data.institutionId == (getInstitutionId() != null ? getInstitutionId() : request.auth.uid) && isValidStudent(request.resource.data);
-      allow delete: if isInstitutionAdmin() && resource.data.institutionId == (getInstitutionId() != null ? getInstitutionId() : request.auth.uid);
+      allow get: if true;
+      allow list: if isTeacher() && isMemberOf(resource.data.institutionId);
+      allow create: if isTeacher() && isMemberOf(request.resource.data.institutionId) && isValidStudent(request.resource.data);
+      allow update: if isTeacher() && isMemberOf(resource.data.institutionId) && isValidStudent(request.resource.data);
+      allow delete: if isInstitutionAdmin() && isMemberOf(resource.data.institutionId);
     }
 
     match /fees/{feeId} {
@@ -397,9 +403,26 @@ service cloud.firestore {
     }
 
     match /batches/{batchId} {
-      allow get: if true; // Publicly readable for profiles
-      allow list: if isTeacher() && (resource.data.institutionId == getInstitutionId() || resource.data.institutionId == request.auth.uid || isAdmin());
-      allow write: if isTeacher() && isValidBatch(request.resource.data);
+      allow get: if true;
+      allow list: if isTeacher() && isMemberOf(resource.data.institutionId);
+      allow create: if isTeacher() && isMemberOf(request.resource.data.institutionId) && isValidBatch(request.resource.data);
+      allow update: if isTeacher() && isMemberOf(resource.data.institutionId) && isValidBatch(request.resource.data);
+      allow delete: if isInstitutionAdmin() && isMemberOf(resource.data.institutionId);
+    }
+
+    match /batch_content/{contentId} {
+      allow read: if true;
+      allow create: if isTeacher() && 
+                      (request.resource.data.institutionId == request.auth.uid || 
+                       (getInstitutionId() != null && request.resource.data.institutionId == getInstitutionId())) &&
+                      isValidBatchContent(request.resource.data);
+      allow update: if isTeacher() && 
+                      (resource.data.institutionId == request.auth.uid || 
+                       (getInstitutionId() != null && resource.data.institutionId == getInstitutionId())) &&
+                      isValidBatchContent(request.resource.data);
+      allow delete: if isTeacher() && 
+                      (resource.data.institutionId == request.auth.uid || 
+                       (getInstitutionId() != null && resource.data.institutionId == getInstitutionId()));
     }
 
     match /offline_exams/{examId} {
@@ -437,6 +460,11 @@ service cloud.firestore {
     match /teachers/{teacherId} {
       allow read: if true; // Publicly readable for profiles
       allow create, update, delete: if isTeacher();
+    }
+
+    match /teacher_attendance/{attendanceId} {
+      allow read: if isTeacher();
+      allow write: if isTeacher() && isValidTeacherAttendance(request.resource.data);
     }
 
     match /notices/{noticeId} {

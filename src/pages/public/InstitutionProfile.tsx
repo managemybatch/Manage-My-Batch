@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { db, handleFirestoreError, OperationType } from '../../firebase';
 import { doc, getDoc, collection, query, where, getDocs, limit, orderBy, getCountFromServer } from 'firebase/firestore';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Building, MapPin, Phone, Mail, Globe, Users, Briefcase, Layers, CheckCircle, Loader2, GraduationCap, Calendar, Download, Megaphone, Newspaper, ArrowRight, Clock, Info, FileText, TrendingUp, Star, HelpCircle, Facebook, Youtube, Linkedin, User } from 'lucide-react';
+import { Building, MapPin, Phone, Mail, Globe, Users, Briefcase, Layers, CheckCircle, Loader2, GraduationCap, Calendar, Download, Megaphone, Newspaper, ArrowRight, Clock, Info, FileText, TrendingUp, Star, HelpCircle, Facebook, Youtube, Linkedin, User, Key, ChevronRight, AlertCircle, X, BookOpen, MessageSquare, Search, Filter } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../../lib/utils';
 import { toPng } from 'html-to-image';
@@ -18,6 +18,20 @@ export function InstitutionProfile() {
   const [events, setEvents] = useState<any[]>([]);
   const [circulars, setCirculars] = useState<any[]>([]);
   const [exams, setExams] = useState<any[]>([]);
+  const [batches, setBatches] = useState<any[]>([]);
+  const [selectedBatch, setSelectedBatch] = useState<any>(null);
+  const [batchUpdates, setBatchUpdates] = useState<any[]>([]);
+  const [isBatchPortalOpen, setIsBatchPortalOpen] = useState(false);
+  const [batchPassword, setBatchPassword] = useState('');
+  const [isBatchAuthorized, setIsBatchAuthorized] = useState(false);
+  const [passwordError, setPasswordError] = useState(false);
+  const [loadingUpdates, setLoadingUpdates] = useState(false);
+  const [students, setStudents] = useState<any[]>([]);
+  const [searchingStudents, setSearchingStudents] = useState(false);
+  const [studentSearchTerm, setStudentSearchTerm] = useState('');
+  const [studentFilterBatch, setStudentFilterBatch] = useState('');
+  const [studentFilterGrade, setStudentFilterGrade] = useState('');
+  const [studentZoneTab, setStudentZoneTab] = useState<'batches' | 'directory'>('batches');
   const bioRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -71,10 +85,11 @@ export function InstitutionProfile() {
           getDocs(query(collection(db, 'notices'), where('institutionId', '==', instId), where('active', '==', true), orderBy('createdAt', 'desc'), limit(5))),
           getDocs(query(collection(db, 'events'), where('institutionId', '==', instId), where('active', '==', true), limit(5))),
           getDocs(query(collection(db, 'circulars'), where('institutionId', '==', instId), where('published', '!=', false), limit(5))),
-          getDocs(query(collection(db, 'offline_exams'), where('institutionId', '==', instId), where('isPublished', '==', true), orderBy('date', 'desc'), limit(10)))
+          getDocs(query(collection(db, 'offline_exams'), where('institutionId', '==', instId), where('isPublished', '==', true), orderBy('date', 'desc'), limit(10))),
+          getDocs(query(collection(db, 'students'), where('institutionId', '==', instId), limit(20)))
         ]);
 
-        const [studentsCount, teachersCount, batchesCount, noticesSnap, eventsSnap, circularsSnap, examsSnap] = results.map(r => r.status === 'fulfilled' ? r.value : null);
+        const [studentsCount, teachersCount, batchesCount, noticesSnap, eventsSnap, circularsSnap, examsSnap, initialStudentsSnap] = results.map(r => r.status === 'fulfilled' ? r.value : null);
 
         setStats({
           students: (studentsCount as any)?.data()?.count || 0,
@@ -84,6 +99,10 @@ export function InstitutionProfile() {
 
         if (noticesSnap && 'docs' in (noticesSnap as any)) {
           setNotices((noticesSnap as any).docs.map((d: any) => ({ id: d.id, ...d.data() })));
+        }
+
+        if (initialStudentsSnap && 'docs' in (initialStudentsSnap as any)) {
+          setStudents((initialStudentsSnap as any).docs.map((d: any) => ({ id: d.id, ...d.data() })));
         }
 
         if (eventsSnap && 'docs' in (eventsSnap as any)) {
@@ -105,6 +124,10 @@ export function InstitutionProfile() {
         if (examsSnap && 'docs' in (examsSnap as any)) {
           setExams((examsSnap as any).docs.map((d: any) => ({ id: d.id, ...d.data() })));
         }
+
+        // Fetch Batches for Portal
+        const batchesSnap = await getDocs(query(collection(db, 'batches'), where('institutionId', '==', instId)));
+        setBatches(batchesSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       } catch (err) {
         handleFirestoreError(err, OperationType.GET, 'institutions');
       } finally {
@@ -113,6 +136,68 @@ export function InstitutionProfile() {
     }
     fetchData();
   }, [id, slug]);
+
+  const scrollToSection = (e: React.MouseEvent, sectionIdOrType: string) => {
+    e.preventDefault();
+    let el = document.getElementById(sectionIdOrType);
+    
+    // Fallback if ID doesn't match (e.g. if it was passed 'sec_batch_portal' but ID is actually something else)
+    if (!el && sectionIdOrType === 'sec_batch_portal') {
+      const portalSection = document.querySelector('[data-section-type="batch_portal"]');
+      if (portalSection) el = portalSection as HTMLElement;
+    }
+
+    if (el) {
+      const navHeight = 80; // Approximate height of sticky nav
+      const elementPosition = el.getBoundingClientRect().top + window.scrollY;
+      const offsetPosition = elementPosition - navHeight;
+
+      window.scrollTo({
+        top: offsetPosition,
+        behavior: 'smooth'
+      });
+    }
+  };
+
+  const fetchStudents = async () => {
+    if (!institution) return;
+    setSearchingStudents(true);
+    try {
+      let q = query(collection(db, 'students'), where('institutionId', '==', institution.id));
+      
+      if (studentFilterBatch) {
+        q = query(q, where('batchId', '==', studentFilterBatch));
+      }
+      
+      if (studentFilterGrade) {
+        q = query(q, where('grade', '==', studentFilterGrade));
+      }
+
+      // Note: Client-side search for name/rollNumber if needed, or structured queries
+      const snap = await getDocs(q);
+      let fetchedStudents = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+      if (studentSearchTerm) {
+        const lowerTerm = studentSearchTerm.toLowerCase();
+        fetchedStudents = fetchedStudents.filter((s: any) => 
+          s.name?.toLowerCase().includes(lowerTerm) || 
+          s.rollNumber?.toString().includes(lowerTerm)
+        );
+      }
+
+      setStudents(fetchedStudents);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setSearchingStudents(false);
+    }
+  };
+
+  useEffect(() => {
+    if (studentZoneTab === 'directory') {
+      fetchStudents();
+    }
+  }, [studentSearchTerm, studentFilterBatch, studentFilterGrade, studentZoneTab]);
 
   const downloadBio = async () => {
     if (!institution || !bioRef.current || downloading) return;
@@ -160,6 +245,51 @@ export function InstitutionProfile() {
       alert(`Failed to generate PDF: ${error.message || 'Check connection'}`);
     } finally {
       setDownloading(false);
+    }
+  };
+
+  const handleSelectBatch = async (batch: any) => {
+    setSelectedBatch(batch);
+    setBatchPassword('');
+    setIsBatchAuthorized(false);
+    setPasswordError(false);
+    
+    // Check if already authorized in session
+    if (sessionStorage.getItem(`batch_auth_${batch.id}`) === 'true' || !batch.websitePassword) {
+      setIsBatchAuthorized(true);
+      fetchBatchUpdates(batch.id);
+    }
+    
+    setIsBatchPortalOpen(true);
+  };
+
+  const fetchBatchUpdates = (batchId: string) => {
+    setLoadingUpdates(true);
+    const q = query(
+      collection(db, 'batch_content'),
+      where('batchId', '==', batchId),
+      orderBy('createdAt', 'desc')
+    );
+
+    return getDocs(q).then((snap) => {
+      setBatchUpdates(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setLoadingUpdates(false);
+    }).catch(err => {
+      console.error(err);
+      setLoadingUpdates(false);
+    });
+  };
+
+  const handleBatchLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (selectedBatch?.websitePassword && batchPassword === selectedBatch.websitePassword) {
+      setIsBatchAuthorized(true);
+      setPasswordError(false);
+      sessionStorage.setItem(`batch_auth_${selectedBatch.id}`, 'true');
+      fetchBatchUpdates(selectedBatch.id);
+    } else {
+      setPasswordError(true);
+      setTimeout(() => setPasswordError(false), 2000);
     }
   };
 
@@ -266,6 +396,20 @@ export function InstitutionProfile() {
                   <p className="text-white/80 flex items-center justify-center md:justify-start gap-2 font-medium">
                     <MapPin className="w-5 h-5 text-brand-light" /> {institution.address || 'Address not provided'}
                   </p>
+                  
+                  <div className="flex flex-wrap items-center justify-center md:justify-start gap-4 pt-4">
+                    <button 
+                      onClick={(e) => scrollToSection(e, 'sec_batch_portal')} 
+                      className="px-8 py-3 bg-white text-brand rounded-2xl font-black text-sm hover:bg-brand-light hover:text-white transition-all shadow-xl shadow-black/20 flex items-center gap-2"
+                    >
+                       <Globe className="w-4 h-4" /> Student Zone
+                    </button>
+                    {institution.admissionForm?.active && (
+                       <button onClick={() => navigate(`/public/admission/${institution.id}`)} className="px-8 py-3 bg-brand-light text-white rounded-2xl font-black text-sm hover:brightness-110 transition-all border border-white/20 flex items-center gap-2">
+                         <GraduationCap className="w-4 h-4" /> Register Now
+                       </button>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -546,7 +690,7 @@ export function InstitutionProfile() {
 
       case 'faq':
         return (section.faqs || []).length > 0 && (
-          <section key={section.id} className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm space-y-6">
+          <section key={section.id} id={section.id} className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm space-y-6">
             <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
               <HelpCircle className="w-6 h-6 text-indigo-600" /> {section.title || 'Frequently Asked Questions'}
             </h2>
@@ -561,6 +705,315 @@ export function InstitutionProfile() {
           </section>
         );
 
+      case 'batch_portal':
+        return (
+          <section 
+            key={section.id} 
+            id={section.id} 
+            data-section-type="batch_portal"
+            className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm space-y-8"
+          >
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="space-y-1">
+                <h2 className="text-2xl font-black text-gray-900 flex items-center gap-2">
+                  <Globe className="w-6 h-6 text-brand" /> {section.title || 'Student Zone'}
+                </h2>
+                <p className="text-sm text-gray-500 font-medium">Daily homework, progress and study materials</p>
+              </div>
+              
+              <div className="flex items-center p-1 bg-gray-100 rounded-xl">
+                <button 
+                  onClick={() => { setStudentZoneTab('batches'); setIsBatchPortalOpen(false); }}
+                  className={cn(
+                    "px-4 py-2 text-xs font-black uppercase tracking-wider rounded-lg transition-all",
+                    studentZoneTab === 'batches' ? "bg-white text-brand shadow-sm" : "text-gray-500 hover:text-gray-700"
+                  )}
+                >
+                  Batches
+                </button>
+                <button 
+                  onClick={() => setStudentZoneTab('directory')}
+                  className={cn(
+                    "px-4 py-2 text-xs font-black uppercase tracking-wider rounded-lg transition-all",
+                    studentZoneTab === 'directory' ? "bg-white text-brand shadow-sm" : "text-gray-500 hover:text-gray-700"
+                  )}
+                >
+                  Directory
+                </button>
+              </div>
+            </div>
+
+            {studentZoneTab === 'batches' ? (
+              <>
+                <div className="flex items-center gap-2 text-brand font-black text-[10px] uppercase tracking-widest bg-brand/5 px-4 py-2 rounded-full w-fit">
+                  <Users className="w-3 h-3" /> {batches.length} Active Batches
+                </div>
+
+                {batches.length === 0 ? (
+                  <div className="text-center py-12 bg-gray-50 rounded-3xl border border-dashed border-gray-200">
+                    <AlertCircle className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                    <h3 className="font-bold text-gray-900">No Batches Found</h3>
+                    <p className="text-sm text-gray-500">Wait for the institution to add batches.</p>
+                  </div>
+                ) : !isBatchPortalOpen ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {batches.map((batch) => (
+                      <button
+                        key={batch.id}
+                        onClick={() => handleSelectBatch(batch)}
+                        className="p-6 bg-gray-50 rounded-[28px] text-left border border-gray-100 hover:border-brand hover:bg-white hover:shadow-xl transition-all group"
+                      >
+                        <div className="flex items-center justify-between mb-4">
+                          <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-brand shadow-sm group-hover:bg-brand group-hover:text-white transition-all">
+                            <Layers className="w-6 h-6" />
+                          </div>
+                          <ArrowRight className="w-4 h-4 text-gray-300 group-hover:text-brand group-hover:translate-x-1 transition-all" />
+                        </div>
+                        <div className="space-y-1">
+                          <h4 className="font-black text-gray-900 line-clamp-1">{batch.name}</h4>
+                          <p className="text-xs text-gray-400 font-bold uppercase tracking-widest leading-none">{batch.grade}</p>
+                        </div>
+                        <div className="mt-4 flex items-center gap-2">
+                          <span className="text-[10px] font-black text-brand bg-brand/5 px-2 py-0.5 rounded-lg border border-brand/10">Access Portal</span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="bg-gray-50/50 rounded-[2.5rem] border border-gray-100 space-y-6 overflow-hidden">
+                    <div className="bg-white px-8 py-4 border-b border-gray-100 flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <button onClick={() => setIsBatchPortalOpen(false)} className="p-2 hover:bg-gray-100 rounded-lg text-gray-500">
+                          <ArrowRight className="w-4 h-4 rotate-180" />
+                        </button>
+                        <div>
+                          <h4 className="font-black text-gray-900 leading-none">{selectedBatch?.name}</h4>
+                          <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1">Batch Content</p>
+                        </div>
+                      </div>
+                      <button onClick={() => setIsBatchPortalOpen(false)} className="p-2 hover:bg-rose-50 rounded-lg text-gray-400 hover:text-rose-500">
+                        <X className="w-5 h-5" />
+                      </button>
+                    </div>
+
+                    <div className="p-8 pt-2">
+                      {!isBatchAuthorized ? (
+                        <div className="max-w-md mx-auto py-10 text-center space-y-6">
+                          <div className="w-20 h-20 bg-indigo-50 rounded-3xl flex items-center justify-center mx-auto text-brand">
+                            <Key className="w-10 h-10" />
+                          </div>
+                          <div>
+                            <h5 className="text-xl font-black text-gray-900">Protected Content</h5>
+                            <p className="text-gray-500 text-sm mt-1">Enter the batch password to view updates.</p>
+                          </div>
+                          <form onSubmit={handleBatchLogin} className="space-y-4">
+                            <input 
+                              type="password"
+                              value={batchPassword}
+                              onChange={(e) => setBatchPassword(e.target.value)}
+                              placeholder="Batch Password"
+                              className={cn(
+                                "w-full px-4 py-4 bg-white border border-gray-200 rounded-2xl text-lg font-bold tracking-widest text-center focus:ring-4 focus:ring-brand/10 outline-none transition-all",
+                                passwordError && "border-rose-500 animate-shake"
+                              )}
+                              autoFocus
+                            />
+                            <button 
+                              type="submit"
+                              className="w-full py-4 bg-brand text-white rounded-2xl font-black text-lg hover:bg-brand/90 shadow-xl shadow-brand/20"
+                            >
+                              Unlock Portal
+                            </button>
+                          </form>
+                        </div>
+                      ) : (
+                        <div className="space-y-6">
+                          {loadingUpdates ? (
+                            <div className="flex justify-center py-20">
+                              <Loader2 className="w-10 h-10 text-brand animate-spin" />
+                            </div>
+                          ) : batchUpdates.length > 0 ? (
+                            batchUpdates.map((update, idx) => (
+                              <motion.div
+                                key={update.id}
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: idx * 0.05 }}
+                                className="bg-white p-6 rounded-[2rem] border border-gray-50 shadow-sm relative overflow-hidden flex flex-col md:flex-row gap-6"
+                              >
+                                <div className={cn(
+                                  "w-12 h-12 rounded-2xl flex items-center justify-center shrink-0",
+                                  update.contentType === 'homework' ? "bg-amber-50 text-amber-600" :
+                                  update.contentType === 'progress' ? "bg-emerald-50 text-emerald-600" :
+                                  update.contentType === 'material' ? "bg-blue-50 text-blue-600" :
+                                  "bg-rose-50 text-rose-600"
+                                )}>
+                                  {update.contentType === 'homework' ? <FileText className="w-6 h-6" /> : 
+                                   update.contentType === 'progress' ? <CheckCircle className="w-6 h-6" /> :
+                                   update.contentType === 'material' ? <BookOpen className="w-6 h-6" /> :
+                                   <MessageSquare className="w-6 h-6" />}
+                                </div>
+                                <div className="flex-1 space-y-4">
+                                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
+                                    <div>
+                                      <div className="flex items-center gap-2 mb-1">
+                                        <span className={cn(
+                                          "text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-lg",
+                                          update.contentType === 'homework' ? "bg-amber-100 text-amber-700" :
+                                          update.contentType === 'progress' ? "bg-emerald-100 text-emerald-700" :
+                                          update.contentType === 'material' ? "bg-blue-100 text-blue-700" :
+                                          "bg-rose-100 text-rose-700"
+                                        )}>
+                                          {update.contentType}
+                                        </span>
+                                        <span className="text-xs text-gray-400 font-bold flex items-center gap-1">
+                                          <Calendar className="w-3 h-3" />
+                                          {update.publishDate}
+                                        </span>
+                                      </div>
+                                      <h5 className="text-lg font-black text-gray-900 tracking-tight">{update.title}</h5>
+                                    </div>
+                                  </div>
+                                  <p className="text-gray-600 text-sm whitespace-pre-wrap">{update.description}</p>
+                                  {update.attachments && update.attachments.length > 0 && (
+                                    <div className="flex flex-wrap gap-2 pt-2">
+                                      {update.attachments.map((link: string, i: number) => (
+                                        <a key={i} href={link} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 border border-gray-100 rounded-lg text-[10px] font-bold text-brand hover:bg-brand hover:text-white transition-all">
+                                          <Globe className="w-3 h-3" /> Resource {i+1}
+                                        </a>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              </motion.div>
+                            ))
+                          ) : (
+                            <div className="text-center py-20 bg-white rounded-3xl border border-dashed border-gray-100">
+                              <AlertCircle className="w-12 h-12 text-gray-200 mx-auto mb-4" />
+                              <h6 className="font-black text-gray-900">No updates yet</h6>
+                              <p className="text-gray-400 text-sm">Check back later for homework and documents.</p>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div className="md:col-span-2 relative">
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <input 
+                      type="text"
+                      value={studentSearchTerm}
+                      onChange={(e) => setStudentSearchTerm(e.target.value)}
+                      placeholder="Search by name or roll number..."
+                      className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-medium focus:ring-4 focus:ring-brand/10 outline-none transition-all"
+                    />
+                  </div>
+                  <div className="relative">
+                    <Filter className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <select 
+                      value={studentFilterBatch}
+                      onChange={(e) => setStudentFilterBatch(e.target.value)}
+                      className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-medium focus:ring-4 focus:ring-brand/10 outline-none appearance-none"
+                    >
+                      <option value="">All Batches</option>
+                      {batches.map(b => (
+                        <option key={b.id} value={b.id}>{b.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="relative">
+                    <Filter className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <select 
+                      value={studentFilterGrade}
+                      onChange={(e) => setStudentFilterGrade(e.target.value)}
+                      className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-medium focus:ring-4 focus:ring-brand/10 outline-none appearance-none"
+                    >
+                      <option value="">All Grades</option>
+                      {Array.from(new Set(batches.map(b => b.grade))).map(g => (
+                        <option key={g} value={g}>{g}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-3xl border border-gray-100 overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full border-collapse">
+                      <thead>
+                        <tr className="bg-gray-50 text-left">
+                          <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Roll</th>
+                          <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Student Name</th>
+                          <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Batch/Grade</th>
+                          <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Attendance</th>
+                          <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Fees</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-50">
+                        {searchingStudents ? (
+                          <tr>
+                            <td colSpan={5} className="py-20 text-center">
+                              <Loader2 className="w-8 h-8 text-brand animate-spin mx-auto" />
+                              <p className="text-xs text-gray-400 font-bold mt-4 uppercase">Searching Students...</p>
+                            </td>
+                          </tr>
+                        ) : students.length > 0 ? (
+                          students.map((student) => (
+                            <tr key={student.id} className="hover:bg-gray-50/50 transition-colors">
+                              <td className="px-6 py-4">
+                                <span className="font-black text-gray-400 text-xs">#{student.rollNumber || '00'}</span>
+                              </td>
+                              <td className="px-6 py-4">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-9 h-9 bg-brand/10 text-brand rounded-xl flex items-center justify-center font-black text-xs">
+                                    {student.name?.charAt(0)}
+                                  </div>
+                                  <div>
+                                    <p className="font-black text-gray-900 text-sm leading-none">{student.name}</p>
+                                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1.5">{student.phone || 'No Phone'}</p>
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="px-6 py-4">
+                                <p className="font-bold text-gray-600 text-xs">{student.batchName || 'No Batch'}</p>
+                                <p className="text-[10px] text-brand font-black uppercase tracking-widest mt-1">{student.grade}</p>
+                              </td>
+                              <td className="px-6 py-4">
+                                <div className="flex items-center gap-1.5 p-1 bg-emerald-50 text-emerald-600 rounded-lg w-fit">
+                                  <CheckCircle className="w-3 h-3" />
+                                  <span className="text-[10px] font-black uppercase tracking-widest">Regular</span>
+                                </div>
+                              </td>
+                              <td className="px-6 py-4">
+                                <div className="flex items-center gap-1.5 p-1 bg-blue-50 text-blue-600 rounded-lg w-fit">
+                                  <TrendingUp className="w-3 h-3" />
+                                  <span className="text-[10px] font-black uppercase tracking-widest">Cleared</span>
+                                </div>
+                              </td>
+                            </tr>
+                          ))
+                        ) : (
+                          <tr>
+                            <td colSpan={5} className="py-20 text-center">
+                              <AlertCircle className="w-12 h-12 text-gray-200 mx-auto mb-4" />
+                              <h6 className="font-black text-gray-900">No Students Found</h6>
+                              <p className="text-gray-400 text-sm">Try adjusting your search or filters.</p>
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+          </section>
+        );
+
       default:
         return null;
     }
@@ -569,6 +1022,7 @@ export function InstitutionProfile() {
   const defaultSections = [
     { id: 'sec_hero', type: 'hero', active: true, order: 0 },
     { id: 'sec_stats', type: 'stats', active: true, order: 1 },
+    { id: 'sec_batch_portal', type: 'batch_portal', title: 'Student Zone', active: true, order: 1.5 },
     { id: 'sec_principal', type: 'principal', active: true, order: 2 },
     { id: 'sec_about', type: 'about', active: true, order: 3 },
     { id: 'sec_news', type: 'news', title: 'Latest Notices', active: notices.length > 0, order: 4 },
@@ -581,7 +1035,15 @@ export function InstitutionProfile() {
   const sections = institution.websiteConfig?.sections?.sort((a: any, b: any) => a.order - b.order) || defaultSections;
   
   // Ensure that if it's not custom, we at least show existing content
-  const finalSections = institution.websiteConfig?.sections?.length ? sections : defaultSections.filter(s => s.active || ['hero', 'stats', 'about', 'principal'].includes(s.type));
+  // Also ensure Student Zone is always present even in custom configs unless explicitly disabled
+  let finalSections = institution.websiteConfig?.sections?.length ? sections : defaultSections.filter(s => s.active || ['hero', 'stats', 'about', 'principal', 'batch_portal'].includes(s.type));
+
+  if (institution.websiteConfig?.sections?.length) {
+    const hasBatchPortal = sections.some((s: any) => s.type === 'batch_portal');
+    if (!hasBatchPortal) {
+      finalSections = [...sections, defaultSections.find(s => s.type === 'batch_portal')!];
+    }
+  }
 
   const primaryColor = institution?.primaryColor || '#4f46e5';
 
@@ -611,6 +1073,12 @@ export function InstitutionProfile() {
           </div>
           <div className="flex items-center gap-4">
             <button 
+              onClick={(e) => scrollToSection(e, 'sec_batch_portal')} 
+              className="hidden md:flex items-center gap-2 px-6 py-2.5 bg-brand/5 text-brand rounded-xl text-sm font-black hover:bg-brand/10 transition-all"
+            >
+              Student Zone
+            </button>
+            <button 
               onClick={downloadBio}
               disabled={downloading}
               className="hidden sm:flex items-center gap-2 px-6 py-2.5 bg-gray-900 text-white rounded-xl text-sm font-bold hover:bg-gray-800 transition-all disabled:opacity-50"
@@ -624,7 +1092,7 @@ export function InstitutionProfile() {
         {/* Dynamic Sections */}
         <div className="space-y-12 flex-grow">
         {finalSections.filter((s: any) => s.active).map(section => (
-          <div key={section.id} className={cn(
+          <div key={section.id} id={section.id} className={cn(
             section.type === 'hero' ? "" : "max-w-5xl mx-auto px-6"
           )}>
             {renderSection(section)}

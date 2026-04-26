@@ -41,7 +41,15 @@ const resources = {
         buyTokens: "Buy Tokens",
         smsTokens: "SMS Tokens",
         sentThisMonth: "{{count}} sent this month",
-        available: "Available"
+        available: "Available",
+        planExpiry: {
+          endingSoonTitle: "Plan Ending Soon",
+          endingSoonDesc: "Your plan will end in {{days}} days. Please renew to avoid service interruption.",
+          endsTodayTitle: "Plan Ends Today",
+          endsTodayDesc: "Your subscription ends today. Please make a payment to continue using all features.",
+          expiredTitle: "Plan Expired (Grace Period)",
+          expiredDesc: "Your plan expired {{days}} days ago. You are in a 5-day grace period. Access will be restricted soon."
+        }
       },
       students: {
         title: "Student Directory",
@@ -53,6 +61,15 @@ const resources = {
         searchPlaceholder: "Search by name or roll no...",
         filter: "Filter",
         allGrades: "All Grades",
+        loadMore: "Load More Students",
+        selectBatch: "Select Batch",
+        deactivate: "Deactivate",
+        subjectGroups: {
+          Science: "Science",
+          Commerce: "Commerce",
+          Arts: "Arts",
+          General: "General"
+        },
         table: {
           student: "Student",
           whatsapp: "WhatsApp",
@@ -108,7 +125,22 @@ const resources = {
         filter: "Filter",
         viewDetails: "View Details",
         created: "Created",
+        allGrades: "All Classes",
+        clearFilters: "Clear Filters",
+        viewStudents: "View Students",
         month: "month",
+        section: "Section",
+        time: "Time",
+        duration: "Duration",
+        monthlyFee: "Monthly Fee",
+        admissionFee: "Admission Fee",
+        students: "Students",
+        subjects: "Subjects",
+        weeklyDays: "Weekly Days",
+        minutes: "minutes",
+        classTeacher: "Class Teacher",
+        noClassTeacher: "No Class Teacher",
+        websitePassword: "Website Password",
         table: {
           name: "Batch Name",
           grade: "Grade",
@@ -415,6 +447,7 @@ const resources = {
         delete: "Delete",
         edit: "Edit",
         add: "Add",
+        approve: "Approve",
         search: "Search",
         success: "Success",
         ok: "OK",
@@ -498,7 +531,9 @@ const resources = {
         tabs: {
           profile: "Coaching Profile",
           admissionForm: "Admission Form",
-          applications: "Applications"
+          applications: "Applications",
+          studentZone: "Student Zone",
+          website: "Coaching Website"
         },
         profile: {
           title: "Coaching Profile",
@@ -700,7 +735,15 @@ bn: {
         buyTokens: "টোকেন কিনুন",
         smsTokens: "এসএমএস টোকেন",
         sentThisMonth: "এই মাসে {{count}}টি পাঠানো হয়েছে",
-        available: "উপলব্ধ"
+        available: "উপলব্ধ",
+        planExpiry: {
+          endingSoonTitle: "প্ল্যান শীঘ্রই শেষ হচ্ছে",
+          endingSoonDesc: "আপনার প্ল্যান {{days}} দিনের মধ্যে শেষ হয়ে যাবে। নিরবচ্ছিন্ন সেবা পেতে অনুগ্রহ করে রিনিউ করুন।",
+          endsTodayTitle: "প্ল্যান আজ শেষ হচ্ছে",
+          endsTodayDesc: "আপনার সাবস্ক্রিপশন আজ শেষ হচ্ছে। সব ফিচার ব্যবহার চালিয়ে যেতে অনুগ্রহ করে পেমেন্ট করুন।",
+          expiredTitle: "প্ল্যান শেষ হয়েছে (গ্রেস পিরিওড)",
+          expiredDesc: "আপনার প্ল্যান {{days}} দিন আগে শেষ হয়েছে। আপনি ৫ দিনের গ্রেস পিরিওডে আছেন। শীঘ্রই অ্যাক্সেস সীমিত করা হবে।"
+        }
       },
       students: {
         title: "ছাত্র তালিকা",
@@ -712,6 +755,15 @@ bn: {
         searchPlaceholder: "নাম বা রোল নম্বর দিয়ে খুঁজুন...",
         filter: "ফিল্টার",
         allGrades: "সব গ্রেড",
+        loadMore: "আরও ছাত্র লোড করুন",
+        selectBatch: "ব্যাচ নির্বাচন করুন",
+        deactivate: "নিষ্ক্রিয় করুন",
+        subjectGroups: {
+          Science: "বিজ্ঞান",
+          Commerce: "ব্যবসায় শিক্ষা",
+          Arts: "মানবিক",
+          General: "সাধারণ"
+        },
         table: {
           student: "ছাত্র",
           whatsapp: "হোয়াটসঅ্যাপ",
@@ -767,7 +819,22 @@ bn: {
         filter: "ফিল্টার",
         viewDetails: "বিস্তারিত দেখুন",
         created: "তৈরি করা হয়েছে",
+        allGrades: "সকল ক্লাস",
+        clearFilters: "ফিল্টার মুছুন",
+        viewStudents: "ছাত্রদের দেখুন",
         month: "মাস",
+        section: "সেকশন",
+        time: "সময়",
+        duration: "মেয়াদ",
+        monthlyFee: "মাসিক ফি",
+        admissionFee: "ভর্তি ফি",
+        students: "ছাত্র সংখ্যা",
+        subjects: "বিষয়সমূহ",
+        weeklyDays: "সাপ্তাহিক দিন",
+        minutes: "মিনিট",
+        classTeacher: "শ্রেণী শিক্ষক",
+        noClassTeacher: "কোন শিক্ষক নেই",
+        websitePassword: "ওয়েবসাইট পাসওয়ার্ড",
         table: {
           name: "ব্যাচের নাম",
           grade: "গ্রেড",
@@ -1076,6 +1143,7 @@ bn: {
         delete: "মুছে ফেলুন",
         edit: "সম্পাদনা করুন",
         add: "যোগ করুন",
+        approve: "অনুমোদন করুন",
         search: "অনুসন্ধান",
         success: "সফল",
         ok: "ঠিক আছে",
@@ -1159,7 +1227,9 @@ bn: {
         tabs: {
           profile: "কোচিং প্রোফাইল",
           admissionForm: "ভর্তি ফরম",
-          applications: "আবেদনসমূহ"
+          applications: "আবেদনসমূহ",
+          studentZone: "স্টুডেন্ট জোন",
+          website: "কোচিং ওয়েবসাইট"
         },
         profile: {
           title: "কোচিং প্রোফাইল",

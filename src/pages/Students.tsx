@@ -406,7 +406,7 @@ export function Students() {
     const plan = SUBSCRIPTION_PLANS.find(p => p.id === user.subscriptionPlan) || SUBSCRIPTION_PLANS[0];
     
     // Check total student limit
-    if (students.length >= plan.studentLimit) {
+    if (students.length >= plan.studentLimit && !user.isSuperAdmin) {
       setIsUpgradeModalOpen(true);
       return;
     }
@@ -1245,7 +1245,7 @@ export function Students() {
               }}
               className="px-6 py-2.5 bg-white border border-gray-100 text-indigo-600 text-sm font-black rounded-xl shadow-sm hover:shadow-md hover:bg-gray-50 transition-all flex items-center gap-2"
             >
-              <Plus className="w-4 h-4" /> Load More Students
+              <Plus className="w-4 h-4" /> {t('students.loadMore')}
             </button>
           </div>
         )}
@@ -1469,7 +1469,7 @@ export function Students() {
                   }}
                   className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
                 >
-                  <option value="">Select batch...</option>
+                  <option value="">{t('students.selectBatch')}</option>
                   {batches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                 </select>
               </div>
@@ -1494,10 +1494,10 @@ export function Students() {
                   onChange={e => setEditingStudent({...editingStudent, subjectGroup: e.target.value})}
                   className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
                 >
-                  <option value="Science">Science</option>
-                  <option value="Commerce">Commerce</option>
-                  <option value="Arts">Arts</option>
-                  <option value="General">General</option>
+                  <option value="Science">{t('students.subjectGroups.Science')}</option>
+                  <option value="Commerce">{t('students.subjectGroups.Commerce')}</option>
+                  <option value="Arts">{t('students.subjectGroups.Arts')}</option>
+                  <option value="General">{t('students.subjectGroups.General')}</option>
                 </select>
               </div>
 

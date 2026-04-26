@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { auth, db, handleFirestoreError, OperationType } from '../../firebase';
 import { sendPasswordResetEmail } from 'firebase/auth';
-import { collection, query, where, getDocs, updateDoc, doc, setDoc, getDoc, limit, count, deleteDoc, getCountFromServer } from 'firebase/firestore';
+import { collection, query, where, getDocs, updateDoc, doc, setDoc, getDoc, limit, count, deleteDoc, getCountFromServer, orderBy } from 'firebase/firestore';
 import { useTranslation } from 'react-i18next';
 import { 
   Search, 
@@ -31,7 +31,8 @@ import {
   UserCheck,
   MoreHorizontal,
   Clock,
-  CreditCard
+  CreditCard,
+  Info
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../../lib/auth';
@@ -85,8 +86,7 @@ export function ManageInstitutions() {
       const usersQuery = query(
         collection(db, 'users'), 
         where('role', '==', 'admin'),
-        orderBy('createdAt', 'desc'),
-        limit(50)
+        limit(100)
       );
       const usersSnapshot = await getDocs(usersQuery);
       const users = usersSnapshot.docs.map(doc => ({ 
@@ -853,11 +853,11 @@ export function ManageInstitutions() {
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center">
+                  <td colSpan={7} className="px-6 py-12 text-center">
                     <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
                   </td>
                 </tr>
-              ) : filteredInstitutions.map((inst) => (
+              ) : filteredInstitutions.length > 0 ? filteredInstitutions.map((inst) => (
                 <tr key={inst.id} className="hover:bg-gray-50/50 dark:hover:bg-gray-800/50 transition-colors">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
@@ -1006,7 +1006,28 @@ export function ManageInstitutions() {
                     </div>
                   </td>
                 </tr>
-              ))}
+              )) : (
+                <tr>
+                  <td colSpan={7} className="px-6 py-20 text-center">
+                    <div className="flex flex-col items-center gap-3">
+                      <div className="w-16 h-16 bg-gray-50 dark:bg-gray-800/50 rounded-3xl flex items-center justify-center text-gray-300">
+                        <Users className="w-8 h-8" />
+                      </div>
+                      <p className="text-gray-500 font-medium">No institutions found matching your criteria</p>
+                      <button 
+                        onClick={() => {
+                          setSearchQuery('');
+                          setFilterExpiry('all');
+                          fetchInstitutions();
+                        }}
+                        className="text-indigo-600 text-xs font-bold hover:underline"
+                      >
+                        Clear filters & refresh
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

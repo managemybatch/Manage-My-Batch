@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Search, Filter, Layers, MoreVertical, Users, Loader2, ChevronDown, ChevronUp, X, Clock, Calendar, CreditCard, BookOpen, MessageSquare, Trash2, XCircle, Briefcase } from 'lucide-react';
+import { Plus, Search, Filter, Layers, MoreVertical, Users, Loader2, ChevronDown, ChevronUp, X, Clock, Calendar, CreditCard, BookOpen, MessageSquare, Trash2, XCircle, Briefcase, Globe, Lock, Share2, Clipboard, ExternalLink, FileText, Layout, Save, CheckCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { collection, onSnapshot, query, addDoc, serverTimestamp, deleteDoc, doc, orderBy, updateDoc, where } from 'firebase/firestore';
@@ -12,6 +12,18 @@ import { GRADES, SECTIONS, SUBSCRIPTION_PLANS } from '../constants';
 import { useTranslation } from 'react-i18next';
 import { SubscriptionModal } from '../components/SubscriptionModal';
 import { Batch, Teacher } from '../types';
+
+interface BatchUpdate {
+  id: string;
+  batchId: string;
+  institutionId: string;
+  title: string;
+  description: string;
+  contentType: 'homework' | 'progress' | 'material' | 'notice';
+  attachments: string[];
+  publishDate: string;
+  createdAt: any;
+}
 
 const WEEK_DAYS = [
   { id: 'Sun', label: 'Sun' },
@@ -76,6 +88,7 @@ export function Batches() {
     monthlyFee: 0,
     classTeacherId: '',
     classTeacherName: '',
+    websitePassword: '',
   });
 
   useEffect(() => {
@@ -127,7 +140,7 @@ export function Batches() {
     if (!user || isSaving) return;
 
     const plan = SUBSCRIPTION_PLANS.find(p => p.id === user.subscriptionPlan) || SUBSCRIPTION_PLANS[0];
-    if (batches.length >= plan.batchLimit) {
+    if (batches.length >= plan.batchLimit && !user.isSuperAdmin) {
       setIsUpgradeModalOpen(true);
       return;
     }
@@ -166,6 +179,7 @@ export function Batches() {
       monthlyFee: 0,
       classTeacherId: '',
       classTeacherName: '',
+      websitePassword: '',
     });
     setShowAdvanced(false);
     setSubjectInput('');
@@ -228,6 +242,7 @@ export function Batches() {
       monthlyFee: batch.monthlyFee,
       classTeacherId: batch.classTeacherId || '',
       classTeacherName: batch.classTeacherName || '',
+      websitePassword: batch.websitePassword || '',
     });
     setIsEditModalOpen(true);
     setActiveMenu(null);
@@ -363,7 +378,7 @@ export function Batches() {
           <div className="space-y-2">
             <label className="text-sm font-bold text-gray-700 flex items-center gap-2">
               <Briefcase className="w-4 h-4 text-amber-500" />
-              Class Teacher
+              {t('batches.classTeacher')}
             </label>
             <select
               value={newBatch.classTeacherId}
@@ -377,7 +392,7 @@ export function Batches() {
               }}
               className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-medium"
             >
-              <option value="">No Class Teacher</option>
+              <option value="">{t('batches.noClassTeacher')}</option>
               {teachers.map(t => (
                 <option key={t.id} value={t.id}>{t.name} ({t.subject})</option>
               ))}
@@ -652,7 +667,7 @@ export function Batches() {
                   <div className="mt-4 p-3 bg-amber-50 rounded-xl border border-amber-100 flex items-center gap-3">
                     <Briefcase className="w-4 h-4 text-amber-600" />
                     <div>
-                      <p className="text-[10px] font-bold text-amber-500 uppercase tracking-widest">Class Teacher</p>
+                      <p className="text-[10px] font-bold text-amber-500 uppercase tracking-widest">{t('batches.classTeacher')}</p>
                       <p className="text-sm font-bold text-gray-900">{batch.classTeacherName}</p>
                     </div>
                   </div>
@@ -733,8 +748,8 @@ export function Batches() {
                 <p className="text-sm font-bold text-gray-900">{selectedBatch.studentCount || 0}</p>
               </div>
               <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100">
-                <p className="text-[10px] font-bold text-amber-500 uppercase tracking-widest mb-1">Class Teacher</p>
-                <p className="text-sm font-bold text-gray-900">{selectedBatch.classTeacherName || 'None'}</p>
+                <p className="text-[10px] font-bold text-amber-500 uppercase tracking-widest mb-1">{t('batches.classTeacher')}</p>
+                <p className="text-sm font-bold text-gray-900">{selectedBatch.classTeacherName || t('batches.noClassTeacher')}</p>
               </div>
             </div>
 

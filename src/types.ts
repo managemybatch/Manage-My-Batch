@@ -46,6 +46,7 @@ export interface Batch {
   institutionId: string;
   classTeacherId?: string;
   classTeacherName?: string;
+  websitePassword?: string;
 }
 
 export interface FeeRecord {
@@ -69,6 +70,7 @@ export interface Attendance {
   studentName: string;
   date: string;
   status: 'present' | 'absent' | 'late';
+  delay?: number;
   batchId: string;
   institutionId: string;
 }

@@ -3,7 +3,7 @@ import { Plus, Search, Filter, MoreVertical, FileText, CheckCircle2, XCircle, Lo
 import { Table, TableRow, TableCell } from '../../components/Table';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../../lib/utils';
-import { collection, onSnapshot, query, addDoc, updateDoc, serverTimestamp, deleteDoc, doc, where, orderBy } from 'firebase/firestore';
+import { collection, onSnapshot, query, addDoc, updateDoc, serverTimestamp, deleteDoc, doc, where, orderBy, limit } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../../firebase';
 import { useAuth } from '../../lib/auth';
 import { Modal } from '../../components/Modal';

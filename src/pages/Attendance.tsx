@@ -19,6 +19,7 @@ interface AttendanceRecord {
   studentName: string;
   date: string;
   status: 'present' | 'absent' | 'late';
+  delay?: number;
   batchId: string;
 }
 
@@ -43,9 +44,36 @@ interface AttendanceSubmission {
   batchId: string;
   batchName: string;
   date: string;
-  records: Record<string, 'present' | 'absent' | 'late'>;
+  records: Record<string, any>;
   status: 'pending' | 'approved';
   createdAt: any;
+}
+
+interface DelayInputProps {
+  value: number;
+  onSave: (val: number) => void;
+}
+
+function DelayInput({ value, onSave }: DelayInputProps) {
+  const [localVal, setLocalVal] = useState(value);
+
+  useEffect(() => {
+    setLocalVal(value);
+  }, [value]);
+
+  return (
+    <div className="flex items-center gap-1.5 px-2 py-1 bg-white border border-amber-200 rounded-lg w-fit">
+      <span className="text-[10px] font-black text-amber-600 uppercase tracking-widest">Delay:</span>
+      <input 
+        type="number" 
+        value={localVal === 0 ? '' : localVal}
+        onChange={(e) => setLocalVal(parseInt(e.target.value) || 0)}
+        onBlur={() => onSave(localVal)}
+        className="w-12 px-1.5 py-0.5 border border-amber-100 rounded text-xs font-bold text-amber-700 focus:outline-none focus:ring-1 focus:ring-amber-500"
+      />
+      <span className="text-[10px] font-bold text-amber-500 uppercase">min</span>
+    </div>
+  );
 }
 
 export function Attendance() {
@@ -185,7 +213,18 @@ export function Attendance() {
         studentName: student.name,
         date: today,
         status,
+        delay: status === 'late' ? (prev[student.id]?.delay || 5) : undefined,
         batchId: student.batchId,
+      }
+    }));
+  };
+
+  const handleUpdateDelay = (studentId: string, delay: number) => {
+    setAttendance(prev => ({
+      ...prev,
+      [studentId]: {
+        ...prev[studentId],
+        delay
       }
     }));
   };
@@ -407,13 +446,17 @@ export function Attendance() {
         studentMap[doc.id] = doc.data().name;
       });
 
-      Object.entries(submission.records).forEach(([studentId, status]) => {
+      Object.entries(submission.records).forEach(([studentId, record]) => {
         const docRef = doc(collection(db, 'attendance'));
+        const status = typeof record === 'string' ? record : record.status;
+        const delay = typeof record === 'string' ? undefined : record.delay;
+
         batch.set(docRef, {
           studentId,
           studentName: studentMap[studentId] || 'Unknown',
           date: submission.date,
           status,
+          delay,
           batchId: submission.batchId,
           institutionId: instId,
           markedBy: 'public_link',
@@ -524,37 +567,45 @@ export function Attendance() {
                         )}
                       </TableCell>
                       <TableCell>
-                        <div className="flex items-center gap-2">
-                          <button 
-                            onClick={() => handleMarkAttendance(student, 'present')}
-                            className={cn(
-                              "p-2.5 rounded-xl transition-all",
-                              record?.status === 'present' ? "bg-emerald-100 text-emerald-700 shadow-sm" : "text-gray-300 hover:bg-emerald-50 hover:text-emerald-600"
-                            )} 
-                            title={t('attendance.status.present')}
-                          >
-                            <CheckCircle2 className="w-5 h-5" />
-                          </button>
-                          <button 
-                            onClick={() => handleMarkAttendance(student, 'absent')}
-                            className={cn(
-                              "p-2.5 rounded-xl transition-all",
-                              record?.status === 'absent' ? "bg-rose-100 text-rose-700 shadow-sm" : "text-gray-300 hover:bg-rose-50 hover:text-rose-600"
-                            )} 
-                            title={t('attendance.status.absent')}
-                          >
-                            <XCircle className="w-5 h-5" />
-                          </button>
-                          <button 
-                            onClick={() => handleMarkAttendance(student, 'late')}
-                            className={cn(
-                              "p-2.5 rounded-xl transition-all",
-                              record?.status === 'late' ? "bg-amber-100 text-amber-700 shadow-sm" : "text-gray-300 hover:bg-amber-50 hover:text-amber-600"
-                            )} 
-                            title={t('attendance.status.late')}
-                          >
-                            <Clock className="w-5 h-5" />
-                          </button>
+                        <div className="flex flex-col gap-2">
+                          <div className="flex items-center gap-2">
+                            <button 
+                              onClick={() => handleMarkAttendance(student, 'present')}
+                              className={cn(
+                                "p-2.5 rounded-xl border transition-all",
+                                record?.status === 'present' ? "bg-emerald-100 border-emerald-100 text-emerald-700 shadow-sm" : "text-gray-300 hover:bg-emerald-50 hover:text-emerald-600"
+                              )} 
+                              title={t('attendance.status.present')}
+                            >
+                              <CheckCircle2 className="w-5 h-5" />
+                            </button>
+                            <button 
+                              onClick={() => handleMarkAttendance(student, 'absent')}
+                              className={cn(
+                                "p-2.5 rounded-xl border transition-all",
+                                record?.status === 'absent' ? "bg-rose-100 border-rose-100 text-rose-700 shadow-sm" : "text-gray-300 hover:bg-rose-50 hover:text-rose-600"
+                              )} 
+                              title={t('attendance.status.absent')}
+                            >
+                              <XCircle className="w-5 h-5" />
+                            </button>
+                            <button 
+                              onClick={() => handleMarkAttendance(student, 'late')}
+                              className={cn(
+                                "p-2.5 rounded-xl border transition-all",
+                                record?.status === 'late' ? "bg-amber-100 border-amber-100 text-amber-700 shadow-sm" : "text-gray-300 hover:bg-amber-50 hover:text-amber-600"
+                              )} 
+                              title={t('attendance.status.late')}
+                            >
+                              <Clock className="w-5 h-5" />
+                            </button>
+                          </div>
+                          {record?.status === 'late' && (
+                            <DelayInput 
+                              value={record.delay || 5} 
+                              onSave={(val) => handleUpdateDelay(student.id, val)} 
+                            />
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>
@@ -575,12 +626,25 @@ export function Attendance() {
                         <p className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest mt-0.5">Roll: {student.rollNo}</p>
                       </div>
                       {record && (
-                        <div className={cn(
-                          "flex items-center gap-1 px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wider",
-                          record.status === 'present' ? "bg-emerald-50 text-emerald-600" : 
-                          record.status === 'absent' ? "bg-rose-50 text-rose-600" : "bg-amber-50 text-amber-600"
-                        )}>
-                          {t(`attendance.status.${record.status}`)}
+                        <div className="flex flex-col items-end gap-1">
+                          <div className={cn(
+                            "flex items-center gap-1 px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wider",
+                            record.status === 'present' ? "bg-emerald-50 text-emerald-600" : 
+                            record.status === 'absent' ? "bg-rose-50 text-rose-600" : "bg-amber-50 text-amber-600"
+                          )}>
+                            {t(`attendance.status.${record.status}`)}
+                          </div>
+                          {record.status === 'late' && (
+                            <div className="flex items-center gap-1">
+                              <input 
+                                type="number"
+                                value={record.delay || ''}
+                                onChange={(e) => handleUpdateDelay(student.id, parseInt(e.target.value) || 0)}
+                                className="w-10 px-1 py-0.5 bg-amber-50 border border-amber-200 rounded text-[9px] font-bold text-amber-700 text-center"
+                              />
+                              <span className="text-[8px] font-bold text-amber-500 uppercase tracking-tighter">min</span>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>

@@ -20,12 +20,54 @@
         "updatedAt": { "type": "string", "format": "date-time", "description": "Last update timestamp" }
       },
       "required": ["title", "slug", "content", "status", "authorId", "createdAt"]
+    },
+    "teacher_attendance": {
+      "title": "Teacher Attendance Record",
+      "description": "An attendance record for a teacher",
+      "type": "object",
+      "properties": {
+        "teacherId": { "type": "string", "description": "ID of the teacher" },
+        "teacherName": { "type": "string", "description": "Name of the teacher" },
+        "date": { "type": "string", "description": "Date of attendance (YYYY-MM-DD)" },
+        "status": { "type": "string", "enum": ["present", "absent", "late", "leave"], "description": "Attendance status" },
+        "lateTime": { "type": "string", "description": "Time of arrival if late (HH:MM)" },
+        "institutionId": { "type": "string", "description": "ID of the institution" },
+        "markedBy": { "type": "string", "description": "UID of the person who marked the attendance" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Creation timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Last update timestamp" }
+      },
+      "required": ["teacherId", "date", "status", "institutionId", "markedBy", "createdAt"]
+    },
+    "batch_content": {
+      "title": "Batch Website Content",
+      "description": "A post or update for a specific batch website",
+      "type": "object",
+      "properties": {
+        "batchId": { "type": "string", "description": "ID of the batch" },
+        "institutionId": { "type": "string", "description": "ID of the institution" },
+        "title": { "type": "string", "description": "Title of the update" },
+        "description": { "type": "string", "description": "Detailed description or homework details" },
+        "contentType": { "type": "string", "enum": ["homework", "progress", "material", "notice"], "description": "Type of update" },
+        "attachments": { "type": "array", "description": "List of links or resource URLs" },
+        "publishDate": { "type": "string", "format": "date", "description": "Date to show for the update" },
+        "authorId": { "type": "string", "description": "UID of the publisher" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Creation timestamp" }
+      },
+      "required": ["batchId", "institutionId", "title", "contentType", "publishDate", "createdAt"]
     }
   },
   "firestore": {
     "/blogs/{blogId}": {
       "schema": "blog",
       "description": "Collection of system-wide blog posts"
+    },
+    "/teacher_attendance/{attendanceId}": {
+      "schema": "teacher_attendance",
+      "description": "Collection of teacher attendance records"
+    },
+    "/batch_content/{contentId}": {
+      "schema": "batch_content",
+      "description": "Daily updates and materials for batch websites"
     }
   }
 }

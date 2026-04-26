@@ -4,14 +4,14 @@ import {
   MapPin, Phone, Mail, Globe, Info, CheckCircle, 
   ExternalLink, Loader2, Plus, Trash2, UserPlus, 
   MessageSquare, Calendar, Newspaper, Megaphone, Send, Edit2,
-  Settings, TrendingUp, Palette, ArrowRight
+  Settings, TrendingUp, Palette, ArrowRight, Lock, Save, Clipboard, Layout, FileText, BookOpen, X
 } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { cn, compressImage } from '../lib/utils';
 import { db, handleFirestoreError, OperationType, safeStringify } from '../firebase';
-import { collection, doc, getDoc, setDoc, updateDoc, query, where, getDocs, onSnapshot, orderBy, limit, addDoc, deleteDoc } from 'firebase/firestore';
+import { collection, doc, getDoc, setDoc, updateDoc, query, where, getDocs, onSnapshot, orderBy, limit, addDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
 import { Modal } from '../components/Modal';
 import { ConfirmModal } from '../components/ConfirmModal';
@@ -19,7 +19,7 @@ import { toPng } from 'html-to-image';
 
 interface WebsiteSection {
   id: string;
-  type: 'hero' | 'stats' | 'about' | 'gallery' | 'news' | 'events' | 'circulars' | 'results' | 'custom_text' | 'testimonials' | 'faq';
+  type: 'hero' | 'stats' | 'about' | 'gallery' | 'news' | 'events' | 'circulars' | 'results' | 'custom_text' | 'testimonials' | 'faq' | 'batch_portal';
   title?: string;
   content?: string;
   subtitle?: string;
@@ -90,11 +90,23 @@ interface Application {
   formData: any;
 }
 
+interface BatchUpdate {
+  id: string;
+  batchId: string;
+  institutionId: string;
+  title: string;
+  description: string;
+  contentType: 'homework' | 'progress' | 'material' | 'notice';
+  attachments: string[];
+  publishDate: string;
+  createdAt: any;
+}
+
 export function Institution() {
   const { user } = useAuth();
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'website' | 'admissionForm' | 'applications'>('website');
+  const [activeTab, setActiveTab] = useState<'website' | 'admissionForm' | 'applications' | 'studentZone'>('website');
   const [newFieldName, setNewFieldName] = useState('');
   const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState(false);
@@ -110,6 +122,19 @@ export function Institution() {
   const [notices, setNotices] = useState<any[]>([]);
   const [events, setEvents] = useState<any[]>([]);
   const [circulars, setCirculars] = useState<any[]>([]);
+  const [batches, setBatches] = useState<any[]>([]);
+  const [selectedBatchId, setSelectedBatchId] = useState<string>('');
+  const [websiteUpdates, setWebsiteUpdates] = useState<BatchUpdate[]>([]);
+  const [isLoadingUpdates, setIsLoadingUpdates] = useState(false);
+  const [isAddingUpdate, setIsAddingUpdate] = useState(false);
+  const [websitePassword, setWebsitePassword] = useState('');
+  const [newUpdate, setNewUpdate] = useState({
+    title: '',
+    description: '',
+    contentType: 'homework' as const,
+    publishDate: new Date().toISOString().split('T')[0],
+    attachments: [] as string[],
+  });
   
   const [showNoticeModal, setShowNoticeModal] = useState(false);
   const [showEventModal, setShowEventModal] = useState(false);
@@ -158,6 +183,7 @@ export function Institution() {
               { id: 'sec_about', type: 'about', active: true, order: 2 },
               { id: 'sec_news', type: 'news', title: 'Latest Notices', active: true, order: 3 },
               { id: 'sec_results', type: 'results', title: 'Exam Results', active: true, order: 4 },
+              { id: 'sec_batch_portal', type: 'batch_portal', title: 'Student Zone', active: true, order: 5 },
             ]
           },
           primaryColor: data.primaryColor || '#4f46e5',
@@ -200,6 +226,7 @@ export function Institution() {
               { id: 'sec_about', type: 'about', active: true, order: 2 },
               { id: 'sec_news', type: 'news', title: 'Latest Notices', active: true, order: 3 },
               { id: 'sec_results', type: 'results', title: 'Exam Results', active: true, order: 4 },
+              { id: 'sec_batch_portal', type: 'batch_portal', title: 'Student Zone', active: true, order: 5 },
             ]
           },
           admissionForm: {
@@ -276,6 +303,11 @@ export function Institution() {
       setEvents(s.docs.map(d => ({ id: d.id, ...d.data() })).sort((a: any, b: any) => new Date(a.date || 0).getTime() - new Date(b.date || 0).getTime()));
     });
 
+    // Fetch Batches
+    const unsubBatchesList = onSnapshot(query(collection(db, 'batches'), where('institutionId', '==', instId)), (s) => {
+      setBatches(s.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+
     return () => {
       unsubInst();
       unsubApps();
@@ -285,8 +317,96 @@ export function Institution() {
       unsubBatches();
       unsubTeachers();
       unsubExams();
+      unsubBatchesList();
     };
   }, [user]);
+
+  useEffect(() => {
+    if (!selectedBatchId) {
+      setWebsiteUpdates([]);
+      setWebsitePassword('');
+      return;
+    }
+
+    const batch = batches.find(b => b.id === selectedBatchId);
+    if (batch) {
+      setWebsitePassword(batch.websitePassword || '');
+    }
+
+    setIsLoadingUpdates(true);
+    const q = query(
+      collection(db, 'batch_content'),
+      where('batchId', '==', selectedBatchId),
+      orderBy('createdAt', 'desc')
+    );
+
+    const unsubUpdates = onSnapshot(q, (snap) => {
+      setWebsiteUpdates(snap.docs.map(d => ({ id: d.id, ...d.data() })) as BatchUpdate[]);
+      setIsLoadingUpdates(false);
+    }, (err) => {
+      console.error(err);
+      setIsLoadingUpdates(false);
+    });
+
+    return () => unsubUpdates();
+  }, [selectedBatchId, batches]);
+
+  const handleUpdatePassword = async () => {
+    if (!selectedBatchId || isSaving) return;
+    setIsSaving(true);
+    try {
+      await updateDoc(doc(db, 'batches', selectedBatchId), {
+        websitePassword,
+        updatedAt: serverTimestamp()
+      });
+      setToast({ message: 'Password updated!', type: 'success' });
+    } catch (err) {
+      setToast({ message: 'Failed to update password', type: 'error' });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleAddUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const instId = user?.institutionId || user?.uid;
+    if (!instId || !selectedBatchId || isSaving) return;
+
+    setIsSaving(true);
+    try {
+      await addDoc(collection(db, 'batch_content'), {
+        ...newUpdate,
+        batchId: selectedBatchId,
+        institutionId: instId,
+        authorId: user?.uid,
+        createdAt: serverTimestamp()
+      });
+      setNewUpdate({
+        title: '',
+        description: '',
+        contentType: 'homework',
+        publishDate: new Date().toISOString().split('T')[0],
+        attachments: [],
+      });
+      setIsAddingUpdate(false);
+      setToast({ message: 'Update published!', type: 'success' });
+    } catch (err: any) {
+      handleFirestoreError(err, OperationType.CREATE, 'batch_content');
+      setToast({ message: `Failed to publish: ${err.message || 'Unknown error'}`, type: 'error' });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDeleteUpdate = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this update?')) return;
+    try {
+      await deleteDoc(doc(db, 'batch_content', id));
+      setToast({ message: 'Update deleted!', type: 'success' });
+    } catch (err) {
+      setToast({ message: 'Failed to delete update', type: 'error' });
+    }
+  };
 
   const handleDeleteItem = async (col: string, id: string) => {
     if (!window.confirm('Are you sure you want to delete this item?')) return;
@@ -575,7 +695,7 @@ export function Institution() {
       </div>
 
       <div className="flex items-center gap-2 p-1 bg-gray-100 rounded-2xl w-fit">
-        {(['website', 'admissionForm', 'applications'] as const).map((tab) => (
+        {(['website', 'admissionForm', 'applications', 'studentZone'] as const).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -586,12 +706,289 @@ export function Institution() {
                 : "text-gray-500 hover:text-gray-700"
             )}
           >
-            {tab === 'website' ? 'Coaching Website' : t(`institution.tabs.${tab}`)}
+            {t(`institution.tabs.${tab}`)}
           </button>
         ))}
       </div>
 
       <AnimatePresence mode="wait">
+        {activeTab === 'studentZone' && (
+          <motion.div
+            key="studentZone"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="space-y-8"
+          >
+             <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm space-y-8">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-gray-50">
+                  <div className="flex items-center gap-4">
+                    <div className="w-14 h-14 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-indigo-100">
+                      <Layout className="w-7 h-7" />
+                    </div>
+                    <div>
+                      <h3 className="text-2xl font-black text-gray-900 tracking-tight">Student Zone Management</h3>
+                      <p className="text-gray-500 font-medium">Post homework, resources and updates for specific batches.</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                  <div className="lg:col-span-1 space-y-6">
+                    <div className="space-y-2">
+                       <label className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">1. Select a Batch</label>
+                       <select 
+                         value={selectedBatchId}
+                         onChange={(e) => setSelectedBatchId(e.target.value)}
+                         className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all font-bold"
+                       >
+                         <option value="">Select a batch...</option>
+                         {batches.map(b => (
+                           <option key={b.id} value={b.id}>{b.name} ({b.grade})</option>
+                         ))}
+                       </select>
+                    </div>
+
+                    {selectedBatchId && (
+                      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
+                        <div className="p-6 bg-indigo-50 rounded-2xl border border-indigo-100 space-y-4">
+                          <div className="flex items-center gap-2 text-indigo-600 font-bold text-sm">
+                            <Lock className="w-4 h-4" /> Batch Password
+                          </div>
+                          <div className="flex gap-2">
+                            <input 
+                              type="text" 
+                              value={websitePassword}
+                              onChange={(e) => setWebsitePassword(e.target.value)}
+                              placeholder="Set a password"
+                              className="flex-1 px-4 py-2 border border-indigo-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none font-mono font-bold"
+                            />
+                            <button 
+                              onClick={handleUpdatePassword}
+                              disabled={isSaving}
+                              className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 transition-all"
+                            >
+                              {isSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
+                            </button>
+                          </div>
+                          <p className="text-[10px] text-gray-400">Students need this password to view content in the Student Zone portal.</p>
+                        </div>
+
+                        <div className="p-6 bg-amber-50 rounded-2xl border border-amber-100 space-y-4">
+                           <div className="flex items-center gap-2 text-amber-600 font-bold text-sm">
+                             <Share2 className="w-4 h-4" /> Share Portal
+                           </div>
+                           <div className="flex items-center gap-2">
+                              <div className="flex-1 px-3 py-2 bg-white/50 border border-amber-200 rounded-lg text-[10px] text-gray-500 truncate font-mono">
+                                 {window.location.host}/p/id/{user?.institutionId || user?.uid}#sec_batch_portal
+                              </div>
+                              <button 
+                                onClick={() => {
+                                  navigator.clipboard.writeText(`${window.location.origin}/p/id/${user?.institutionId || user?.uid}#sec_batch_portal`);
+                                  setToast({ message: 'Link copied!', type: 'success' });
+                                }}
+                                className="p-2 text-amber-600 hover:bg-amber-100 rounded-lg"
+                              >
+                                <Clipboard className="w-4 h-4" />
+                              </button>
+                           </div>
+                        </div>
+                      </motion.div>
+                    )}
+                  </div>
+
+                  <div className="lg:col-span-2 space-y-6">
+                    {!selectedBatchId ? (
+                      <div className="h-full min-h-[400px] flex flex-col items-center justify-center text-center p-12 border-2 border-dashed border-gray-100 rounded-[2.5rem] bg-gray-50/30">
+                        <div className="w-20 h-20 bg-white rounded-3xl shadow-sm flex items-center justify-center text-gray-300 mb-6">
+                          <Layers className="w-10 h-10" />
+                        </div>
+                        <h4 className="text-xl font-bold text-gray-900">Select a batch to manage updates</h4>
+                        <p className="text-gray-500 max-w-sm mt-2">Pick a batch from the list on the left to start posting homework and study materials.</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-8">
+                         <div className="flex items-center justify-between">
+                            <h4 className="text-lg font-black text-gray-900">Batch Feed</h4>
+                            <button 
+                              onClick={() => setIsAddingUpdate(!isAddingUpdate)}
+                              className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-black hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100"
+                            >
+                              {isAddingUpdate ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+                              {isAddingUpdate ? 'Cancel' : 'Post New Update'}
+                            </button>
+                         </div>
+
+                         <AnimatePresence>
+                            {isAddingUpdate && (
+                              <motion.div
+                                initial={{ height: 0, opacity: 0 }}
+                                animate={{ height: 'auto', opacity: 1 }}
+                                exit={{ height: 0, opacity: 0 }}
+                                className="overflow-hidden"
+                              >
+                                <form onSubmit={handleAddUpdate} className="bg-gray-50/50 p-6 rounded-[2rem] border-2 border-dashed border-indigo-100 space-y-6">
+                                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                      <div className="space-y-2">
+                                         <label className="text-xs font-bold text-gray-500 uppercase tracking-widest ml-1">Title</label>
+                                         <input 
+                                           required
+                                           type="text"
+                                           value={newUpdate.title}
+                                           onChange={e => setNewUpdate({...newUpdate, title: e.target.value})}
+                                           placeholder="e.g. Chapter 4 Practice Homework"
+                                           className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none"
+                                         />
+                                      </div>
+                                      <div className="space-y-2">
+                                         <label className="text-xs font-bold text-gray-500 uppercase tracking-widest ml-1">Type</label>
+                                         <select 
+                                           value={newUpdate.contentType}
+                                           onChange={e => setNewUpdate({...newUpdate, contentType: e.target.value as any})}
+                                           className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none font-bold"
+                                         >
+                                           <option value="homework">Homework</option>
+                                           <option value="progress">Class Progress</option>
+                                           <option value="material">Resource / Material</option>
+                                           <option value="notice">Batch Notice</option>
+                                         </select>
+                                      </div>
+                                   </div>
+
+                                   <div className="space-y-2">
+                                      <label className="text-xs font-bold text-gray-500 uppercase tracking-widest ml-1">Description / Instructions</label>
+                                      <textarea 
+                                        required
+                                        value={newUpdate.description}
+                                        onChange={e => setNewUpdate({...newUpdate, description: e.target.value})}
+                                        rows={4}
+                                        placeholder="Explain what the students need to do..."
+                                        className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none resize-none"
+                                      />
+                                   </div>
+
+                                   <div className="space-y-2">
+                                      <label className="text-xs font-bold text-gray-500 uppercase tracking-widest ml-1">Links & Files (Google Drive / Docs)</label>
+                                      <div className="flex gap-2">
+                                         <input 
+                                           type="text"
+                                           id="attachment-input"
+                                           placeholder="Paste document link here..."
+                                           className="flex-1 px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none"
+                                         />
+                                         <button 
+                                           type="button"
+                                           onClick={() => {
+                                             const input = document.getElementById('attachment-input') as HTMLInputElement;
+                                             if (input.value) {
+                                               setNewUpdate({...newUpdate, attachments: [...newUpdate.attachments, input.value]});
+                                               input.value = '';
+                                             }
+                                           }}
+                                           className="px-6 py-2 bg-indigo-100 text-indigo-700 rounded-xl font-bold text-sm hover:bg-indigo-200 transition-all"
+                                         >
+                                           Add Link
+                                         </button>
+                                      </div>
+                                      <div className="flex flex-wrap gap-2 mt-2">
+                                        {newUpdate.attachments.map((link, i) => (
+                                          <div key={i} className="flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-100 rounded-lg text-[10px] font-bold text-indigo-600 shadow-sm transition-all group">
+                                            <Globe className="w-3 h-3 shrink-0" />
+                                            <span className="truncate max-w-[150px]">{link}</span>
+                                            <button type="button" onClick={() => setNewUpdate({...newUpdate, attachments: newUpdate.attachments.filter((_, idx) => idx !== i)})} className="text-rose-500 hover:scale-110">
+                                              <X className="w-3 h-3" />
+                                            </button>
+                                          </div>
+                                        ))}
+                                      </div>
+                                   </div>
+
+                                   <div className="flex justify-end pt-2">
+                                      <button 
+                                        type="submit"
+                                        disabled={isSaving}
+                                        className="px-10 py-3.5 bg-indigo-600 text-white rounded-2xl font-black shadow-xl shadow-indigo-100 hover:bg-indigo-700 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-2"
+                                      >
+                                        {isSaving && <Loader2 className="w-5 h-5 animate-spin" />}
+                                        Publish Update
+                                      </button>
+                                   </div>
+                                </form>
+                              </motion.div>
+                            )}
+                         </AnimatePresence>
+
+                         <div className="space-y-4">
+                            {isLoadingUpdates ? (
+                               <div className="flex justify-center py-20">
+                                  <Loader2 className="w-10 h-10 text-indigo-600 animate-spin" />
+                               </div>
+                            ) : websiteUpdates.length > 0 ? (
+                               websiteUpdates.map((update) => (
+                                  <div key={update.id} className="bg-white p-6 rounded-3xl border border-gray-50 shadow-sm hover:shadow-md transition-all flex items-start gap-4 group relative">
+                                     <div className={cn(
+                                       "p-3 rounded-2xl",
+                                       update.contentType === 'homework' ? "bg-amber-50 text-amber-600" :
+                                       update.contentType === 'progress' ? "bg-emerald-50 text-emerald-600" :
+                                       update.contentType === 'material' ? "bg-blue-50 text-blue-600" :
+                                       "bg-rose-50 text-rose-600"
+                                     )}>
+                                       {update.contentType === 'homework' ? <FileText className="w-6 h-6" /> : 
+                                        update.contentType === 'progress' ? <CheckCircle className="w-6 h-6" /> :
+                                        update.contentType === 'material' ? <BookOpen className="w-6 h-6" /> :
+                                        <MessageSquare className="w-6 h-6" />}
+                                     </div>
+                                     <div className="flex-1 space-y-2">
+                                        <div className="flex items-center justify-between">
+                                           <div className="flex items-center gap-2">
+                                              <h5 className="font-black text-gray-900">{update.title}</h5>
+                                              <span className="text-[10px] font-black uppercase tracking-widest bg-gray-50 text-gray-400 px-2 py-0.5 rounded-lg">{update.contentType}</span>
+                                           </div>
+                                           <span className="text-xs text-gray-400 font-bold">{update.publishDate}</span>
+                                        </div>
+                                        <p className="text-sm text-gray-500 whitespace-pre-wrap">{update.description}</p>
+                                        {update.attachments && update.attachments.length > 0 && (
+                                           <div className="flex flex-wrap gap-2 pt-2">
+                                              {update.attachments.map((link, i) => (
+                                                <a 
+                                                   key={i} 
+                                                   href={link} 
+                                                   target="_blank" 
+                                                   rel="noopener noreferrer"
+                                                   className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50/50 text-indigo-600 rounded-lg text-[10px] font-bold hover:bg-indigo-600 hover:text-white transition-all shadow-sm"
+                                                >
+                                                   <ExternalLink className="w-3 h-3" />
+                                                   Resource {i + 1}
+                                                </a>
+                                              ))}
+                                           </div>
+                                        )}
+                                     </div>
+                                     <button 
+                                        onClick={() => handleDeleteUpdate(update.id)}
+                                        className="p-2 text-gray-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all"
+                                     >
+                                        <Trash2 className="w-4 h-4" />
+                                     </button>
+                                  </div>
+                               ))
+                            ) : (
+                               <div className="text-center py-20 bg-gray-50 rounded-[2.5rem] border-2 border-dashed border-gray-100">
+                                  <div className="w-16 h-16 bg-white rounded-3xl shadow-sm flex items-center justify-center text-gray-300 mx-auto mb-4">
+                                     <FileText className="w-8 h-8" />
+                                  </div>
+                                  <h6 className="font-bold text-gray-900">No updates yet</h6>
+                                  <p className="text-gray-400 text-sm mt-1">Updates for this batch will appear here after you post them.</p>
+                               </div>
+                            )}
+                         </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+             </div>
+          </motion.div>
+        )}
         {activeTab === 'website' && (
           <motion.div
             key="website"

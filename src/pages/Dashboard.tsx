@@ -71,10 +71,10 @@ export function Dashboard() {
     });
 
     const unsubscribe = onSnapshot(q, (snap) => {
-      const notifs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const notifs = snap.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
       
       // Sort client-side
-      const sortedNotifs = notifs.sort((a: any, b: any) => {
+      const sortedNotifs = notifs.sort((a, b) => {
         const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
         const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
         return dateB - dateA;
@@ -127,24 +127,24 @@ export function Dashboard() {
       setExpiryNotification({
         id: 'auto-expiry-3',
         type: 'warning',
-        title: 'Plan Ending Soon',
-        message: 'Your plan will end in 3 days. Please renew to avoid service interruption.',
+        title: t('dashboard.planExpiry.endingSoonTitle'),
+        message: t('dashboard.planExpiry.endingSoonDesc', { days: 3 }),
         createdAt: new Date().toISOString()
       });
     } else if (diffDays === 0) {
       setExpiryNotification({
         id: 'auto-expiry-0',
         type: 'error',
-        title: 'Plan Ends Today',
-        message: 'Your subscription ends today. Please make a payment to continue using all features.',
+        title: t('dashboard.planExpiry.endsTodayTitle'),
+        message: t('dashboard.planExpiry.endsTodayDesc'),
         createdAt: new Date().toISOString()
       });
     } else if (diffDays < 0 && diffDays >= -5) {
       setExpiryNotification({
         id: `auto-expiry-past-${Math.abs(diffDays)}`,
         type: 'error',
-        title: 'Plan Expired (Grace Period)',
-        message: `Your plan expired ${Math.abs(diffDays)} days ago. You are in a 5-day grace period. Access will be restricted soon.`,
+        title: t('dashboard.planExpiry.expiredTitle'),
+        message: t('dashboard.planExpiry.expiredDesc', { days: Math.abs(diffDays) }),
         createdAt: new Date().toISOString()
       });
     } else {
@@ -1028,6 +1028,7 @@ function QuickAction({ title, description, icon: Icon, to, color }: { title: str
 }
 
 function ChecklistCard({ step, title, desc, to, done }: { step: string, title: string, desc: string, to: string, done: boolean }) {
+  const { t } = useTranslation();
   return (
     <Link to={to} className={cn(
       "p-5 rounded-3xl border-2 transition-all group",
@@ -1040,7 +1041,7 @@ function ChecklistCard({ step, title, desc, to, done }: { step: string, title: s
         )}>
           {done ? <CheckCircle2 className="w-4 h-4" /> : step}
         </span>
-        {done && <span className="text-[10px] font-black text-emerald-600 uppercase">Completed</span>}
+        {done && <span className="text-[10px] font-black text-emerald-600 uppercase">{t('common.done')}</span>}
       </div>
       <h4 className={cn("font-black text-sm", done ? "text-emerald-900" : "text-gray-900")}>{title}</h4>
       <p className="text-[10px] text-gray-500 mt-1 font-medium leading-relaxed">{desc}</p>
