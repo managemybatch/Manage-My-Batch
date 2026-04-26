@@ -164,118 +164,137 @@ export function Students() {
   const processBulkImport = async () => {
     if (!user || importData.length === 0) return;
 
+    const plan = SUBSCRIPTION_PLANS.find(p => p.id === user.subscriptionPlan) || SUBSCRIPTION_PLANS[0];
+    if (students.length + importData.length > plan.studentLimit && !user.isSuperAdmin) {
+      alert(t('students.limitReached', { defaultValue: `Import would exceed your plan limit of ${plan.studentLimit} students. Please upgrade your plan.` }));
+      setIsUpgradeModalOpen(true);
+      return;
+    }
+
     setIsSaving(true);
     try {
-      const firestoreBatch = writeBatch(db);
       const instId = user.institutionId || user.uid;
       let count = 0;
+      const CHUNK_SIZE = 50; // Each student can have up to 4 operations (student, 2 fees, batch update)
+      
+      for (let i = 0; i < importData.length; i += CHUNK_SIZE) {
+        const chunk = importData.slice(i, i + CHUNK_SIZE);
+        const firestoreBatch = writeBatch(db);
+        const chunkBatchUpdates = new Map<string, number>();
 
-      for (const row of importData) {
-        const getVal = (keys: string[]) => {
-          const key = Object.keys(row).find(k => keys.includes(k.trim().toLowerCase()));
-          return key ? row[key] : undefined;
-        };
+        for (const row of chunk) {
+          const getVal = (keys: string[]) => {
+            const key = Object.keys(row).find(k => keys.includes(k.trim().toLowerCase()));
+            return key ? row[key] : undefined;
+          };
 
-        const name = getVal(['name', 'student name', 'full name']);
-        const phone = getVal(['guardianphone', 'phone', 'mobile', 'contact', 'guardian phone']);
-        const batchNameStr = getVal(['batch', 'batch name', 'class']);
-        const rollNo = String(getVal(['rollno', 'roll', 'id', 'student id']) || '');
-        const admissionFeeOverride = parseFloat(getVal(['admissionfee', 'admission fee']) || '0');
-        const monthlyFeeOverride = parseFloat(getVal(['monthlyfee', 'monthly fee']) || '0');
-        const dob = getVal(['dateofbirth', 'dob', 'birth date']);
-        const fName = getVal(['fathername', 'father name']);
-        const mName = getVal(['mothername', 'mother name']);
-        const address = getVal(['address', 'location']);
+          const name = getVal(['name', 'student name', 'full name']);
+          const phone = getVal(['guardianphone', 'phone', 'mobile', 'contact', 'guardian phone']);
+          const batchNameStr = getVal(['batch', 'batch name', 'class']);
+          const rollNo = String(getVal(['rollno', 'roll', 'id', 'student id']) || '');
+          const admissionFeeOverride = parseFloat(getVal(['admissionfee', 'admission fee']) || '0');
+          const monthlyFeeOverride = parseFloat(getVal(['monthlyfee', 'monthly fee']) || '0');
+          const dob = getVal(['dateofbirth', 'dob', 'birth date']);
+          const fName = getVal(['fathername', 'father name']);
+          const mName = getVal(['mothername', 'mother name']);
+          const address = getVal(['address', 'location']);
 
-        if (!name) continue;
+          if (!name) continue;
 
-        // Determine batch
-        let b = null;
-        if (bulkSettings.batchId) {
-          b = batches.find(batch => batch.id === bulkSettings.batchId);
-        } else if (batchNameStr) {
-          b = batches.find(batch => batch.name.toLowerCase() === String(batchNameStr).trim().toLowerCase());
-        }
+          // Determine batch
+          let b = null;
+          if (bulkSettings.batchId) {
+            b = batches.find(batch => batch.id === bulkSettings.batchId);
+          } else if (batchNameStr) {
+            b = batches.find(batch => batch.name.toLowerCase() === String(batchNameStr).trim().toLowerCase());
+          }
 
-        const studentRef = doc(collection(db, 'students'));
-        const studentData: any = {
-          name: String(name).trim(),
-          guardianPhone: String(phone || '').trim(),
-          batchId: b?.id || '',
-          batchName: b?.name || (batchNameStr ? String(batchNameStr).trim() : ''),
-          grade: b?.grade || '',
-          rollNo: rollNo.trim(),
-          status: 'active',
-          joinDate: new Date().toISOString().split('T')[0],
-          monthlyFee: monthlyFeeOverride || b?.monthlyFee || 0,
-          admissionFee: admissionFeeOverride || b?.admissionFee || 0,
-          dateOfBirth: dob ? String(dob) : '',
-          fatherName: fName ? String(fName) : '',
-          motherName: mName ? String(mName) : '',
-          address: address ? String(address) : '',
-          feeType: 'Full Fee',
-          institutionId: instId,
-          createdBy: user.uid,
-          createdAt: serverTimestamp(),
-        };
-
-        firestoreBatch.set(studentRef, studentData);
-
-        // Handle Fee Records based on settings
-        const admissionFeeValue = studentData.admissionFee;
-        const monthlyFeeValue = studentData.monthlyFee;
-        const now = new Date();
-        const currentMonth = MONTHS[now.getMonth()];
-        const currentYear = now.getFullYear();
-
-        if (admissionFeeValue > 0 && bulkSettings.isAdmissionPaid) {
-          const feeRef = doc(collection(db, 'fees'));
-          firestoreBatch.set(feeRef, {
-            studentId: studentRef.id,
-            studentName: studentData.name,
-            amount: admissionFeeValue,
-            date: now.toISOString(),
-            month: currentMonth,
-            year: currentYear,
-            status: 'paid',
-            type: 'Admission Fee',
+          const studentRef = doc(collection(db, 'students'));
+          const studentData: any = {
+            name: String(name).trim(),
+            guardianPhone: String(phone || '').trim(),
+            batchId: b?.id || '',
+            batchName: b?.name || (batchNameStr ? String(batchNameStr).trim() : ''),
+            grade: b?.grade || '',
+            rollNo: rollNo.trim(),
+            status: 'active',
+            joinDate: new Date().toISOString().split('T')[0],
+            monthlyFee: monthlyFeeOverride || b?.monthlyFee || 0,
+            admissionFee: admissionFeeOverride || b?.admissionFee || 0,
+            dateOfBirth: dob ? String(dob) : '',
+            fatherName: fName ? String(fName) : '',
+            motherName: mName ? String(mName) : '',
+            address: address ? String(address) : '',
+            feeType: 'Full Fee',
             institutionId: instId,
             createdBy: user.uid,
             createdAt: serverTimestamp(),
-          });
+          };
+
+          firestoreBatch.set(studentRef, studentData);
+
+          // Handle Fee Records based on settings
+          const admissionFeeValue = studentData.admissionFee;
+          const monthlyFeeValue = studentData.monthlyFee;
+          const now = new Date();
+          const currentMonth = MONTHS[now.getMonth()];
+          const currentYear = now.getFullYear();
+
+          if (admissionFeeValue > 0 && bulkSettings.isAdmissionPaid) {
+            const feeRef = doc(collection(db, 'fees'));
+            firestoreBatch.set(feeRef, {
+              studentId: studentRef.id,
+              studentName: studentData.name,
+              amount: admissionFeeValue,
+              date: now.toISOString(),
+              month: currentMonth,
+              year: currentYear,
+              status: 'paid',
+              type: 'Admission Fee',
+              institutionId: instId,
+              createdBy: user.uid,
+              createdAt: serverTimestamp(),
+            });
+          }
+
+          if (monthlyFeeValue > 0 && bulkSettings.isMonthlyPaid) {
+            const feeRef = doc(collection(db, 'fees'));
+            firestoreBatch.set(feeRef, {
+              studentId: studentRef.id,
+              studentName: studentData.name,
+              amount: monthlyFeeValue,
+              date: now.toISOString(),
+              month: currentMonth,
+              year: currentYear,
+              status: 'paid',
+              type: 'Monthly Fee',
+              institutionId: instId,
+              createdBy: user.uid,
+              createdAt: serverTimestamp(),
+            });
+          }
+
+          if (b?.id) {
+            chunkBatchUpdates.set(b.id, (chunkBatchUpdates.get(b.id) || 0) + 1);
+          }
+          count++;
         }
 
-        if (monthlyFeeValue > 0 && bulkSettings.isMonthlyPaid) {
-          const feeRef = doc(collection(db, 'fees'));
-          firestoreBatch.set(feeRef, {
-            studentId: studentRef.id,
-            studentName: studentData.name,
-            amount: monthlyFeeValue,
-            date: now.toISOString(),
-            month: currentMonth,
-            year: currentYear,
-            status: 'paid',
-            type: 'Monthly Fee',
-            institutionId: instId,
-            createdBy: user.uid,
-            createdAt: serverTimestamp(),
-          });
-        }
-
-        if (b?.id) {
-          const bRef = doc(db, 'batches', b.id);
-          firestoreBatch.update(bRef, { studentCount: increment(1) });
-        }
-        count++;
+        // Apply batch studentCount updates for THIS chunk
+        chunkBatchUpdates.forEach((incr, bId) => {
+          const bRef = doc(db, 'batches', bId);
+          firestoreBatch.update(bRef, { studentCount: increment(incr) });
+        });
+        
+        await firestoreBatch.commit();
       }
 
-      await firestoreBatch.commit();
       alert(`Successfully imported ${count} students`);
       setIsImportModalOpen(false);
       setImportData([]);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Import process failed', err);
-      alert('Failed to process bulk import. Please try again.');
+      alert(`Failed to process bulk import: ${err.message || 'Unknown error'}. Please try again.`);
     } finally {
       setIsSaving(false);
     }

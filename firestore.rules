@@ -393,13 +393,17 @@ service cloud.firestore {
     }
 
     match /fees/{feeId} {
-      allow read: if isTeacher() && (resource.data.institutionId == getInstitutionId() || resource.data.institutionId == request.auth.uid || isAdmin());
-      allow write: if isTeacher() && (request.resource.data.institutionId == (getInstitutionId() != null ? getInstitutionId() : request.auth.uid) || resource.data.institutionId == (getInstitutionId() != null ? getInstitutionId() : request.auth.uid)) && isValidFee(request.resource.data);
+      allow read: if isTeacher() && isMemberOf(resource.data.institutionId);
+      allow create: if isTeacher() && isMemberOf(request.resource.data.institutionId) && isValidFee(request.resource.data);
+      allow update: if isTeacher() && isMemberOf(resource.data.institutionId) && isValidFee(request.resource.data);
+      allow delete: if isInstitutionAdmin() && isMemberOf(resource.data.institutionId);
     }
 
     match /attendance/{attendanceId} {
-      allow read: if isTeacher() && (resource.data.institutionId == getInstitutionId() || resource.data.institutionId == request.auth.uid || isAdmin());
-      allow write: if isTeacher() && isValidAttendance(request.resource.data);
+      allow read: if isTeacher() && isMemberOf(resource.data.institutionId);
+      allow create: if isTeacher() && isMemberOf(request.resource.data.institutionId) && isValidAttendance(request.resource.data);
+      allow update: if isTeacher() && isMemberOf(resource.data.institutionId) && isValidAttendance(request.resource.data);
+      allow delete: if isInstitutionAdmin() && isMemberOf(resource.data.institutionId);
     }
 
     match /batches/{batchId} {
@@ -440,9 +444,9 @@ service cloud.firestore {
 
     match /attendance_submissions/{submissionId} {
       allow read: if isTeacher();
-      allow create: if true; // Publicly submittable
-      allow update: if isTeacher() && (resource.data.institutionId == request.auth.uid || resource.data.institutionId == getInstitutionId() || isAdmin());
-      allow delete: if isTeacher();
+      allow create: if true;
+      allow update: if isTeacher() && isMemberOf(resource.data.institutionId);
+      allow delete: if isTeacher() && isMemberOf(resource.data.institutionId);
     }
 
     match /institutions/{instId} {
@@ -464,27 +468,37 @@ service cloud.firestore {
 
     match /teacher_attendance/{attendanceId} {
       allow read: if isTeacher();
-      allow write: if isTeacher() && isValidTeacherAttendance(request.resource.data);
+      allow create: if isInstitutionAdmin() && isMemberOf(request.resource.data.institutionId) && isValidTeacherAttendance(request.resource.data);
+      allow update: if isInstitutionAdmin() && isMemberOf(resource.data.institutionId) && isValidTeacherAttendance(request.resource.data);
+      allow delete: if isInstitutionAdmin() && isMemberOf(resource.data.institutionId);
     }
 
     match /notices/{noticeId} {
       allow read: if true;
-      allow create, update, delete: if isTeacher();
+      allow create: if isTeacher() && isMemberOf(request.resource.data.institutionId);
+      allow update: if isTeacher() && isMemberOf(resource.data.institutionId);
+      allow delete: if isTeacher() && isMemberOf(resource.data.institutionId);
     }
 
     match /events/{eventId} {
       allow read: if true;
-      allow create, update, delete: if isTeacher();
+      allow create: if isTeacher() && isMemberOf(request.resource.data.institutionId);
+      allow update: if isTeacher() && isMemberOf(resource.data.institutionId);
+      allow delete: if isTeacher() && isMemberOf(resource.data.institutionId);
     }
 
     match /schedules/{scheduleId} {
       allow read: if isTeacher();
-      allow create, update, delete: if isTeacher();
+      allow create: if isTeacher() && isMemberOf(request.resource.data.institutionId);
+      allow update: if isTeacher() && isMemberOf(resource.data.institutionId);
+      allow delete: if isTeacher() && isMemberOf(resource.data.institutionId);
     }
 
     match /circulars/{circularId} {
-      allow read: if true; // Publicly readable
-      allow create, update, delete: if isTeacher();
+      allow read: if true;
+      allow create: if isTeacher() && isMemberOf(request.resource.data.institutionId);
+      allow update: if isTeacher() && isMemberOf(resource.data.institutionId);
+      allow delete: if isTeacher() && isMemberOf(resource.data.institutionId);
     }
 
     match /job_applications/{appId} {
