@@ -99,6 +99,7 @@ export function Students() {
     const data = [
       {
         'Name': 'John Doe',
+        'StudentPhone': '01555667788',
         'GuardianPhone': '01711223344',
         'Batch': 'Class 10 - Science',
         'RollNo': '101',
@@ -111,6 +112,7 @@ export function Students() {
       },
       {
         'Name': 'Jane Smith',
+        'StudentPhone': '01999887766',
         'GuardianPhone': '01822334455',
         'Batch': 'Class 10 - Arts',
         'RollNo': '102',
@@ -189,6 +191,7 @@ export function Students() {
           };
 
           const name = getVal(['name', 'student name', 'full name']);
+          const studentPhone = getVal(['studentphone', 'student phone', 'student mobile']);
           const phone = getVal(['guardianphone', 'phone', 'mobile', 'contact', 'guardian phone']);
           const batchNameStr = getVal(['batch', 'batch name', 'class']);
           const rollNo = String(getVal(['rollno', 'roll', 'id', 'student id']) || '');
@@ -212,6 +215,7 @@ export function Students() {
           const studentRef = doc(collection(db, 'students'));
           const studentData: any = {
             name: String(name).trim(),
+            phone: String(studentPhone || '').trim(),
             guardianPhone: String(phone || '').trim(),
             batchId: b?.id || '',
             batchName: b?.name || (batchNameStr ? String(batchNameStr).trim() : ''),
@@ -631,6 +635,7 @@ export function Students() {
       fatherName: app.formData?.fatherName || '',
       motherName: app.formData?.motherName || '',
       guardianPhone: app.formData?.guardianPhone || app.guardianPhone || '',
+      phone: app.formData?.studentPhone || app.studentPhone || '',
       address: app.formData?.address || '',
       photoUrl: app.photoUrl || '',
       batchId: app.batchId || '',
@@ -1038,6 +1043,7 @@ export function Students() {
             <div className="grid grid-cols-2 gap-3">
               {[
                 { name: t('students.addModal.name'), desc: t('students.importInstructions.nameDesc') },
+                { name: t('students.addModal.studentPhone'), desc: 'Student mobile number (optional)' },
                 { name: t('students.addModal.guardianPhone'), desc: t('students.importInstructions.phoneDesc') },
                 { name: t('students.addModal.batch'), desc: t('students.importInstructions.batchDesc') },
                 { name: t('students.addModal.rollNo'), desc: t('students.importInstructions.rollDesc') },
@@ -1055,7 +1061,7 @@ export function Students() {
           <div className="bg-gray-900 p-4 rounded-2xl overflow-x-auto border border-gray-800">
             <p className="text-[10px] text-gray-500 uppercase font-black mb-2 tracking-widest">Excel Header Format</p>
             <div className="text-xs text-indigo-300 font-mono whitespace-nowrap border-b border-gray-800 pb-2 mb-2">
-              Name | GuardianPhone | Batch | RollNo | AdmissionFee | MonthlyFee
+              Name | StudentPhone | GuardianPhone | Batch | RollNo | AdmissionFee | MonthlyFee
             </div>
           </div>
 
@@ -1149,8 +1155,13 @@ export function Students() {
               <TableCell>
                 <div className="flex flex-col gap-1">
                   <div className="flex items-center gap-1.5 text-xs text-gray-500">
-                    <Phone className="w-3 h-3" /> {student.guardianPhone}
+                    <Phone className="w-3 h-3" /> G: {student.guardianPhone}
                   </div>
+                  {student.phone && (
+                    <div className="flex items-center gap-1.5 text-[10px] text-gray-400">
+                      <Phone className="w-2.5 h-2.5" /> S: {student.phone}
+                    </div>
+                  )}
                 </div>
               </TableCell>
               <TableCell>
@@ -1469,6 +1480,16 @@ export function Students() {
                   type="text"
                   value={editingStudent.guardianPhone}
                   onChange={e => setEditingStudent({...editingStudent, guardianPhone: e.target.value})}
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-bold"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">{t('students.addModal.studentPhone')}</label>
+                <input
+                  type="text"
+                  value={editingStudent.phone || ''}
+                  onChange={e => setEditingStudent({...editingStudent, phone: e.target.value})}
                   className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
                 />
               </div>
@@ -1696,6 +1717,17 @@ export function Students() {
                 placeholder="e.g. 01711-123456"
                 value={newStudent.guardianPhone}
                 onChange={e => setNewStudent({...newStudent, guardianPhone: e.target.value})}
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-bold"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">{t('students.addModal.studentPhone')}</label>
+              <input
+                type="text"
+                placeholder="e.g. 01711-123456"
+                value={newStudent.phone}
+                onChange={e => setNewStudent({...newStudent, phone: e.target.value})}
                 className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
               />
             </div>

@@ -192,7 +192,7 @@ export function Institution() {
             active: false,
             title: 'Admission Form',
             instructions: 'Please fill out the form below to apply.',
-            fields: { studentName: true, guardianPhone: true, address: true }
+            fields: { studentName: true, guardianPhone: true, studentPhone: true, address: true }
           }
         } as InstitutionData);
       } else {
@@ -242,6 +242,7 @@ export function Institution() {
               fatherName: true,
               motherName: true,
               guardianPhone: true,
+              studentPhone: true,
               admissionDate: true,
               batch: true,
               subjectGroup: false,
@@ -572,7 +573,8 @@ export function Institution() {
     { key: 'nid', label: 'এনআইডি নম্বর', required: false },
     { key: 'fatherName', label: 'পিতার নাম', required: false },
     { key: 'motherName', label: 'মাতার নাম', required: false },
-    { key: 'guardianPhone', label: 'ফোন*', required: true },
+    { key: 'guardianPhone', label: 'অভিভাবকের ফোন*', required: true },
+    { key: 'studentPhone', label: 'ছাত্রের ফোন', required: false },
     { key: 'admissionDate', label: 'ভর্তির তারিখ*', required: true },
     { key: 'batch', label: 'ব্যাচ*', required: true },
     { key: 'subjectGroup', label: 'বিষয় গ্রুপ', required: false },
@@ -598,6 +600,7 @@ export function Institution() {
     const prefillData = {
       name: app.studentName,
       guardianPhone: app.guardianPhone,
+      phone: (app as any).studentPhone || (app.formData as any)?.studentPhone,
       email: app.email,
       grade: app.grade,
       photoUrl: (app as any).photoUrl || (app.formData as any)?.photoUrl || (app.formData as any)?.photo,

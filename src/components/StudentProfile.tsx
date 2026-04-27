@@ -289,8 +289,8 @@ export function StudentProfile({ isOpen, onClose, student, onEdit }: StudentProf
     doc.text(`Father's Name: ${student.fatherName || 'N/A'}`, 25, 59);
     doc.text(`Mother's Name: ${student.motherName || 'N/A'}`, 25, 66);
     doc.text(`Date of Birth: ${student.dateOfBirth ? formatDate(student.dateOfBirth) : 'N/A'}`, 25, 73);
-    doc.text(`Phone: ${student.phone || 'N/A'}`, 25, 80);
-    doc.text(`Guardian Phone: ${student.guardianPhone}`, 25, 87);
+    doc.text(`Phone: ${student.guardianPhone}`, 25, 80);
+    doc.text(`Student Phone: ${student.phone || 'N/A'}`, 25, 87);
     
     // Academic Info
     doc.setFont('helvetica', 'bold');
@@ -380,7 +380,7 @@ export function StudentProfile({ isOpen, onClose, student, onEdit }: StudentProf
     pdf.setFont('helvetica', 'normal');
     pdf.text(`Roll No: ${student.rollNo}`, 35, 27);
     pdf.text(`Batch: ${student.batchName}`, 35, 31);
-    pdf.text(`Phone: ${student.guardianPhone}`, 35, 35);
+    pdf.text(`Phone: ${student.phone || student.guardianPhone}`, 35, 35);
     
     const expiry = new Date();
     expiry.setFullYear(expiry.getFullYear() + 1);
@@ -627,6 +627,8 @@ export function StudentProfile({ isOpen, onClose, student, onEdit }: StudentProf
                 <div className="space-y-1">
                   <DetailRow label={t('studentProfile.info.fatherName')} value={student.fatherName} />
                   <DetailRow label={t('studentProfile.info.motherName')} value={student.motherName} />
+                  <DetailRow label={t('studentProfile.info.studentPhone')} value={student.phone} />
+                  <DetailRow label={t('studentProfile.info.guardianPhone')} value={student.guardianPhone} />
                   <DetailRow label={t('studentProfile.info.dob')} value={student.dateOfBirth ? formatDate(student.dateOfBirth) : '—'} />
                   <DetailRow label={t('studentProfile.info.birthCert')} value={student.birthCertificateNo} />
                   <DetailRow label={t('studentProfile.info.nid')} value={student.nidNumber} />
@@ -791,6 +793,26 @@ export function StudentProfile({ isOpen, onClose, student, onEdit }: StudentProf
               >
                 <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex items-center justify-between">
                   <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center text-emerald-600">
+                      <Phone className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{t('studentProfile.info.studentPhone')}</p>
+                      <p className="font-bold text-gray-900">{student.phone || '—'}</p>
+                    </div>
+                  </div>
+                  {student.phone && (
+                    <button 
+                      onClick={() => window.open(`https://wa.me/${student.phone}`, '_blank')}
+                      className="p-2 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-100 transition-all"
+                    >
+                      <MessageSquare className="w-5 h-5" />
+                    </button>
+                  )}
+                </div>
+
+                <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex items-center justify-between">
+                  <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-600">
                       <Phone className="w-5 h-5" />
                     </div>
