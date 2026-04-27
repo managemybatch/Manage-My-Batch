@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { db, handleFirestoreError, OperationType } from '../../firebase';
-import { doc, getDoc, collection, query, where, getDocs, limit, orderBy, getCountFromServer } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs, limit, orderBy, getCountFromServer, onSnapshot } from 'firebase/firestore';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Building, MapPin, Phone, Mail, Globe, Users, Briefcase, Layers, CheckCircle, Loader2, GraduationCap, Calendar, Download, Megaphone, Newspaper, ArrowRight, Clock, Info, FileText, TrendingUp, Star, HelpCircle, Facebook, Youtube, Linkedin, User, Key, ChevronRight, AlertCircle, X, BookOpen, MessageSquare, Search, Filter } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -125,16 +125,40 @@ export function InstitutionProfile() {
           setExams((examsSnap as any).docs.map((d: any) => ({ id: d.id, ...d.data() })));
         }
 
-        // Fetch Batches for Portal
-        const batchesSnap = await getDocs(query(collection(db, 'batches'), where('institutionId', '==', instId)));
-        setBatches(batchesSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+        // Fetch Batches for Portal (Real-time)
+        const unsubBatches = onSnapshot(
+          query(collection(db, 'batches'), where('institutionId', '==', instId)),
+          (snap) => {
+            const fetchedBatches = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            setBatches(fetchedBatches);
+            
+            // Re-sync stats for batches
+            setStats(prev => ({ ...prev, batches: snap.size }));
+            
+            // If the portal is open and the selected batch was updated, update it
+            if (selectedBatch) {
+              const updatedBatch = fetchedBatches.find(b => b.id === selectedBatch.id);
+              if (updatedBatch) {
+                setSelectedBatch(updatedBatch);
+              }
+            }
+          },
+          (err) => {
+            console.error("Batches sync error:", err);
+          }
+        );
+
+        return () => unsubBatches();
       } catch (err) {
         handleFirestoreError(err, OperationType.GET, 'institutions');
       } finally {
         setLoading(false);
       }
     }
-    fetchData();
+    const cleanup = fetchData();
+    return () => {
+      cleanup.then(unsub => unsub && (unsub as any)());
+    };
   }, [id, slug]);
 
   const scrollToSection = (e: React.MouseEvent, sectionIdOrType: string) => {
@@ -282,7 +306,7 @@ export function InstitutionProfile() {
 
   const handleBatchLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (selectedBatch?.websitePassword && batchPassword === selectedBatch.websitePassword) {
+    if (selectedBatch?.websitePassword && batchPassword.trim() === selectedBatch.websitePassword.trim()) {
       setIsBatchAuthorized(true);
       setPasswordError(false);
       sessionStorage.setItem(`batch_auth_${selectedBatch.id}`, 'true');

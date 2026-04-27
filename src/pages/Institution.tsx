@@ -131,7 +131,7 @@ export function Institution() {
   const [newUpdate, setNewUpdate] = useState({
     title: '',
     description: '',
-    contentType: 'homework' as const,
+    contentType: 'homework' as 'homework' | 'progress' | 'material' | 'notice',
     publishDate: new Date().toISOString().split('T')[0],
     attachments: [] as string[],
   });
@@ -141,6 +141,7 @@ export function Institution() {
   const [showCircularModal, setShowCircularModal] = useState(false);
   const [showSectionModal, setShowSectionModal] = useState(false);
   const [editingItem, setEditingItem] = useState<any>(null);
+  const [editingUpdate, setEditingUpdate] = useState<BatchUpdate | null>(null);
   const [editingSection, setEditingSection] = useState<WebsiteSection | null>(null);
 
   useEffect(() => {
@@ -374,13 +375,23 @@ export function Institution() {
 
     setIsSaving(true);
     try {
-      await addDoc(collection(db, 'batch_content'), {
-        ...newUpdate,
-        batchId: selectedBatchId,
-        institutionId: instId,
-        authorId: user?.uid,
-        createdAt: serverTimestamp()
-      });
+      if (editingUpdate) {
+        await updateDoc(doc(db, 'batch_content', editingUpdate.id), {
+          ...newUpdate,
+          updatedAt: serverTimestamp()
+        });
+        setEditingUpdate(null);
+        setToast({ message: 'Update updated!', type: 'success' });
+      } else {
+        await addDoc(collection(db, 'batch_content'), {
+          ...newUpdate,
+          batchId: selectedBatchId,
+          institutionId: instId,
+          authorId: user?.uid,
+          createdAt: serverTimestamp()
+        });
+        setToast({ message: 'Update published!', type: 'success' });
+      }
       setNewUpdate({
         title: '',
         description: '',
@@ -389,10 +400,9 @@ export function Institution() {
         attachments: [],
       });
       setIsAddingUpdate(false);
-      setToast({ message: 'Update published!', type: 'success' });
     } catch (err: any) {
       handleFirestoreError(err, OperationType.CREATE, 'batch_content');
-      setToast({ message: `Failed to publish: ${err.message || 'Unknown error'}`, type: 'error' });
+      setToast({ message: `Failed to save: ${err.message || 'Unknown error'}`, type: 'error' });
     } finally {
       setIsSaving(false);
     }
@@ -435,6 +445,7 @@ export function Institution() {
       setToast({ message: 'Saved successfully!', type: 'success' });
       setShowNoticeModal(false);
       setShowEventModal(false);
+      setShowCircularModal(false);
       setEditingItem(null);
     } catch (error) {
       setToast({ message: 'Failed to save!', type: 'error' });
@@ -811,7 +822,21 @@ export function Institution() {
                          <div className="flex items-center justify-between">
                             <h4 className="text-lg font-black text-gray-900">Batch Feed</h4>
                             <button 
-                              onClick={() => setIsAddingUpdate(!isAddingUpdate)}
+                              onClick={() => {
+                                if (isAddingUpdate) {
+                                  setIsAddingUpdate(false);
+                                  setEditingUpdate(null);
+                                  setNewUpdate({
+                                    title: '',
+                                    description: '',
+                                    contentType: 'homework',
+                                    publishDate: new Date().toISOString().split('T')[0],
+                                    attachments: [],
+                                  });
+                                } else {
+                                  setIsAddingUpdate(true);
+                                }
+                              }}
                               className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-black hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100"
                             >
                               {isAddingUpdate ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
@@ -828,6 +853,9 @@ export function Institution() {
                                 className="overflow-hidden"
                               >
                                 <form onSubmit={handleAddUpdate} className="bg-gray-50/50 p-6 rounded-[2rem] border-2 border-dashed border-indigo-100 space-y-6">
+                                   <div className="flex items-center justify-between">
+                                     <h5 className="font-black text-indigo-900">{editingUpdate ? 'Edit Update' : 'New Update'}</h5>
+                                   </div>
                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                       <div className="space-y-2">
                                          <label className="text-xs font-bold text-gray-500 uppercase tracking-widest ml-1">Title</label>
@@ -964,12 +992,33 @@ export function Institution() {
                                            </div>
                                         )}
                                      </div>
-                                     <button 
-                                        onClick={() => handleDeleteUpdate(update.id)}
-                                        className="p-2 text-gray-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all"
-                                     >
-                                        <Trash2 className="w-4 h-4" />
-                                     </button>
+                                      <div className="flex flex-col gap-1 shrink-0">
+                                        <button 
+                                           onClick={() => {
+                                             setEditingUpdate(update);
+                                             setNewUpdate({
+                                               title: update.title,
+                                               description: update.description,
+                                               contentType: update.contentType,
+                                               publishDate: update.publishDate || new Date().toISOString().split('T')[0],
+                                               attachments: update.attachments || [],
+                                             });
+                                             setIsAddingUpdate(true);
+                                             window.scrollTo({ top: 300, behavior: 'smooth' });
+                                           }}
+                                           className="p-2 text-gray-400 hover:text-indigo-600 md:opacity-0 md:group-hover:opacity-100 transition-all rounded-lg hover:bg-indigo-50"
+                                           title="Edit Update"
+                                        >
+                                           <Edit2 className="w-4 h-4" />
+                                        </button>
+                                        <button 
+                                           onClick={() => handleDeleteUpdate(update.id)}
+                                           className="p-2 text-gray-400 hover:text-rose-500 md:opacity-0 md:group-hover:opacity-100 transition-all rounded-lg hover:bg-rose-50"
+                                           title="Delete Update"
+                                        >
+                                           <Trash2 className="w-4 h-4" />
+                                        </button>
+                                      </div>
                                   </div>
                                ))
                             ) : (

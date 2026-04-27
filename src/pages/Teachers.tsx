@@ -115,6 +115,7 @@ export function Teachers() {
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [editingTeacher, setEditingTeacher] = useState<Teacher | null>(null);
+  const [editingCircular, setEditingCircular] = useState<Circular | null>(null);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [showApplicationsModal, setShowApplicationsModal] = useState(false);
   const [selectedCircular, setSelectedCircular] = useState<Circular | null>(null);
@@ -474,7 +475,7 @@ export function Teachers() {
     }
   };
 
-  const handleCreateCircular = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSaveCircular = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!user?.uid || isSaving) return;
     setIsSaving(true);
@@ -482,25 +483,36 @@ export function Teachers() {
     const form = e.currentTarget;
     const formData = new FormData(form);
     const instId = user.institutionId || user.uid;
+    const data = {
+      title: formData.get('title'),
+      description: formData.get('description'),
+      salaryRange: formData.get('salaryRange'),
+      deadline: formData.get('deadline'),
+      requirements: (formData.get('requirements') as string).split('\n').filter(r => r.trim()),
+      vacancies: formData.get('vacancies'),
+      education: formData.get('education'),
+      experience: formData.get('experience'),
+      jobType: formData.get('jobType'),
+      active: true,
+      published: true,
+      institutionId: instId,
+      updatedAt: serverTimestamp()
+    };
+
     try {
-      await addDoc(collection(db, 'circulars'), {
-        title: formData.get('title'),
-        description: formData.get('description'),
-        salaryRange: formData.get('salaryRange'),
-        deadline: formData.get('deadline'),
-        requirements: (formData.get('requirements') as string).split('\n').filter(r => r.trim()),
-        vacancies: formData.get('vacancies'),
-        education: formData.get('education'),
-        experience: formData.get('experience'),
-        jobType: formData.get('jobType'),
-        active: true,
-        published: true,
-        institutionId: instId,
-        createdAt: serverTimestamp()
-      });
+      if (editingCircular) {
+        await updateDoc(doc(db, 'circulars', editingCircular.id), data);
+        setEditingCircular(null);
+        setToast({ message: 'Circular updated successfully!', type: 'success' });
+      } else {
+        await addDoc(collection(db, 'circulars'), {
+          ...data,
+          createdAt: serverTimestamp()
+        });
+        setToast({ message: 'Circular posted successfully!', type: 'success' });
+      }
       
       if (form) form.reset();
-      setToast({ message: 'Circular posted successfully!', type: 'success' });
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, 'circulars');
     } finally {
@@ -1189,8 +1201,19 @@ export function Teachers() {
                           </div>
                           <div className="flex items-center gap-2">
                             <button 
-                              onClick={() => shareCircular(circular.id)}
+                              onClick={() => {
+                                setEditingCircular(circular);
+                                // Scroll the form into view on mobile
+                                window.scrollTo({ top: document.querySelector('form')?.offsetTop || 0, behavior: 'smooth' });
+                              }}
                               className="p-2 bg-white text-indigo-600 border border-indigo-100 rounded-xl hover:bg-indigo-50 transition-all"
+                              title="Edit Circular"
+                            >
+                              <Edit2 className="w-4 h-4" />
+                            </button>
+                            <button 
+                              onClick={() => shareCircular(circular.id)}
+                              className="p-2 bg-white text-emerald-600 border border-emerald-100 rounded-xl hover:bg-emerald-50 transition-all font-bold"
                             >
                               <Share2 className="w-4 h-4" />
                             </button>
@@ -1257,24 +1280,39 @@ export function Teachers() {
             </div>
 
             <div className="space-y-6">
-              <form onSubmit={handleCreateCircular} className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm space-y-4">
-                <div className="flex items-center gap-3 text-indigo-900 mb-2">
-                  <div className="w-10 h-10 bg-indigo-50 rounded-xl flex items-center justify-center">
-                    <Briefcase className="w-5 h-5 text-indigo-600" />
+              <form 
+                key={editingCircular?.id || 'new'}
+                onSubmit={handleSaveCircular} 
+                className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm space-y-4"
+              >
+                <div className="flex items-center justify-between gap-3 text-indigo-900 mb-2">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-indigo-50 rounded-xl flex items-center justify-center">
+                      <Briefcase className="w-5 h-5 text-indigo-600" />
+                    </div>
+                    <h3 className="font-black text-lg">{editingCircular ? 'Edit Circular' : t('teachers.hiring.createCircular')}</h3>
                   </div>
-                  <h3 className="font-black text-lg">{t('teachers.hiring.createCircular')}</h3>
+                  {editingCircular && (
+                    <button 
+                      type="button"
+                      onClick={() => setEditingCircular(null)}
+                      className="p-2 text-gray-400 hover:text-rose-600 transition-all"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  )}
                 </div>
                 
                 <div className="grid grid-cols-1 gap-4">
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Position Name</label>
-                    <input name="title" type="text" placeholder="e.g. Senior Math Teacher" required className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-sm" />
+                    <input name="title" type="text" defaultValue={editingCircular?.title} placeholder="e.g. Senior Math Teacher" required className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-sm" />
                   </div>
                   
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1.5">
                       <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Job Type</label>
-                      <select name="jobType" className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-sm font-bold text-gray-700">
+                      <select name="jobType" defaultValue={(editingCircular as any)?.jobType || 'Full Time'} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-sm font-bold text-gray-700">
                         <option>Full Time</option>
                         <option>Part Time</option>
                         <option>Contractual</option>
@@ -1283,29 +1321,29 @@ export function Teachers() {
                     </div>
                     <div className="space-y-1.5">
                       <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">{t('teachers.hiring.vacancies')}</label>
-                      <input name="vacancies" type="number" placeholder="1" required className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-sm" />
+                      <input name="vacancies" type="number" defaultValue={(editingCircular as any)?.vacancies || 1} placeholder="1" required className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-sm" />
                     </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1.5">
                       <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">{t('teachers.hiring.salaryRange')}</label>
-                      <input name="salaryRange" type="text" placeholder="e.g. 15k - 20k" className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-sm" />
+                      <input name="salaryRange" type="text" defaultValue={editingCircular?.salaryRange} placeholder="e.g. 15k - 20k" className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-sm" />
                     </div>
                     <div className="space-y-1.5">
                       <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">{t('teachers.hiring.deadline')}</label>
-                      <input name="deadline" type="date" required className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-sm" />
+                      <input name="deadline" type="date" defaultValue={editingCircular?.deadline} required className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-sm" />
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-1.5">
                       <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">{t('teachers.hiring.education')}</label>
-                      <input name="education" type="text" placeholder="e.g. Honours/Masters/NTRCA" required className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-sm" />
+                      <input name="education" type="text" defaultValue={(editingCircular as any)?.education} placeholder="e.g. Honours/Masters/NTRCA" required className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-sm" />
                     </div>
                     <div className="space-y-1.5">
                       <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">{t('teachers.hiring.experience')}</label>
-                      <input name="experience" type="text" placeholder="e.g. 2 Years" required className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-sm" />
+                      <input name="experience" type="text" defaultValue={(editingCircular as any)?.experience} placeholder="e.g. 2 Years" required className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-sm" />
                     </div>
                   </div>
 
@@ -1321,16 +1359,16 @@ export function Teachers() {
 
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">{t('teachers.hiring.description')}</label>
-                    <textarea name="description" rows={3} placeholder="Describe the role..." required className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-sm resize-none" />
+                    <textarea name="description" rows={3} defaultValue={editingCircular?.description} placeholder="Describe the role..." required className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-sm resize-none" />
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Requirements (one per line)</label>
-                    <textarea name="requirements" rows={3} placeholder="Requirement 1&#10;Requirement 2..." className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-sm resize-none" />
+                    <textarea name="requirements" rows={3} defaultValue={editingCircular?.requirements.join('\n')} placeholder="Requirement 1&#10;Requirement 2..." className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-sm resize-none" />
                   </div>
                 </div>
                 <button type="submit" disabled={isSaving} className="w-full py-4 bg-indigo-600 text-white font-bold rounded-2xl hover:bg-indigo-700 disabled:opacity-50 transition-all shadow-lg shadow-indigo-100 flex items-center justify-center gap-2">
                   {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
-                  {t('teachers.hiring.createCircular')}
+                  {editingCircular ? 'Update Job Circular' : t('teachers.hiring.createCircular')}
                 </button>
               </form>
 

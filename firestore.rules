@@ -408,7 +408,7 @@ service cloud.firestore {
 
     match /batches/{batchId} {
       allow get: if true;
-      allow list: if isTeacher() && isMemberOf(resource.data.institutionId);
+      allow list: if true; // Publicly listable for institution profiles
       allow create: if isTeacher() && isMemberOf(request.resource.data.institutionId) && isValidBatch(request.resource.data);
       allow update: if isTeacher() && isMemberOf(resource.data.institutionId) && isValidBatch(request.resource.data);
       allow delete: if isInstitutionAdmin() && isMemberOf(resource.data.institutionId);
@@ -431,7 +431,7 @@ service cloud.firestore {
 
     match /offline_exams/{examId} {
       allow get: if true; // Publicly readable for results
-      allow list: if isTeacher() && (resource.data.institutionId == getInstitutionId() || resource.data.institutionId == request.auth.uid || isAdmin());
+      allow list: if true; // Publicly listable for checking results
       allow create: if isTeacher() && (request.resource.data.institutionId == (getInstitutionId() != null ? getInstitutionId() : request.auth.uid)) && isValidOfflineExam(request.resource.data);
       allow update: if isTeacher() && resource.data.institutionId == (getInstitutionId() != null ? getInstitutionId() : request.auth.uid) && isValidOfflineExam(request.resource.data);
       allow delete: if isTeacher() && resource.data.institutionId == (getInstitutionId() != null ? getInstitutionId() : request.auth.uid);

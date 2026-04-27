@@ -294,6 +294,7 @@ export function Students() {
       setImportData([]);
     } catch (err: any) {
       console.error('Import process failed', err);
+      handleFirestoreError(err, OperationType.WRITE, 'students_bulk');
       alert(`Failed to process bulk import: ${err.message || 'Unknown error'}. Please try again.`);
     } finally {
       setIsSaving(false);
