@@ -222,9 +222,9 @@ service cloud.firestore {
 
     function isMemberOf(institutionId) {
       return isAuthenticated() && (
-        getInstitutionId() == institutionId || 
+        isAdmin() || 
         request.auth.uid == institutionId || 
-        isAdmin()
+        getInstitutionId() == institutionId
       );
     }
 
@@ -516,6 +516,18 @@ service cloud.firestore {
       allow read: if isTeacher() && (resource.data.institutionId == request.auth.uid || resource.data.institutionId == getInstitutionId() || isAdmin());
       allow create: if isTeacher() && isValidMessage(request.resource.data);
       allow delete: if isAdmin();
+    }
+
+    match /exam_ai_config/{configId} {
+      allow read: if isAuthenticated() && (isAdmin() || (isTeacher() && isMemberOf(resource.data.institutionId)));
+      allow create, update: if isAuthenticated() && (isAdmin() || (isTeacher() && isMemberOf(request.resource.data.institutionId)));
+      allow delete: if isAuthenticated() && (isAdmin() || (isTeacher() && isMemberOf(resource.data.institutionId)));
+    }
+
+    match /ai_evaluations/{evalId} {
+      allow read: if isAuthenticated() && (isAdmin() || (isTeacher() && isMemberOf(resource.data.institutionId)));
+      allow create, update: if isAuthenticated() && (isAdmin() || (isTeacher() && isMemberOf(request.resource.data.institutionId)));
+      allow delete: if isAuthenticated() && (isAdmin() || (isTeacher() && isMemberOf(resource.data.institutionId)));
     }
 
     match /super_notifications/{notificationId} {

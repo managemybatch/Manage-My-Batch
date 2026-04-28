@@ -101,6 +101,7 @@ export function Students() {
         'Name': 'John Doe',
         'StudentPhone': '01555667788',
         'GuardianPhone': '01711223344',
+        'Institution': 'Dhaka Residential Model College',
         'Batch': 'Class 10 - Science',
         'RollNo': '101',
         'AdmissionFee': 1000,
@@ -114,6 +115,7 @@ export function Students() {
         'Name': 'Jane Smith',
         'StudentPhone': '01999887766',
         'GuardianPhone': '01822334455',
+        'Institution': 'Viqarunnisa Noon School & College',
         'Batch': 'Class 10 - Arts',
         'RollNo': '102',
         'AdmissionFee': 1000,
@@ -201,6 +203,7 @@ export function Students() {
           const fName = getVal(['fathername', 'father name']);
           const mName = getVal(['mothername', 'mother name']);
           const address = getVal(['address', 'location']);
+          const schoolName = getVal(['schoolname', 'school name', 'institution', 'school']);
 
           if (!name) continue;
 
@@ -229,6 +232,7 @@ export function Students() {
             fatherName: fName ? String(fName) : '',
             motherName: mName ? String(mName) : '',
             address: address ? String(address) : '',
+            schoolName: schoolName ? String(schoolName) : '',
             feeType: 'Full Fee',
             institutionId: instId,
             createdBy: user.uid,
@@ -327,6 +331,7 @@ export function Students() {
     monthlyFee: 0,
     admissionFee: 0,
     subjectGroup: 'Science',
+    schoolName: '',
     feeType: 'Full Fee',
     isAdmissionFeePaid: true,
     isMonthlyFeePaid: true,
@@ -575,6 +580,7 @@ export function Students() {
         monthlyFee: 0,
         admissionFee: 0,
         subjectGroup: 'Science',
+        schoolName: '',
         feeType: 'Full Fee',
         status: 'active',
         isAdmissionFeePaid: false,
@@ -643,6 +649,7 @@ export function Students() {
       monthlyFee: app.monthlyFee || 0,
       admissionFee: app.admissionFee || 0,
       dateOfBirth: app.formData?.dob || '',
+      schoolName: app.formData?.schoolName || '',
       birthCertificateNo: app.formData?.birthReg || '',
       nidNumber: app.formData?.nid || '',
       joinDate: app.formData?.admissionDate || new Date().toISOString().split('T')[0],
@@ -1284,6 +1291,7 @@ export function Students() {
     ) : (
         <Table headers={[
           t('students.table.student'),
+          'প্রতিষ্ঠানের তথ্য (Institution)',
           t('students.table.contact'),
           t('students.table.batchGrade'),
           t('students.table.date'),
@@ -1305,6 +1313,9 @@ export function Students() {
                     <p className="text-xs text-gray-500">Father: {app.formData?.fatherName || '—'}</p>
                   </div>
                 </div>
+              </TableCell>
+              <TableCell>
+                 <p className="text-xs font-bold text-indigo-600">{app.formData?.schoolName || '—'}</p>
               </TableCell>
               <TableCell>
                 <p className="text-sm font-bold text-gray-900">{app.formData?.guardianPhone || app.guardianPhone}</p>
@@ -1454,6 +1465,18 @@ export function Students() {
                   className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
                 />
               </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">প্রতিষ্ঠান (Institution)</label>
+                <input
+                  type="text"
+                  placeholder="Institution/School/College"
+                  value={editingStudent.schoolName || ''}
+                  onChange={e => setEditingStudent({...editingStudent, schoolName: e.target.value})}
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-bold text-indigo-600"
+                />
+              </div>
+
               <div className="space-y-2">
                 <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">{t('students.addModal.fatherName')}</label>
                 <input
@@ -1688,6 +1711,18 @@ export function Students() {
                 className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
               />
             </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">প্রতিষ্ঠান (Institution)</label>
+              <input
+                type="text"
+                placeholder="School/College Name"
+                value={newStudent.schoolName}
+                onChange={e => setNewStudent({...newStudent, schoolName: e.target.value})}
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-bold text-indigo-600"
+              />
+            </div>
+
             <div className="space-y-2">
               <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">{t('students.addModal.fatherName')}</label>
               <input

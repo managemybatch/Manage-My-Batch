@@ -22,6 +22,7 @@ interface Student {
   batchName: string;
   grade?: string;
   address?: string;
+  phone?: string;
   guardianPhone: string;
   fatherName?: string;
 }
@@ -201,7 +202,7 @@ export function IDCardDesigner({ students, institution }: IDCardDesignerProps) {
       .replace(/{{STUDENT_ROLL}}/g, String(student.rollNo || ''))
       .replace(/{{STUDENT_BATCH}}/g, student.batchName || '')
       .replace(/{{STUDENT_GRADE}}/g, student.grade || 'N/A')
-      .replace(/{{STUDENT_PHONE}}/g, student.guardianPhone || '')
+      .replace(/{{STUDENT_PHONE}}/g, student.phone || student.guardianPhone || '')
       .replace(/{{STUDENT_PHOTO}}/g, student.photoUrl || 'https://via.placeholder.com/150')
       .replace(/{{INSTITUTION_NAME}}/g, config.institutionNameOverride || institution?.name || 'INSTITUTION NAME')
       .replace(/{{INSTITUTION_NAME_INITIAL}}/g, (config.institutionNameOverride || institution?.name || 'I')[0])
@@ -313,6 +314,10 @@ export function IDCardDesigner({ students, institution }: IDCardDesignerProps) {
                    <span className="font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">{config.expiryLabel}</span>
                    <span className="font-black text-gray-900 truncate ml-2">{config.expiryDate}</span>
                  </div>
+                 <div className="flex justify-between items-center text-[9px]">
+                   <span className="font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">Phone</span>
+                   <span className="font-black text-gray-900 truncate ml-2">{student.phone || student.guardianPhone}</span>
+                 </div>
               </div>
             </div>
 
@@ -378,7 +383,7 @@ export function IDCardDesigner({ students, institution }: IDCardDesignerProps) {
                  </div>
                  <div className="flex justify-between items-center text-[10px]">
                     <span className="font-bold text-gray-400 uppercase tracking-widest">Phone</span>
-                    <span className="font-black text-gray-900 font-mono">{student.guardianPhone}</span>
+                    <span className="font-black text-gray-900 font-mono">{student.phone || student.guardianPhone}</span>
                  </div>
                  <div className="flex justify-between items-center text-[10px]">
                     <span className="font-bold text-gray-400 uppercase tracking-widest">{config.expiryLabel}</span>
@@ -440,7 +445,7 @@ export function IDCardDesigner({ students, institution }: IDCardDesignerProps) {
                  </div>
                  <div className="text-center">
                     <p className="text-[7px] font-bold text-gray-400 uppercase tracking-widest mb-1">CONTACT</p>
-                    <p className="text-[10px] font-black text-gray-900">{student.guardianPhone?.slice(-5)}***</p>
+                    <p className="text-[10px] font-black text-gray-900">{(student.phone || student.guardianPhone || "")?.slice(-5)}***</p>
                  </div>
               </div>
            </div>
@@ -558,7 +563,7 @@ export function IDCardDesigner({ students, institution }: IDCardDesignerProps) {
                     </div>
                     <div className="flex flex-col">
                        <span className="text-[7px] font-black text-gray-300 uppercase tracking-widest">Contact No</span>
-                       <p className="text-[10px] font-bold text-gray-700">{student.guardianPhone}</p>
+                       <p className="text-[10px] font-bold text-gray-700">{student.phone || student.guardianPhone}</p>
                     </div>
                  </div>
               </div>

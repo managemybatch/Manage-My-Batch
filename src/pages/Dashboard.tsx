@@ -25,8 +25,10 @@ import {
   Image as ImageIcon,
   Sparkles,
   Cake,
-  BoxIcon
+  BoxIcon,
+  Flag
 } from 'lucide-react';
+import { BANGLADESH_HOLIDAYS_2026, getUpcomingHolidays, getHolidayForDate } from '../data/holidays';
 import { Link } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { cn, formatCurrency } from '../lib/utils';
@@ -58,6 +60,7 @@ export function Dashboard() {
   const [expiryNotification, setExpiryNotification] = useState<any | null>(null);
   const [selectedNotification, setSelectedNotification] = useState<any | null>(null);
   const [smsBalance, setSmsBalance] = useState(0);
+  const [holidayNotification, setHolidayNotification] = useState<any | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -151,6 +154,27 @@ export function Dashboard() {
       setExpiryNotification(null);
     }
   }, [user]);
+
+  // Handle Holiday Notifications
+  useEffect(() => {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(0, 0, 0, 0);
+
+    const holiday = getHolidayForDate(tomorrow);
+    if (holiday) {
+      setHolidayNotification({
+        id: `holiday-${holiday.date}`,
+        type: 'info',
+        title: i18n.language === 'en' ? 'Upcoming Government Holiday' : 'আসন্ন সরকারি ছুটি',
+        message: i18n.language === 'en' 
+          ? `Tomorrow is ${holiday.name}. This is a gazetted holiday in Bangladesh.`
+          : `আগামীকাল ${holiday.nameBn}। এটি বাংলাদেশের একটি সরকারি সাধারণ ছুটি।`,
+        isHoliday: true,
+        holidayName: i18n.language === 'en' ? holiday.name : holiday.nameBn
+      });
+    }
+  }, [i18n.language]);
 
   const dismissNotification = async (id: string) => {
     if (!user) return;
@@ -451,12 +475,39 @@ export function Dashboard() {
 
       {/* System Notifications */}
       <AnimatePresence>
-        {(systemNotifications.length > 0 || expiryNotification) && (
+        {(systemNotifications.length > 0 || expiryNotification || holidayNotification) && (
           <div className="space-y-4">
             <h3 className="text-sm font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2 px-2">
               <Bell className="w-4 h-4" /> {t('common.notifications')}
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {holidayNotification && (
+                <motion.div 
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="bg-emerald-600 p-6 rounded-3xl border border-emerald-500 shadow-xl shadow-emerald-200 text-white flex gap-4 relative overflow-hidden"
+                >
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-3xl -mr-16 -mt-16" />
+                  <div className="p-3 rounded-2xl bg-white/20 h-fit">
+                    <Flag className="w-6 h-6 text-white" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h4 className="text-lg font-black text-white truncate">{holidayNotification.title}</h4>
+                    <p className="text-sm text-emerald-50 opacity-90 line-clamp-3 mt-1 font-medium">{holidayNotification.message}</p>
+                    <div className="mt-4 flex items-center gap-2">
+                      <span className="px-3 py-1 bg-white/20 rounded-full text-[10px] font-black uppercase tracking-widest">
+                        {holidayNotification.holidayName}
+                      </span>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => setHolidayNotification(null)}
+                    className="absolute top-4 right-4 p-1 hover:bg-white/10 rounded-lg transition-all"
+                  >
+                    <XCircle className="w-5 h-5 text-white/50" />
+                  </button>
+                </motion.div>
+              )}
               {expiryNotification && (
                 <motion.div 
                   initial={{ opacity: 0, scale: 0.95 }}
@@ -741,6 +792,52 @@ export function Dashboard() {
           to="/students" 
           color="bg-indigo-50 text-indigo-600"
         />
+      </div>
+
+      {/* Government Holidays Section */}
+      <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden mb-8">
+        <div className="p-6 border-b border-gray-50 flex items-center justify-between bg-emerald-50/30">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center">
+              <Flag className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="font-bold text-gray-900">{i18n.language === 'en' ? 'Upcoming Government Holidays' : 'আসন্ন সরকারি ছুটির তালিকা'}</h3>
+              <p className="text-xs text-gray-500 font-medium">Gazetted holidays of Bangladesh (2026)</p>
+            </div>
+          </div>
+        </div>
+        <div className="p-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {getUpcomingHolidays(6).map((holiday) => (
+              <div key={holiday.date} className="flex items-center gap-4 p-4 rounded-2xl border border-gray-50 hover:bg-gray-50 transition-all group">
+                <div className="w-12 h-12 rounded-xl bg-gray-50 flex flex-col items-center justify-center border border-gray-100 group-hover:bg-white transition-colors">
+                  <span className="text-[10px] font-black text-gray-400 uppercase tracking-tighter">
+                    {new Date(holiday.date).toLocaleDateString('en-US', { month: 'short' })}
+                  </span>
+                  <span className="text-lg font-black text-gray-900 leading-none">
+                    {new Date(holiday.date).getDate()}
+                  </span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold text-gray-900 truncate">
+                    {i18n.language === 'en' ? holiday.name : holiday.nameBn}
+                  </p>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-bold uppercase tracking-wider ${
+                      holiday.type === 'Public' ? 'bg-blue-50 text-blue-600' : 'bg-emerald-50 text-emerald-600'
+                    }`}>
+                      {holiday.type}
+                    </span>
+                    <span className="text-[10px] text-gray-400 font-medium">
+                      {new Date(holiday.date).toLocaleDateString('en-US', { weekday: 'long' })}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
 
       {/* Recent Sections */}

@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, Search, Filter, FileText, MoreVertical, Calendar, CheckCircle2, Clock, Loader2, Download, Palette, Layout, Award, Save, Trash2, Edit2, Share2, Copy, ExternalLink, Image as ImageIcon, Sparkles, Star, Trophy, BoxIcon, Globe } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Plus, Search, Filter, FileText, MoreVertical, Calendar, CheckCircle2, Clock, Loader2, Download, Palette, Layout, Award, Save, Trash2, Edit2, Share2, Copy, ExternalLink, Image as ImageIcon, Sparkles, Star, Trophy, BoxIcon, Globe, MessageSquare } from 'lucide-react';
 import { motion } from 'motion/react';
 import { cn } from '../lib/utils';
-import { collection, onSnapshot, query, addDoc, serverTimestamp, deleteDoc, doc, orderBy, setDoc, where } from 'firebase/firestore';
+import { collection, onSnapshot, query, addDoc, serverTimestamp, deleteDoc, doc, orderBy, setDoc, where, getDoc, updateDoc, increment } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { useAuth } from '../lib/auth';
 import { Modal } from '../components/Modal';
@@ -11,6 +12,7 @@ import jsPDF from 'jspdf';
 import { toPng } from 'html-to-image';
 import { useTranslation } from 'react-i18next';
 import { AdmitCardDesigner } from '../components/AdmitCardDesigner';
+import { sendSMS } from '../lib/sms';
 
 interface OfflineExam {
   id: string;
@@ -52,6 +54,8 @@ interface Student {
   rollNo: string;
   photoUrl?: string;
   batchId: string;
+  phone?: string;
+  guardianPhone?: string;
 }
 
 interface Batch {
@@ -60,7 +64,8 @@ interface Batch {
 }
 
 export function OfflineExams() {
-  const { t } = useTranslation();
+  const navigate = useNavigate();
+  const { t, i18n } = useTranslation();
   const { user } = useAuth();
   const [exams, setExams] = useState<OfflineExam[]>([]);
   const [batches, setBatches] = useState<Batch[]>([]);
@@ -92,6 +97,8 @@ export function OfflineExams() {
   const [selectedStudentForResult, setSelectedStudentForResult] = useState<any>(null);
   const markSheetRef = useRef<HTMLDivElement>(null);
   const [isMarkSheetModalOpen, setIsMarkSheetModalOpen] = useState(false);
+  const [isSendingSMS, setIsSendingSMS] = useState(false);
+  const [creditsBalance, setCreditsBalance] = useState<number>(0);
 
   const [isCombinedModalOpen, setIsCombinedModalOpen] = useState(false);
   const [combinedBatchId, setCombinedBatchId] = useState('');
@@ -104,8 +111,146 @@ export function OfflineExams() {
     const unsubInst = onSnapshot(doc(db, 'institutions', instId), (doc) => {
       if (doc.exists()) setInstData(doc.data());
     });
-    return () => unsubInst();
+
+    const unsubCredits = onSnapshot(doc(db, 'credits', instId), (doc) => {
+      if (doc.exists()) {
+        setCreditsBalance(doc.data().balance || 0);
+      }
+    });
+
+    return () => {
+      unsubInst();
+      unsubCredits();
+    };
   }, [user]);
+
+  const handleSendResultSMS = async (student: any, rankedInfo: any, sendToStudentOnly = false) => {
+    if (!user || !instData || !selectedExam) return;
+    if (creditsBalance <= 0) {
+      alert("Insufficient SMS credits. Please buy more tokens.");
+      return;
+    }
+    
+    setIsSendingSMS(true);
+    const instId = user.institutionId || user.uid;
+    
+    try {
+      const message = `Result: ${selectedExam.title}\nStudent: ${student.name}\nRoll: ${student.rollNo}\nMarks: ${rankedInfo.totalObtained}/${rankedInfo.totalPossible}\nGrade: ${rankedInfo.grade}\nRank: ${rankedInfo.rank}\nInstitution: ${instData.name}`;
+      
+      const phonesToSend: string[] = [];
+      if (sendToStudentOnly && student.phone) {
+        phonesToSend.push(student.phone);
+      } else {
+        if (student.guardianPhone) phonesToSend.push(student.guardianPhone);
+        if (student.phone) phonesToSend.push(student.phone);
+      }
+
+      if (phonesToSend.length === 0) {
+        alert("No phone numbers found for this student.");
+        setIsSendingSMS(false);
+        return;
+      }
+
+      let sentCount = 0;
+      for (const phone of phonesToSend) {
+        const result = await sendSMS(instData.smsConfig, phone, message);
+        if (result.success) {
+          sentCount++;
+          await addDoc(collection(db, 'messages'), {
+            institutionId: instId,
+            senderId: user.uid,
+            senderName: user.displayName || 'Admin',
+            recipientType: 'individual',
+            recipientId: student.id,
+            recipientName: student.name,
+            content: message,
+            status: 'delivered',
+            creditsUsed: 1,
+            createdAt: serverTimestamp(),
+            sentTo: phone
+          });
+        }
+      }
+      
+      if (sentCount > 0) {
+        await updateDoc(doc(db, 'credits', instId), {
+          balance: increment(-sentCount),
+          totalSent: increment(sentCount),
+          lastUpdated: serverTimestamp()
+        });
+
+        setSuccessMessage(`Result SMS sent to ${sentCount} recipient(s)!`);
+        setIsSuccessModalOpen(true);
+      } else {
+        alert(`Failed to send SMS.`);
+      }
+    } catch (error) {
+      console.error("SMS Send Error:", error);
+      alert("An error occurred while sending the message.");
+    } finally {
+      setIsSendingSMS(false);
+    }
+  };
+
+  const handleSendAllResultsSMS = async () => {
+    const rankedStudents = getRankedStudents();
+    if (!rankedStudents.length) return;
+    if (!confirm(`Are you sure you want to send results via SMS to all ${rankedStudents.length} students? This will use your SMS credits.`)) return;
+    
+    if (creditsBalance < rankedStudents.length) {
+      alert(`Insufficient credits. You need at least ${rankedStudents.length} credits but have ${creditsBalance}.`);
+      return;
+    }
+
+    setIsSendingSMS(true);
+    let totalSent = 0;
+    const instId = user.institutionId || user.uid;
+
+    try {
+      for (const rankedInfo of rankedStudents) {
+        const student = students.find(s => s.id === rankedInfo.id);
+        if (!student) continue;
+
+        const message = `Result: ${selectedExam?.title}\nStudent: ${student.name}\nRoll: ${student.rollNo}\nMarks: ${rankedInfo.totalObtained}/${rankedInfo.totalPossible}\nGrade: ${rankedInfo.grade}\nRank: ${rankedInfo.rank}\nInstitution: ${instData?.name}`;
+        
+        // In bulk, we default to guardian phone to save credits unless it's missing
+        const phone = student.guardianPhone || student.phone;
+        if (!phone) continue;
+
+        const result = await sendSMS(instData?.smsConfig, phone, message);
+        if (result.success) {
+          totalSent++;
+          await addDoc(collection(db, 'messages'), {
+            institutionId: instId,
+            senderId: user?.uid,
+            senderName: user?.displayName || 'Admin',
+            recipientType: 'individual',
+            recipientId: student.id,
+            recipientName: student.name,
+            content: message,
+            status: 'delivered',
+            creditsUsed: 1,
+            createdAt: serverTimestamp(),
+            sentTo: phone
+          });
+        }
+      }
+
+      if (totalSent > 0) {
+        await updateDoc(doc(db, 'credits', instId), {
+          balance: increment(-totalSent),
+          totalSent: increment(totalSent),
+          lastUpdated: serverTimestamp()
+        });
+        setSuccessMessage(`Bulk Results SMS sent to ${totalSent} students!`);
+        setIsSuccessModalOpen(true);
+      }
+    } catch (error) {
+      console.error("Bulk SMS Error:", error);
+    } finally {
+      setIsSendingSMS(false);
+    }
+  };
 
   const handleDownloadImage = async (ref: React.RefObject<HTMLDivElement | null>, filename: string) => {
     if (!ref.current) return;
@@ -1583,6 +1728,14 @@ export function OfflineExams() {
                     {isGeneratingPDF ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
                     Download Overall Sheet
                   </button>
+                  <button 
+                    onClick={handleSendAllResultsSMS}
+                    disabled={isSendingSMS}
+                    className="flex-1 sm:flex-none px-4 py-2 bg-rose-600 text-white rounded-lg text-xs font-bold hover:bg-rose-700 transition-all flex items-center justify-center gap-2 disabled:opacity-50 shadow-md shadow-rose-100"
+                  >
+                    {isSendingSMS ? <Loader2 className="w-4 h-4 animate-spin" /> : <MessageSquare className="w-4 h-4" />}
+                    SMS ALL Results
+                  </button>
                 </div>
               </div>
 
@@ -1729,6 +1882,24 @@ export function OfflineExams() {
                               >
                                 <Award className="w-5 h-5" />
                               </button>
+                              <button
+                                onClick={() => alert(i18n.language === 'bn' ? 'শীঘ্রই আসছে (Coming Soon)' : 'Coming Soon')}
+                                className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-all"
+                                title="এআই খাতা মূল্যায়ন (AI Paper Analysis)"
+                              >
+                                <Sparkles className="w-5 h-5" />
+                              </button>
+                              <button
+                                onClick={() => {
+                                  const rankedInfo = getRankedStudents().find(s => s.id === student.id);
+                                  if (rankedInfo) handleSendResultSMS(student, rankedInfo);
+                                }}
+                                disabled={isSendingSMS}
+                                className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all disabled:opacity-50"
+                                title="Send Result SMS"
+                              >
+                                {isSendingSMS ? <Loader2 className="w-5 h-5 animate-spin" /> : <MessageSquare className="w-5 h-5" />}
+                              </button>
                             </div>
                           </td>
                         </tr>
@@ -1842,11 +2013,28 @@ export function OfflineExams() {
                               setSelectedStudentForResult(student);
                               setIsMarkSheetModalOpen(true);
                             }}
-                            className="flex-1 py-2.5 bg-emerald-50 text-emerald-600 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2"
+                            className="flex-1 py-1.5 bg-emerald-50 text-emerald-600 rounded-lg text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-2"
                           >
-                            <Award className="w-3.5 h-3.5" /> Marksheet
+                            <Award className="w-3 h-3" /> Marksheet
                           </button>
                         )}
+                        <button
+                          onClick={() => alert(i18n.language === 'bn' ? 'শীঘ্রই আসছে (Coming Soon)' : 'Coming Soon')}
+                          className="flex-1 py-1.5 bg-purple-50 text-purple-600 rounded-lg text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-2"
+                        >
+                          <Sparkles className="w-3 h-3" /> AI Analyze
+                        </button>
+                        <button
+                          onClick={() => {
+                            const rankedInfo = getRankedStudents().find(s => s.id === student.id);
+                            if (rankedInfo) handleSendResultSMS(student, rankedInfo);
+                          }}
+                          disabled={isSendingSMS}
+                          className="flex-1 py-1.5 bg-indigo-50 text-indigo-600 rounded-lg text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-indigo-100 disabled:opacity-50"
+                        >
+                          {isSendingSMS ? <Loader2 className="w-3 h-3 animate-spin" /> : <MessageSquare className="w-3 h-3" />}
+                          SMS Result
+                        </button>
                       </div>
                     </div>
                   ))}

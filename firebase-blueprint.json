@@ -54,6 +54,67 @@
         "createdAt": { "type": "string", "format": "date-time", "description": "Creation timestamp" }
       },
       "required": ["batchId", "institutionId", "title", "contentType", "publishDate", "createdAt"]
+    },
+    "exam_ai_config": {
+      "title": "Exam AI Configuration",
+      "description": "Rules and questions for AI-based paper evaluation",
+      "type": "object",
+      "properties": {
+        "examId": { "type": "string", "description": "The linked offline exam ID" },
+        "institutionId": { "type": "string", "description": "Owner institution ID" },
+        "questions": {
+          "type": "array",
+          "description": "List of questions with grading logic",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "number": { "type": "string" },
+              "text": { "type": "string" },
+              "maxMarks": { "type": "number" },
+              "expectedAnswer": { "type": "string" },
+              "gradingRubric": { "type": "string", "description": "Bangla instructions for AI marks deduction" }
+            }
+          }
+        },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["examId", "institutionId", "questions"]
+    },
+    "ai_evaluation": {
+      "title": "AI Paper Evaluation",
+      "description": "Results of an AI paper scan for a student",
+      "type": "object",
+      "properties": {
+        "examId": { "type": "string" },
+        "studentId": { "type": "string" },
+        "studentName": { "type": "string" },
+        "institutionId": { "type": "string" },
+        "images": { "type": "array", "items": { "type": "string" }, "description": "Base64 or Cloud Storage URLs of student paper" },
+        "status": { "type": "string", "enum": ["pending", "reviewed", "finalized"] },
+        "analysis": {
+          "type": "object",
+          "properties": {
+            "totalMarks": { "type": "number" },
+            "feedback": { "type": "string", "description": "Overall feedback in Bangla" },
+            "questionWise": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "questionId": { "type": "string" },
+                  "marksObtained": { "type": "number" },
+                  "mistakes": { "type": "string" },
+                  "corrections": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "evaluatedBy": { "type": "string", "description": "UID of the teacher who reviewed/finalized" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["examId", "studentId", "institutionId", "status", "createdAt"]
     }
   },
   "firestore": {
@@ -68,6 +129,14 @@
     "/batch_content/{contentId}": {
       "schema": "batch_content",
       "description": "Daily updates and materials for batch websites"
+    },
+    "/exam_ai_config/{configId}": {
+      "schema": "exam_ai_config",
+      "description": "AI configurations for exams"
+    },
+    "/ai_evaluations/{evalId}": {
+      "schema": "ai_evaluation",
+      "description": "AI-based paper scans and analysis"
     }
   }
 }

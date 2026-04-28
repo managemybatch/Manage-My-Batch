@@ -9,6 +9,7 @@ import { Fees } from './pages/Fees';
 import { Attendance } from './pages/Attendance';
 import { Batches } from './pages/Batches';
 import { OfflineExams } from './pages/OfflineExams';
+import { AIPaperEvaluator } from './pages/AIPaperEvaluator';
 import { Messages } from './pages/Messages';
 import { Settings } from './pages/Settings';
 import { Institution } from './pages/Institution';
@@ -92,6 +93,7 @@ function AppRoutes() {
         <Route path="/fees" element={<Fees />} />
         <Route path="/attendance" element={<Attendance />} />
         <Route path="/offline-exams" element={<OfflineExams />} />
+        <Route path="/ai-evaluator" element={<AIPaperEvaluator />} />
         <Route path="/messages" element={<Messages />} />
         <Route path="/institution" element={<Institution />} />
         <Route path="/teachers" element={<Teachers />} />

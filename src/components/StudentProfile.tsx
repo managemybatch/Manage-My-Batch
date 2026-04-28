@@ -54,6 +54,7 @@ interface Student {
   joinDate: string;
   monthlyFee: number;
   subjectGroup?: string;
+  schoolName?: string;
   feeType?: string;
   status: 'active' | 'inactive';
 }
@@ -286,34 +287,35 @@ export function StudentProfile({ isOpen, onClose, student, onEdit }: StudentProf
     doc.text('Personal Information', 20, 45);
     doc.setFont('helvetica', 'normal');
     doc.text(`Name: ${student.name}`, 25, 52);
-    doc.text(`Father's Name: ${student.fatherName || 'N/A'}`, 25, 59);
-    doc.text(`Mother's Name: ${student.motherName || 'N/A'}`, 25, 66);
-    doc.text(`Date of Birth: ${student.dateOfBirth ? formatDate(student.dateOfBirth) : 'N/A'}`, 25, 73);
-    doc.text(`Phone: ${student.guardianPhone}`, 25, 80);
-    doc.text(`Student Phone: ${student.phone || 'N/A'}`, 25, 87);
+    doc.text(`Institution: ${student.schoolName || 'N/A'}`, 25, 59);
+    doc.text(`Father's Name: ${student.fatherName || 'N/A'}`, 25, 66);
+    doc.text(`Mother's Name: ${student.motherName || 'N/A'}`, 25, 73);
+    doc.text(`Date of Birth: ${student.dateOfBirth ? formatDate(student.dateOfBirth) : 'N/A'}`, 25, 80);
+    doc.text(`Phone: ${student.guardianPhone}`, 25, 87);
+    doc.text(`Student Phone: ${student.phone || 'N/A'}`, 25, 94);
     
     // Academic Info
     doc.setFont('helvetica', 'bold');
-    doc.text('Academic Information', 20, 100);
+    doc.text('Academic Information', 20, 107);
     doc.setFont('helvetica', 'normal');
-    doc.text(`Batch: ${student.batchName}`, 25, 107);
-    doc.text(`Grade: ${student.grade || 'N/A'}`, 25, 114);
-    doc.text(`Section: ${student.section || 'N/A'}`, 25, 121);
-    doc.text(`Join Date: ${student.joinDate ? formatDate(student.joinDate) : 'N/A'}`, 25, 128);
-    doc.text(`Monthly Fee: ${formatCurrency(student.monthlyFee)}`, 25, 135);
+    doc.text(`Batch: ${student.batchName}`, 25, 114);
+    doc.text(`Grade: ${student.grade || 'N/A'}`, 25, 121);
+    doc.text(`Section: ${student.section || 'N/A'}`, 25, 128);
+    doc.text(`Join Date: ${student.joinDate ? formatDate(student.joinDate) : 'N/A'}`, 25, 135);
+    doc.text(`Monthly Fee: ${formatCurrency(student.monthlyFee)}`, 25, 142);
     
     // Financial Summary
     doc.setFont('helvetica', 'bold');
-    doc.text('Financial Summary', 20, 150);
+    doc.text('Financial Summary', 20, 157);
     doc.setFont('helvetica', 'normal');
-    doc.text(`Total Paid: ${formatCurrency(totalPaid)}`, 25, 157);
-    doc.text(`Months Paid: ${monthsPaid}`, 25, 164);
+    doc.text(`Total Paid: ${formatCurrency(totalPaid)}`, 25, 164);
+    doc.text(`Months Paid: ${monthsPaid}`, 25, 171);
     if (dueMonths.length > 0) {
       doc.setTextColor(225, 29, 72); // Rose-600
-      doc.text(`Dues: ${dueMonths.join(', ')}`, 25, 171);
+      doc.text(`Dues: ${dueMonths.join(', ')}`, 25, 178);
     } else {
       doc.setTextColor(5, 150, 105); // Emerald-600
-      doc.text('Status: Clear (No Dues)', 25, 171);
+      doc.text('Status: Clear (No Dues)', 25, 178);
     }
     
     doc.save(`${student.name.replace(/\s+/g, '_')}_Profile.pdf`);
@@ -626,6 +628,7 @@ export function StudentProfile({ isOpen, onClose, student, onEdit }: StudentProf
 
                 <div className="space-y-1">
                   <DetailRow label={t('studentProfile.info.fatherName')} value={student.fatherName} />
+                  <DetailRow label="প্রতিষ্ঠান (Institution)" value={student.schoolName || '—'} />
                   <DetailRow label={t('studentProfile.info.motherName')} value={student.motherName} />
                   <DetailRow label={t('studentProfile.info.studentPhone')} value={student.phone} />
                   <DetailRow label={t('studentProfile.info.guardianPhone')} value={student.guardianPhone} />

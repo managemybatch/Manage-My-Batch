@@ -14,6 +14,7 @@ export interface Student {
   monthlyFee: number;
   batchName?: string;
   guardianPhone?: string;
+  schoolName?: string;
 }
 
 export interface Teacher {

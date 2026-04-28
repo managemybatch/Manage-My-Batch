@@ -14,10 +14,12 @@ import {
   Briefcase, 
   MessageSquare, 
   Zap,
+  Sparkles,
   HelpCircle,
   ShieldCheck,
   Building2,
-  Bell
+  Bell,
+  Lock as LockIcon
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useAuth } from '../lib/auth';
@@ -28,7 +30,7 @@ import { db } from '../firebase';
 
 export function Sidebar() {
   const { logout, user } = useAuth();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = React.useState(false);
   const [birthdayCount, setBirthdayCount] = React.useState(0);
 
@@ -70,6 +72,7 @@ export function Sidebar() {
     { icon: Users, label: t('nav.students'), path: '/students' },
     { icon: ClipboardCheck, label: t('nav.attendance'), path: '/attendance' },
     { icon: GraduationCap, label: t('nav.offlineExams'), path: '/offline-exams' },
+    { icon: Sparkles, label: i18n.language === 'bn' ? 'এআই খাতা মূল্যায়ন' : 'AI Evaluator', path: '/ai-evaluator' },
     { icon: MessageSquare, label: t('nav.messages'), path: '/messages' },
     { icon: CreditCard, label: t('nav.fees'), path: '/fees' },
     { icon: School, label: t('nav.institution'), path: '/institution' },
@@ -108,26 +111,43 @@ export function Sidebar() {
       
       <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
         {menuItems.map((item) => (
-          <NavLink
-            key={item.path}
-            to={item.path}
-            className={({ isActive }) =>
-              cn(
-                "flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 group",
-                isActive 
-                  ? "bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 font-medium" 
-                  : "text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-100"
-              )
-            }
-          >
-            <item.icon className={cn("w-5 h-5", "group-hover:scale-110 transition-transform")} />
-            <span className="flex-1">{item.label}</span>
-            {item.badge && (
-              <span className="bg-red-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full min-w-[18px] text-center shadow-lg shadow-red-200 animate-pulse">
-                {item.badge}
+          item.path === '/ai-evaluator' ? (
+            <button
+              key={item.path}
+              onClick={() => alert(i18n.language === 'bn' ? 'শীঘ্রই আসছে (Coming Soon)' : 'Coming Soon')}
+              className="flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 group w-full text-left text-gray-400 dark:text-gray-500 cursor-not-allowed opacity-80"
+            >
+              <item.icon className="w-5 h-5" />
+              <span className="flex-1 flex items-center gap-2">
+                {item.label} 
+                <span className="text-[10px] font-bold px-1.5 py-0.5 bg-gray-100 dark:bg-gray-800 rounded text-gray-500 border border-gray-200 dark:border-gray-700 uppercase tracking-tighter">
+                  {i18n.language === 'bn' ? 'শীঘ্রই' : 'Soon'}
+                </span>
               </span>
-            )}
-          </NavLink>
+              <LockIcon className="w-3.5 h-3.5 opacity-50" />
+            </button>
+          ) : (
+            <NavLink
+              key={item.path}
+              to={item.path}
+              className={({ isActive }) =>
+                cn(
+                  "flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 group",
+                  isActive 
+                    ? "bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 font-medium" 
+                    : "text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-100"
+                )
+              }
+            >
+              <item.icon className={cn("w-5 h-5", "group-hover:scale-110 transition-transform")} />
+              <span className="flex-1">{item.label}</span>
+              {item.badge && (
+                <span className="bg-red-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full min-w-[18px] text-center shadow-lg shadow-red-200 animate-pulse">
+                  {item.badge}
+                </span>
+              )}
+            </NavLink>
+          )
         ))}
       </nav>
 

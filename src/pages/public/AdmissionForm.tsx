@@ -160,6 +160,7 @@ export function AdmissionForm() {
     { key: 'admissionDate', label: 'ভর্তির তারিখ*', required: true, icon: Calendar, placeholder: 'ভর্তির তারিখ', type: 'date' },
     { key: 'batch', label: 'ব্যাচ*', required: true, icon: GraduationCap, placeholder: 'ব্যাচের নাম লিখুন' },
     { key: 'subjectGroup', label: 'বিষয় গ্রুপ', required: false, icon: GraduationCap, placeholder: 'যেমন: বিজ্ঞান/মানবিক' },
+    { key: 'schoolName', label: 'পূর্ববর্তী প্রতিষ্ঠান (স্কুল/কলেজ)', required: false, icon: Building, placeholder: 'পূর্ববর্তী প্রতিষ্ঠানের নাম লিখুন' },
     { key: 'address', label: 'বিস্তারিত ঠিকানা', required: false, icon: Building, placeholder: 'বর্তমান ঠিকানা লিখুন', textarea: true },
   ];
 
