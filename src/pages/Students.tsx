@@ -40,6 +40,7 @@ interface Student {
   joinDate: string;
   monthlyFee: number;
   subjectGroup?: string;
+  schoolName?: string;
   feeType?: string;
   status: 'active' | 'inactive';
   isAdmissionFeePaid?: boolean;
@@ -1578,6 +1579,17 @@ export function Students() {
               </div>
 
               <div className="space-y-2 md:col-span-2">
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">প্রতিষ্ঠানের তথ্য (Institution)</label>
+                <input
+                  type="text"
+                  placeholder="The school/college of the student"
+                  value={editingStudent.schoolName || ''}
+                  onChange={e => setEditingStudent({...editingStudent, schoolName: e.target.value})}
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-bold"
+                />
+              </div>
+
+              <div className="space-y-2 md:col-span-2">
                 <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">{t('students.addModal.address')}</label>
                 <textarea
                   rows={3}
@@ -1970,6 +1982,17 @@ export function Students() {
                   </div>
                 </label>
               </div>
+            </div>
+
+            <div className="space-y-2 md:col-span-2">
+              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">প্রতিষ্ঠানের তথ্য (Institution)</label>
+              <input
+                type="text"
+                placeholder="The school/college of the student"
+                value={newStudent.schoolName || ''}
+                onChange={e => setNewStudent({...newStudent, schoolName: e.target.value})}
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-bold"
+              />
             </div>
 
             <div className="space-y-2 md:col-span-2">

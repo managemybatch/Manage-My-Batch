@@ -1883,7 +1883,7 @@ export function OfflineExams() {
                                 <Award className="w-5 h-5" />
                               </button>
                               <button
-                                onClick={() => alert(i18n.language === 'bn' ? 'শীঘ্রই আসছে (Coming Soon)' : 'Coming Soon')}
+                                onClick={() => alert(i18n?.language === 'bn' ? 'শীঘ্রই আসছে (Coming Soon)' : 'Coming Soon')}
                                 className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-all"
                                 title="এআই খাতা মূল্যায়ন (AI Paper Analysis)"
                               >
@@ -2019,7 +2019,7 @@ export function OfflineExams() {
                           </button>
                         )}
                         <button
-                          onClick={() => alert(i18n.language === 'bn' ? 'শীঘ্রই আসছে (Coming Soon)' : 'Coming Soon')}
+                          onClick={() => alert(i18n?.language === 'bn' ? 'শীঘ্রই আসছে (Coming Soon)' : 'Coming Soon')}
                           className="flex-1 py-1.5 bg-purple-50 text-purple-600 rounded-lg text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-2"
                         >
                           <Sparkles className="w-3 h-3" /> AI Analyze

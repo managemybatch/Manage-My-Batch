@@ -19,7 +19,7 @@ import {
   ShieldCheck,
   Building2,
   Bell,
-  Lock as LockIcon
+  Lock as LucideLock
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useAuth } from '../lib/auth';
@@ -72,7 +72,7 @@ export function Sidebar() {
     { icon: Users, label: t('nav.students'), path: '/students' },
     { icon: ClipboardCheck, label: t('nav.attendance'), path: '/attendance' },
     { icon: GraduationCap, label: t('nav.offlineExams'), path: '/offline-exams' },
-    { icon: Sparkles, label: i18n.language === 'bn' ? 'এআই খাতা মূল্যায়ন' : 'AI Evaluator', path: '/ai-evaluator' },
+    { icon: Sparkles, label: i18n?.language === 'bn' ? 'এআই খাতা মূল্যায়ন' : 'AI Evaluator', path: '/ai-evaluator' },
     { icon: MessageSquare, label: t('nav.messages'), path: '/messages' },
     { icon: CreditCard, label: t('nav.fees'), path: '/fees' },
     { icon: School, label: t('nav.institution'), path: '/institution' },
@@ -114,17 +114,17 @@ export function Sidebar() {
           item.path === '/ai-evaluator' ? (
             <button
               key={item.path}
-              onClick={() => alert(i18n.language === 'bn' ? 'শীঘ্রই আসছে (Coming Soon)' : 'Coming Soon')}
+              onClick={() => alert(i18n?.language === 'bn' ? 'শীঘ্রই আসছে (Coming Soon)' : 'Coming Soon')}
               className="flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 group w-full text-left text-gray-400 dark:text-gray-500 cursor-not-allowed opacity-80"
             >
               <item.icon className="w-5 h-5" />
               <span className="flex-1 flex items-center gap-2">
                 {item.label} 
                 <span className="text-[10px] font-bold px-1.5 py-0.5 bg-gray-100 dark:bg-gray-800 rounded text-gray-500 border border-gray-200 dark:border-gray-700 uppercase tracking-tighter">
-                  {i18n.language === 'bn' ? 'শীঘ্রই' : 'Soon'}
+                  {i18n?.language === 'bn' ? 'শীঘ্রই' : 'Soon'}
                 </span>
               </span>
-              <LockIcon className="w-3.5 h-3.5 opacity-50" />
+              <LucideLock className="w-3.5 h-3.5 opacity-50" />
             </button>
           ) : (
             <NavLink

@@ -109,7 +109,7 @@ export function AIPaperEvaluator() {
   }, [user, location.state, selectedExam]);
 
   useEffect(() => {
-    if (!selectedExam) {
+    if (!user || !selectedExam) {
       setConfig(null);
       setEvaluations([]);
       return;

@@ -166,12 +166,12 @@ export function Dashboard() {
       setHolidayNotification({
         id: `holiday-${holiday.date}`,
         type: 'info',
-        title: i18n.language === 'en' ? 'Upcoming Government Holiday' : 'আসন্ন সরকারি ছুটি',
-        message: i18n.language === 'en' 
+        title: i18n?.language === 'en' ? 'Upcoming Government Holiday' : 'আসন্ন সরকারি ছুটি',
+        message: i18n?.language === 'en' 
           ? `Tomorrow is ${holiday.name}. This is a gazetted holiday in Bangladesh.`
           : `আগামীকাল ${holiday.nameBn}। এটি বাংলাদেশের একটি সরকারি সাধারণ ছুটি।`,
         isHoliday: true,
-        holidayName: i18n.language === 'en' ? holiday.name : holiday.nameBn
+        holidayName: i18n?.language === 'en' ? holiday.name : holiday.nameBn
       });
     }
   }, [i18n.language]);

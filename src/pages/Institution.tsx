@@ -578,6 +578,7 @@ export function Institution() {
     { key: 'admissionDate', label: 'ভর্তির তারিখ*', required: true },
     { key: 'batch', label: 'ব্যাচ*', required: true },
     { key: 'subjectGroup', label: 'বিষয় গ্রুপ', required: false },
+    { key: 'schoolName', label: 'প্রতিষ্ঠানের তথ্য (Institution)', required: false },
     { key: 'address', label: 'বিস্তারিত ঠিকানা', required: false },
   ];
 

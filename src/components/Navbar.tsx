@@ -26,8 +26,8 @@ export function Navbar() {
   const isDashboard = location.pathname === '/dashboard';
 
   const toggleLanguage = () => {
-    const nextLang = i18n.language === 'en' ? 'bn' : 'en';
-    i18n.changeLanguage(nextLang);
+    const nextLang = i18n?.language === 'en' ? 'bn' : 'en';
+    i18n?.changeLanguage(nextLang);
   };
 
   return (
@@ -73,7 +73,7 @@ export function Navbar() {
           className="flex items-center gap-2 px-3 py-1.5 text-sm font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 rounded-xl transition-all border border-indigo-100 dark:border-indigo-900/50"
         >
           <Globe className="w-4 h-4" />
-          <span>{i18n.language === 'en' ? 'বাংলা' : 'English'}</span>
+          <span>{i18n?.language === 'en' ? 'বাংলা' : 'English'}</span>
         </button>
 
         <button 
