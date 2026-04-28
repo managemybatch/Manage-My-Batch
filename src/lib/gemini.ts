@@ -1,6 +1,17 @@
 import { GoogleGenAI, Type } from "@google/genai";
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+let ai: GoogleGenAI | null = null;
+
+function getGenAI() {
+  if (!ai) {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      throw new Error("Gemini API Key is not configured. Please check your environment variables.");
+    }
+    ai = new GoogleGenAI({ apiKey });
+  }
+  return ai;
+}
 
 export interface QuestionDefinition {
   id: string;
@@ -27,6 +38,8 @@ export async function evaluatePaper(
   images: string[], // base64 strings
   questions: QuestionDefinition[]
 ): Promise<AIEvaluationResult> {
+  const genAI = getGenAI();
+
   const prompt = `
 You are an expert strict examiner for school/coaching exams in Bangladesh. 
 Your task is to evaluate a student's handwritten exam paper based on the provided questions and grading criteria.
@@ -76,13 +89,13 @@ ${questions.map(q => `
     }
   }));
 
-  const response = await ai.models.generateContent({
-    model: "gemini-1.5-pro",
-    contents: {
+  const response = await genAI.models.generateContent({
+    model: "gemini-3.1-pro-preview",
+    contents: { 
       parts: [
-        ...imageParts,
-        { text: prompt }
-      ]
+        { text: prompt },
+        ...imageParts
+      ] 
     },
     config: {
       responseMimeType: "application/json",
@@ -111,10 +124,12 @@ ${questions.map(q => `
     }
   });
 
+  const text = response.text || '';
+
   try {
-    return JSON.parse(response.text);
+    return JSON.parse(text);
   } catch (error) {
-    console.error("Failed to parse AI response:", response.text);
+    console.error("Failed to parse AI response:", text);
     throw new Error("AI-এর উত্তর প্রসেস করতে সমস্যা হয়েছে। আবার চেষ্টা করুন।");
   }
 }

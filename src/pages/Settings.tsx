@@ -840,21 +840,21 @@ export function Settings() {
                       onClick={() => changeLanguage('en')}
                       className={cn(
                         "flex items-center justify-between p-4 border rounded-xl transition-all",
-                        i18n.language === 'en' ? "border-indigo-600 bg-indigo-50 dark:bg-indigo-900/20 font-bold text-indigo-600 dark:text-indigo-400" : "border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-400"
+                        i18n?.language === 'en' ? "border-indigo-600 bg-indigo-50 dark:bg-indigo-900/20 font-bold text-indigo-600 dark:text-indigo-400" : "border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-400"
                       )}
                     >
                       <span>English</span>
-                      {i18n.language === 'en' && <CheckCircle className="w-4 h-4" />}
+                      {i18n?.language === 'en' && <CheckCircle className="w-4 h-4" />}
                     </button>
                     <button 
                       onClick={() => changeLanguage('bn')}
                       className={cn(
                         "flex items-center justify-between p-4 border rounded-xl transition-all",
-                        i18n.language === 'bn' ? "border-indigo-600 bg-indigo-50 dark:bg-indigo-900/20 font-bold text-indigo-600 dark:text-indigo-400" : "border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-400"
+                        i18n?.language === 'bn' ? "border-indigo-600 bg-indigo-50 dark:bg-indigo-900/20 font-bold text-indigo-600 dark:text-indigo-400" : "border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-400"
                       )}
                     >
                       <span>বাংলা (Bengali)</span>
-                      {i18n.language === 'bn' && <CheckCircle className="w-4 h-4" />}
+                      {i18n?.language === 'bn' && <CheckCircle className="w-4 h-4" />}
                     </button>
                   </div>
                 </div>

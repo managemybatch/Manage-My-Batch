@@ -174,7 +174,7 @@ export function Dashboard() {
         holidayName: i18n?.language === 'en' ? holiday.name : holiday.nameBn
       });
     }
-  }, [i18n.language]);
+  }, [i18n?.language]);
 
   const dismissNotification = async (id: string) => {
     if (!user) return;
@@ -566,7 +566,7 @@ export function Dashboard() {
                       onClick={() => setSelectedNotification(notif)}
                       className="mt-4 text-[10px] font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-400 flex items-center gap-1.5 hover:gap-2 transition-all"
                     >
-                      {i18n.language === 'en' ? 'Read Full Message' : 'বিস্তারিত দেখুন'} <ChevronRight className="w-3 h-3" />
+                      {i18n?.language === 'en' ? 'Read Full Message' : 'বিস্তারিত দেখুন'} <ChevronRight className="w-3 h-3" />
                     </button>
                     <p className="text-[10px] text-gray-400 mt-2">{new Date(notif.createdAt).toLocaleDateString()}</p>
                   </div>
@@ -802,7 +802,7 @@ export function Dashboard() {
               <Flag className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="font-bold text-gray-900">{i18n.language === 'en' ? 'Upcoming Government Holidays' : 'আসন্ন সরকারি ছুটির তালিকা'}</h3>
+              <h3 className="font-bold text-gray-900">{i18n?.language === 'en' ? 'Upcoming Government Holidays' : 'আসন্ন সরকারি ছুটির তালিকা'}</h3>
               <p className="text-xs text-gray-500 font-medium">Gazetted holidays of Bangladesh (2026)</p>
             </div>
           </div>
@@ -821,7 +821,7 @@ export function Dashboard() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-bold text-gray-900 truncate">
-                    {i18n.language === 'en' ? holiday.name : holiday.nameBn}
+                    {i18n?.language === 'en' ? holiday.name : holiday.nameBn}
                   </p>
                   <div className="flex items-center gap-2 mt-0.5">
                     <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-bold uppercase tracking-wider ${
@@ -985,7 +985,7 @@ export function Dashboard() {
             <div>
               <h3 className="text-2xl font-black text-gray-900">{selectedNotification?.title}</h3>
               <p className="text-xs font-bold uppercase tracking-widest opacity-60 mt-2">
-                {selectedNotification?.createdAt ? new Date(selectedNotification.createdAt).toLocaleDateString(i18n.language === 'bn' ? 'bn-BD' : 'en-US', { day: 'numeric', month: 'long', year: 'numeric' }) : ''}
+                {selectedNotification?.createdAt ? new Date(selectedNotification.createdAt).toLocaleDateString(i18n?.language === 'bn' ? 'bn-BD' : 'en-US', { day: 'numeric', month: 'long', year: 'numeric' }) : ''}
               </p>
             </div>
           </div>

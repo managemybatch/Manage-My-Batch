@@ -123,14 +123,12 @@ function AppRoutes() {
 export default function App() {
   return (
     <ErrorBoundary>
-      <ThemeProvider>
-        <AuthProvider>
-          <Router>
-            <ScrollToTop />
-            <AppRoutes />
-          </Router>
-        </AuthProvider>
-      </ThemeProvider>
+      <AuthProvider>
+        <Router>
+          <ScrollToTop />
+          <AppRoutes />
+        </Router>
+      </AuthProvider>
     </ErrorBoundary>
   );
 }
