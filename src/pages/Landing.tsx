@@ -93,6 +93,9 @@ const reviews = [
   }
 ];
 
+import { motion, AnimatePresence } from 'motion/react';
+import { LandingBackground } from '../components/LandingBackground';
+
 export function Landing() {
   const { user } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
@@ -118,7 +121,8 @@ export function Landing() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-white font-sans">
+    <div className="min-h-screen bg-slate-50 font-sans selection:bg-blue-100 selection:text-blue-700">
+      <LandingBackground />
       {/* Sticky Header */}
       <header className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -217,38 +221,72 @@ export function Landing() {
       </header>
 
       {/* Hero Section */}
-      <section className="pt-32 pb-20 px-4 bg-gradient-to-b from-blue-50 to-white relative">
+      <section className="pt-32 pb-20 px-4 relative">
         <div className="max-w-7xl mx-auto text-center relative z-10">
-          <div className="inline-flex items-center gap-2 bg-blue-100 text-blue-700 px-4 py-2 rounded-full text-sm font-bold mb-8">
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="inline-flex items-center gap-2 bg-blue-100 text-blue-700 px-4 py-2 rounded-full text-sm font-bold mb-8"
+          >
             <ShieldCheck className="w-4 h-4" />
             স্কুল, মাদ্রাসা ও কোচিং ম্যানেজমেন্টের আধুনিক সমাধান
-          </div>
-          <h1 className="text-4xl md:text-6xl font-black text-gray-900 mb-6 leading-tight">
+          </motion.div>
+          <motion.h1 
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.1 }}
+            className="text-4xl md:text-7xl font-black text-gray-900 mb-6 leading-[1.1] tracking-tight"
+          >
             শিক্ষা প্রতিষ্ঠানের জন্য <br />
-            <span className="text-blue-600">স্মার্ট ও প্রফেশনাল ম্যানেজমেন্ট</span>
-          </h1>
-          <p className="text-lg md:text-xl text-gray-600 mb-10 max-w-3xl mx-auto leading-relaxed">
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600">স্মার্ট ও প্রফেশনাল ম্যানেজমেন্ট</span>
+          </motion.h1>
+          <motion.p 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.2 }}
+            className="text-lg md:text-xl text-gray-600 mb-10 max-w-3xl mx-auto leading-relaxed font-medium"
+          >
             আপনার প্রতিষ্ঠানকে দিন একটি প্রফেশনাল রূপ। আইডি কার্ড, এডমিট কার্ড, এটেনডেন্স এবং ফি কালেকশন - সবকিছু এখন আপনার হাতের নাগালে। কোচিং, মাদ্রাসা বা স্কুলের সব জটিল সমস্যা সমাধান করুন এক ক্লিকে।
-          </p>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 relative z-20">
+          </motion.p>
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.5, delay: 0.3 }}
+            className="flex flex-col sm:flex-row items-center justify-center gap-4 relative z-20"
+          >
             <Link 
               to="/signup"
-              className="w-full sm:w-auto bg-blue-600 text-white px-10 py-4 rounded-full text-lg font-black hover:bg-blue-700 transition-all shadow-xl shadow-blue-200 flex items-center justify-center gap-2 group cursor-pointer"
+              className="w-full sm:w-auto bg-blue-600 text-white px-10 py-5 rounded-2xl text-lg font-black hover:bg-blue-700 transition-all shadow-2xl shadow-blue-200 flex items-center justify-center gap-2 group cursor-pointer"
             >
               এখনই শুরু করুন
               <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
             </Link>
-          </div>
+            <a 
+              href="#features"
+              className="w-full sm:w-auto bg-white text-gray-900 border-2 border-gray-100 px-10 py-5 rounded-2xl text-lg font-black hover:border-blue-100 transition-all flex items-center justify-center gap-2"
+            >
+              ফিচারসমূহ দেখুন
+            </a>
+          </motion.div>
           
-            <div className="mt-16 relative">
-            <div className="absolute inset-0 bg-blue-600/5 blur-3xl rounded-full transform -translate-y-1/2"></div>
-            <img 
-              src="https://d3ob0s3rxbjyep.cloudfront.net/content/Sheikh_Khalifa_Bin_Zayed_Bangladeshi_Islamia_School_Abu_Dhabi_B_31_03_3d646f0b35_2a025387ad_e943a37811.jpg" 
-              alt="Sheikh Khalifa Bin Zayed Bangladeshi Islamia School" 
-              className="relative rounded-2xl shadow-2xl border border-gray-100 mx-auto max-w-5xl w-full object-cover h-[300px] md:h-[500px]"
-              referrerPolicy="no-referrer"
-            />
-          </div>
+          <motion.div 
+            initial={{ opacity: 0, y: 100 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.4 }}
+            className="mt-20 relative"
+          >
+            <div className="absolute inset-0 bg-blue-600/10 blur-[120px] rounded-full transform -translate-y-1/2 scale-150"></div>
+            <div className="relative group">
+              <div className="absolute -inset-1 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-[2.5rem] blur opacity-25 group-hover:opacity-40 transition duration-1000 group-hover:duration-200"></div>
+              <img 
+                src="https://d3ob0s3rxbjyep.cloudfront.net/content/Sheikh_Khalifa_Bin_Zayed_Bangladeshi_Islamia_School_Abu_Dhabi_B_31_03_3d646f0b35_2a025387ad_e943a37811.jpg" 
+                alt="Sheikh Khalifa Bin Zayed Bangladeshi Islamia School" 
+                className="relative rounded-[2rem] shadow-2xl border-4 border-white mx-auto max-w-5xl w-full object-cover h-[350px] md:h-[550px]"
+                referrerPolicy="no-referrer"
+              />
+            </div>
+          </motion.div>
         </div>
       </section>
 
@@ -275,247 +313,307 @@ export function Landing() {
       </section>
 
       {/* Features Section */}
-      <section id="features" className="py-24 px-4 bg-gray-50">
-        <div className="max-w-7xl mx-auto">
+      <section id="features" className="py-24 px-4 relative overflow-hidden">
+        <div className="max-w-7xl mx-auto relative z-10">
           <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-black text-gray-900 mb-4">সেরা শিক্ষা প্রতিষ্ঠান ম্যানেজমেন্ট ফিচার</h2>
-            <p className="text-gray-600 max-w-2xl mx-auto">স্কুল, মাদ্রাসা বা কোচিং সেন্টারের দৈনন্দিন কাজগুলোকে সহজ করতে আমরা নিয়ে এসেছি সব আধুনিক ডিজিটাল ফিচার।</p>
+            <motion.h2 
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              className="text-3xl md:text-5xl font-black text-gray-900 mb-4 tracking-tight"
+            >
+              সেরা শিক্ষা প্রতিষ্ঠান ম্যানেজমেন্ট ফিচার
+            </motion.h2>
+            <motion.p 
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: 0.1 }}
+              className="text-gray-600 max-w-2xl mx-auto font-medium"
+            >
+              স্কুল, মাদ্রাসা বা কোচিং সেন্টারের দৈনন্দিন কাজগুলোকে সহজ করতে আমরা নিয়ে এসেছি সব আধুনিক ডিজিটাল ফিচার।
+            </motion.p>
           </div>
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
             {features.map((feature, index) => (
-              <div key={index} className="bg-white p-8 rounded-2xl border border-gray-100 hover:border-blue-200 transition-all hover:shadow-xl group">
-                <div className={cn("w-14 h-14 rounded-xl flex items-center justify-center mb-6 transition-transform group-hover:scale-110", feature.bgColor)}>
-                  <feature.icon className={cn("w-7 h-7", feature.color)} />
+              <motion.div 
+                key={index}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: index * 0.1 }}
+                whileHover={{ y: -8, transition: { duration: 0.2 } }}
+                className="bg-white/80 backdrop-blur-sm p-8 rounded-[2rem] border border-gray-100 hover:border-blue-200 transition-all hover:shadow-[0_20px_50px_rgba(37,99,235,0.1)] group relative overflow-hidden"
+              >
+                <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-bl-[3rem] -mr-8 -mt-8 group-hover:scale-110 transition-transform" />
+                <div className={cn("w-16 h-16 rounded-2xl flex items-center justify-center mb-8 shadow-sm group-hover:rotate-6 transition-transform relative z-10", feature.bgColor)}>
+                  <feature.icon className={cn("w-8 h-8", feature.color)} />
                 </div>
-                <h3 className="text-xl font-bold text-gray-900 mb-3">{feature.title}</h3>
-                <p className="text-gray-600 leading-relaxed">{feature.description}</p>
-              </div>
+                <h3 className="text-xl font-black text-gray-900 mb-4 group-hover:text-blue-600 transition-colors relative z-10">
+                  {feature.title}
+                </h3>
+                <p className="text-gray-600 leading-relaxed font-medium relative z-10">
+                  {feature.description}
+                </p>
+                <div className="mt-8 flex items-center gap-2 text-blue-600 font-black text-[10px] uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">
+                  বিস্তারিত জানুন <ArrowRight className="w-3 h-3" />
+                </div>
+              </motion.div>
             ))}
           </div>
         </div>
       </section>
 
       {/* Problem/Solution Section */}
-      <section id="about" className="py-24 px-4 bg-white overflow-hidden">
-        <div className="max-w-7xl mx-auto">
+      <section id="about" className="py-24 px-4 overflow-hidden relative">
+        <div className="max-w-7xl mx-auto relative z-10">
           <div className="flex flex-col lg:flex-row items-center gap-16">
-            <div className="flex-1">
-              <h2 className="text-3xl md:text-4xl font-black text-gray-900 mb-8 leading-tight">
+            <motion.div 
+              initial={{ opacity: 0, x: -50 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
+              className="flex-1"
+            >
+              <h2 className="text-3xl md:text-5xl font-black text-gray-900 mb-8 leading-tight tracking-tight">
                 কেন আপনার শিক্ষা প্রতিষ্ঠানের জন্য <br />
                 <span className="text-blue-600">আমাদের ম্যানেজমেন্ট সফটওয়্যার প্রয়োজন?</span>
               </h2>
-              <div className="space-y-6">
-                <div className="flex gap-4">
-                  <div className="flex-shrink-0 w-6 h-6 bg-green-100 rounded-full flex items-center justify-center mt-1">
-                    <CheckCircle2 className="w-4 h-4 text-green-600" />
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-gray-900 mb-1">কাগজ কলমের ঝামেলা মুক্তি</h4>
-                    <p className="text-gray-600">সব তথ্য ডিজিটালভাবে সংরক্ষিত থাকে, তাই হারিয়ে যাওয়ার ভয় নেই।</p>
-                  </div>
-                </div>
-                <div className="flex gap-4">
-                  <div className="flex-shrink-0 w-6 h-6 bg-green-100 rounded-full flex items-center justify-center mt-1">
-                    <CheckCircle2 className="w-4 h-4 text-green-600" />
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-gray-900 mb-1">প্রফেশনাল ব্র্যান্ডিং ও আইডেন্টিটি</h4>
-                    <p className="text-gray-600">নিজস্ব লোগো সহ আইডি কার্ড ও এডমিট কার্ড তৈরি করে প্রতিষ্ঠানের সুনাম বৃদ্ধি করুন।</p>
-                  </div>
-                </div>
-                <div className="flex gap-4">
-                  <div className="flex-shrink-0 w-6 h-6 bg-green-100 rounded-full flex items-center justify-center mt-1">
-                    <CheckCircle2 className="w-4 h-4 text-green-600" />
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-gray-900 mb-1">স্বচ্ছ ফি ম্যানেজমেন্ট</h4>
-                    <p className="text-gray-600">কার কত টাকা বকেয়া আছে তা এক পলকেই দেখে নিন এবং SMS পাঠান।</p>
-                  </div>
-                </div>
-                <div className="flex gap-4">
-                  <div className="flex-shrink-0 w-6 h-6 bg-green-100 rounded-full flex items-center justify-center mt-1">
-                    <CheckCircle2 className="w-4 h-4 text-green-600" />
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-gray-900 mb-1">অভিভাবকদের সাথে নিবিড় যোগাযোগ</h4>
-                    <p className="text-gray-600">উপস্থিতি এবং রেজাল্ট সরাসরি অভিভাবকদের ফোনে পৌঁছে যায়।</p>
-                  </div>
-                </div>
+              <div className="space-y-8">
+                {[
+                  { title: 'কাগজ কলমের ঝামেলা মুক্তি', desc: 'সব তথ্য ডিজিটালভাবে সংরক্ষিত থাকে, তাই হারিয়ে যাওয়ার ভয় নেই।' },
+                  { title: 'প্রফেশনাল ব্র্যান্ডিং ও আইডেন্টিটি', desc: 'নিজস্ব লোগো সহ আইডি কার্ড ও এডমিট কার্ড তৈরি করে প্রতিষ্ঠানের সুনাম বৃদ্ধি করুন।' },
+                  { title: 'স্বচ্ছ ফি ম্যানেজমেন্ট', desc: 'কার কত টাকা বকেয়া আছে তা এক পলকেই দেখে নিন এবং SMS পাঠান।' },
+                  { title: 'অভিভাবকদের সাথে নিবিড় যোগাযোগ', desc: 'উপস্থিতি এবং রেজাল্ট সরাসরি অভিভাবকদের ফোনে পৌঁছে যায়।' }
+                ].map((item, i) => (
+                  <motion.div 
+                    key={i}
+                    initial={{ opacity: 0, x: -20 }}
+                    whileInView={{ opacity: 1, x: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: 0.1 * i }}
+                    className="flex gap-1 group"
+                  >
+                    <div className="flex-shrink-0 w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center mt-1 group-hover:scale-110 transition-transform">
+                      <CheckCircle2 className="w-5 h-5 text-blue-600" />
+                    </div>
+                    <div className="bg-white/50 backdrop-blur-sm p-4 rounded-2xl border border-transparent hover:border-blue-100 transition-all flex-1">
+                      <h4 className="font-black text-gray-900 mb-1">{item.title}</h4>
+                      <p className="text-gray-600 text-sm font-medium">{item.desc}</p>
+                    </div>
+                  </motion.div>
+                ))}
               </div>
-              <div className="mt-10">
-                <Link to="/login" className="inline-flex items-center gap-2 text-blue-600 font-bold hover:gap-3 transition-all">
-                  বিস্তারিত জানতে আমাদের সাথে যোগাযোগ করুন
-                  <ArrowRight className="w-5 h-5" />
+              <div className="mt-12">
+                <Link to="/signup" className="group inline-flex items-center gap-3 px-8 py-4 bg-gray-900 text-white rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-black transition-all">
+                  শুরু করতে এখানে ক্লিক করুন
+                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                 </Link>
               </div>
-            </div>
-            <div className="flex-1 relative">
-              <div className="absolute -right-20 -top-20 w-64 h-64 bg-blue-600/10 rounded-full blur-3xl"></div>
-              <div className="absolute -left-20 -bottom-20 w-64 h-64 bg-purple-600/10 rounded-full blur-3xl"></div>
-              <img 
-                src="https://bangladesh.chevron.com/-/media/bangladesh/community/images/01-education-hero.jpg?la=en&h=433&w=800&hash=033DA2301BA897593EFF9A0002F4A4F7" 
-                alt="Bangladeshi School Students" 
-                className="relative rounded-2xl shadow-2xl z-10"
-                referrerPolicy="no-referrer"
-              />
-            </div>
+            </motion.div>
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.8, rotate: 5 }}
+              whileInView={{ opacity: 1, scale: 1, rotate: 0 }}
+              viewport={{ once: true }}
+              className="flex-1 relative"
+            >
+              <div className="absolute -right-20 -top-20 w-80 h-80 bg-blue-600/10 rounded-full blur-3xl" />
+              <div className="absolute -left-20 -bottom-20 w-80 h-80 bg-brand-secondary/10 rounded-full blur-3xl" />
+              <div className="relative group max-w-lg mx-auto">
+                <div className="absolute -inset-2 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-[3rem] blur opacity-20 group-hover:opacity-30 transition duration-500" />
+                <img 
+                  src="https://bangladesh.chevron.com/-/media/bangladesh/community/images/01-education-hero.jpg?la=en&h=433&w=800&hash=033DA2301BA897593EFF9A0002F4A4F7" 
+                  alt="Bangladeshi School Students" 
+                  className="relative rounded-[2.5rem] shadow-2xl border-4 border-white transition-transform group-hover:scale-[1.02] duration-500"
+                  referrerPolicy="no-referrer"
+                />
+              </div>
+            </motion.div>
           </div>
         </div>
       </section>
 
       {/* Pricing Section */}
-      <section id="pricing" className="py-24 px-4 bg-gray-50">
-        <div className="max-w-7xl mx-auto">
+      <section id="pricing" className="py-24 px-4 relative">
+        <div className="max-w-7xl mx-auto relative z-10">
           <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-5xl font-black text-gray-900 mb-4 tracking-tight">সহজ এবং স্বচ্ছ প্রাইসিং</h2>
-            <p className="text-gray-500 max-w-2xl mx-auto font-medium">আপনার প্রতিষ্ঠানের প্রয়োজন অনুযায়ী সেরা প্ল্যানটি বেছে নিন। কোনো লুকানো চার্জ নেই।</p>
+            <motion.h2 
+              initial={{ opacity: 0 }}
+              whileInView={{ opacity: 1 }}
+              viewport={{ once: true }}
+              className="text-3xl md:text-5xl font-black text-gray-900 mb-4 tracking-tight"
+            >
+              সহজ এবং স্বচ্ছ প্রাইসিং
+            </motion.h2>
+            <motion.p 
+              initial={{ opacity: 0 }}
+              whileInView={{ opacity: 1 }}
+              viewport={{ once: true }}
+              transition={{ delay: 0.1 }}
+              className="text-gray-500 max-w-2xl mx-auto font-medium"
+            >
+              আপনার প্রতিষ্ঠানের প্রয়োজন অনুযায়ী সেরা প্ল্যানটি বেছে নিন। কোনো লুকানো চার্জ নেই।
+            </motion.p>
           </div>
 
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8 mb-16">
-            {SUBSCRIPTION_PLANS.map((plan) => (
-              <div 
+            {SUBSCRIPTION_PLANS.map((plan, index) => (
+              <motion.div 
                 key={plan.id} 
+                initial={{ opacity: 0, scale: 0.95 }}
+                whileInView={{ opacity: 1, scale: 1 }}
+                viewport={{ once: true }}
+                transition={{ delay: index * 0.1 }}
+                whileHover={{ y: -10 }}
                 className={cn(
-                  "bg-white p-8 rounded-[2rem] border relative transition-all duration-300 hover:shadow-2xl hover:-translate-y-2",
-                  plan.id === 'standard' ? "border-blue-500 shadow-xl shadow-blue-100" : "border-gray-100 shadow-sm"
+                  "bg-white/80 backdrop-blur-md p-8 rounded-[2.5rem] border relative transition-all duration-300",
+                  plan.id === 'standard' ? "border-blue-500 shadow-[0_20px_50px_rgba(37,99,235,0.15)] ring-1 ring-blue-100" : "border-gray-100 shadow-sm"
                 )}
               >
                 {plan.id === 'standard' && (
-                  <div className="absolute top-0 right-10 -translate-y-1/2 bg-blue-600 text-white px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg">
-                    Popular
+                  <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-xl">
+                    Most Popular
                   </div>
                 )}
                 <div className="mb-8">
                   <h3 className="text-xl font-black text-gray-900 uppercase tracking-tight mb-2">{plan.name}</h3>
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-4xl font-black text-gray-900">{plan.price}</span>
-                    <span className="text-gray-500 font-bold">/মাস</span>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-5xl font-black text-gray-900 leading-none tracking-tighter">{plan.price}</span>
+                    <div className="flex flex-col">
+                      <span className="text-gray-400 font-bold text-[10px] tracking-widest uppercase">BDT</span>
+                      <span className="text-gray-400 font-bold text-[10px] tracking-widest uppercase">/মো</span>
+                    </div>
                   </div>
                 </div>
 
-                <ul className="space-y-4 mb-10">
-                  <li className="flex items-center gap-3 text-sm font-medium text-gray-600">
-                    <CheckCircle2 className="w-5 h-5 text-blue-600 flex-shrink-0" />
-                    <span>সর্বোচ্চ {plan.studentLimit} জন ছাত্র</span>
-                  </li>
-                  <li className="flex items-center gap-3 text-sm font-medium text-gray-600">
-                    <CheckCircle2 className="w-5 h-5 text-blue-600 flex-shrink-0" />
-                    <span>সর্বোচ্চ {plan.batchLimit} টি ব্যাচ</span>
-                  </li>
-                  <li className="flex items-center gap-3 text-sm font-medium text-gray-600">
-                    <CheckCircle2 className="w-5 h-5 text-blue-600 flex-shrink-0" />
-                    <span>আনলিমিটেড এটেনডেন্স ও রেজাল্ট</span>
-                  </li>
-                  <li className="flex items-center gap-3 text-sm font-medium text-gray-600">
-                    <CheckCircle2 className="w-5 h-5 text-blue-600 flex-shrink-0" />
-                    <span>প্রিমিয়াম সাপোর্ট ও এসএমএস টোকেন সুবিধা</span>
-                  </li>
+                <ul className="space-y-5 mb-10">
+                  {[
+                    `সর্বোচ্চ ${plan.studentLimit} জন ছাত্র`,
+                    `সর্বোচ্চ ${plan.batchLimit} টি ব্যাচ`,
+                    `আনলিমিটেড এটেনডেন্স ও রেজাল্ট`,
+                    `প্রিমিয়াম সাপোর্ট ও এসএমএস সুবিধা`
+                  ].map((text, i) => (
+                    <li key={i} className="flex items-center gap-3 text-sm font-medium text-gray-600">
+                      <div className="w-5 h-5 rounded-full bg-blue-50 flex items-center justify-center flex-shrink-0">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-blue-600" />
+                      </div>
+                      <span>{text}</span>
+                    </li>
+                  ))}
                 </ul>
 
                 <Link 
                   to="/signup"
                   className={cn(
-                    "w-full py-4 rounded-2xl font-black text-sm transition-all text-center block",
+                    "w-full py-4 rounded-2xl font-black uppercase tracking-widest text-xs transition-all text-center block",
                     plan.id === 'standard' 
-                      ? "bg-blue-600 text-white hover:bg-blue-700 shadow-lg shadow-blue-200" 
-                      : "bg-gray-50 text-gray-900 hover:bg-gray-100 border border-gray-200"
+                      ? "bg-blue-600 text-white hover:bg-blue-700 shadow-xl shadow-blue-200" 
+                      : "bg-gray-50 text-gray-900 hover:bg-gray-200 border border-gray-200"
                   )}
                 >
                   শুরু করুন
                 </Link>
-              </div>
+              </motion.div>
             ))}
           </div>
 
           {/* Benefits Grid */}
           <div className="grid md:grid-cols-3 gap-6">
-            <div className="bg-white p-6 rounded-2xl border border-blue-50 border-t-4 border-t-blue-500 shadow-sm">
-              <div className="w-10 h-10 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center mb-4">
+            <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="bg-white/60 backdrop-blur-sm p-8 rounded-[2rem] border border-blue-50 shadow-sm hover:border-blue-200 transition-colors">
+              <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mb-6">
                 <CheckCircle2 className="w-6 h-6" />
               </div>
-              <h4 className="font-black text-gray-900 mb-2">কোনো অগ্রিম চার্জ নেই</h4>
-              <p className="text-sm text-gray-500 leading-relaxed">আমাদের সেবায় কোনো ইন্সটলমেন্ট ফি বা হিডেন চার্জ নেই। আপনি শুধুমাত্র মাসের সাবস্ক্রিপশন ফি দিয়েই সেবাটি ব্যবহার করতে পারবেন।</p>
-            </div>
-            <div className="bg-white p-6 rounded-2xl border border-amber-50 border-t-4 border-t-amber-500 shadow-sm">
-              <div className="w-10 h-10 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center mb-4">
+              <h4 className="font-black text-gray-900 mb-3 text-lg">কোনো অগ্রিম চার্জ নেই</h4>
+              <p className="text-sm text-gray-500 leading-relaxed font-medium">আমাদের সেবায় কোনো ইন্সটলমেন্ট ফি বা হিডেন চার্জ নেই। আপনি শুধুমাত্র মাসের সাবস্ক্রিপশন ফি দিয়েই সেবাটি ব্যবহার করতে পারবেন।</p>
+            </motion.div>
+            <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: 0.1 }} className="bg-white/60 backdrop-blur-sm p-8 rounded-[2rem] border border-amber-50 shadow-sm hover:border-amber-200 transition-colors">
+              <div className="w-12 h-12 bg-amber-50 text-amber-600 rounded-2xl flex items-center justify-center mb-6">
                 <Clock className="w-6 h-6" />
               </div>
-              <h4 className="font-black text-gray-900 mb-2">৫ দিনের গ্রেস পিরিয়ড</h4>
-              <p className="text-sm text-gray-500 leading-relaxed">প্ল্যান শেষ হওয়ার পর আপনার কোনো জরুরি কাজ যাতে না থামে, সেজন্য আমরা ৫ দিন অতিরিক্ত ব্যবহারের সুবিধা দেই।</p>
-            </div>
-            <div className="bg-white p-6 rounded-2xl border border-rose-50 border-t-4 border-t-rose-500 shadow-sm">
-              <div className="w-10 h-10 bg-rose-50 text-rose-600 rounded-xl flex items-center justify-center mb-4">
+              <h4 className="font-black text-gray-900 mb-3 text-lg">৫ দিনের গ্রেস পিরিয়ড</h4>
+              <p className="text-sm text-gray-500 leading-relaxed font-medium">প্ল্যান শেষ হওয়ার পর আপনার কোনো জরুরি কাজ যাতে না থামে, সেজন্য আমরা ৫ দিন অতিরিক্ত ব্যবহারের সুবিধা দেই।</p>
+            </motion.div>
+            <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: 0.2 }} className="bg-white/60 backdrop-blur-sm p-8 rounded-[2rem] border border-rose-50 shadow-sm hover:border-rose-200 transition-colors">
+              <div className="w-12 h-12 bg-rose-50 text-rose-600 rounded-2xl flex items-center justify-center mb-6">
                 <AlertTriangle className="w-6 h-6" />
               </div>
-              <h4 className="font-black text-gray-900 mb-2">ডাটা ডিলিট পলিসি</h4>
-              <p className="text-sm text-gray-500 leading-relaxed">যদি কোনো প্রতিষ্ঠান টানা ৩০ দিন সফটওয়্যারটি ব্যবহার না করে (অ্যাকাউন্ট নিষ্ক্রিয় থাকে), তবে নিরাপত্তার খাতিরে ডাটা স্থায়ীভাবে মুছে ফেলা হবে।</p>
-            </div>
+              <h4 className="font-black text-gray-900 mb-3 text-lg">ডাটা ডিলিট পলিসি</h4>
+              <p className="text-sm text-gray-500 leading-relaxed font-medium">যদি কোনো প্রতিষ্ঠান টানা ৩০ দিন সফটওয়্যারটি ব্যবহার না করে (অ্যাকাউন্ট নিষ্ক্রিয় থাকে), তবে নিরাপত্তার খাতিরে ডাটা স্থায়ীভাবে মুছে ফেলা হবে।</p>
+            </motion.div>
           </div>
         </div>
       </section>
 
       {/* Latest Insights Section */}
-      {latestBlogs.length > 0 && (
-        <section className="py-24 px-4 bg-white relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-96 h-96 bg-blue-50 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 opacity-50" />
-          <div className="max-w-7xl mx-auto relative z-10">
-            <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-16">
-              <div className="max-w-2xl">
-                <span className="px-4 py-1.5 bg-blue-100 text-blue-700 text-[10px] font-black uppercase tracking-widest rounded-full mb-4 inline-block">
-                  Resource Center
-                </span>
-                <h2 className="text-3xl md:text-5xl font-black text-gray-900 tracking-tight leading-tight">
-                  শিক্ষক ও প্রতিষ্ঠান পরিচালকদের জন্য <span className="text-blue-600">সেরা পরামর্শ</span>
-                </h2>
-              </div>
-              <Link to="/blog" className="flex items-center gap-2 text-blue-600 font-black uppercase tracking-widest text-sm hover:gap-4 transition-all pb-2">
-                সবগুলো পড়ুন <ArrowRightIcon className="w-5 h-5" />
-              </Link>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              {latestBlogs.map((blog) => (
-                <Link 
-                  key={blog.id} 
-                  to={`/blog/${blog.slug}`}
-                  className="group flex flex-col bg-white rounded-[2rem] border border-gray-100 overflow-hidden hover:shadow-2xl hover:-translate-y-2 transition-all"
-                >
-                  <div className="relative h-52 overflow-hidden bg-gray-50 flex items-center justify-center">
-                    {blog.coverImage ? (
-                      <img src={blog.coverImage} alt={blog.title} className="w-full h-full object-cover transition-transform group-hover:scale-110" referrerPolicy="no-referrer" />
-                    ) : (
-                      <BookOpen className="w-12 h-12 text-blue-100" />
-                    )}
-                    <div className="absolute top-4 left-4">
-                      {blog.tags?.[0] && (
-                        <span className="px-3 py-1 bg-white/90 backdrop-blur-sm text-[9px] font-black uppercase tracking-widest text-blue-600 rounded-full shadow-sm">
-                          {blog.tags[0]}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="p-8">
-                    <div className="flex items-center gap-2 text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">
-                      <Calendar className="w-3 h-3" />
-                      {new Date(blog.createdAt?.seconds * 1000).toLocaleDateString()}
-                    </div>
-                    <h3 className="text-lg font-black text-gray-900 mb-3 group-hover:text-blue-600 transition-colors line-clamp-2 leading-snug">
-                      {blog.title}
-                    </h3>
-                    <p className="text-gray-500 text-sm font-medium line-clamp-2 mb-6 leading-relaxed">
-                      {blog.excerpt}
-                    </p>
-                    <div className="pt-6 border-t border-gray-50 flex items-center gap-2 text-xs font-black text-blue-600 group-hover:gap-3 transition-all">
-                      Read Article <ArrowRightIcon className="w-4 h-4" />
-                    </div>
-                  </div>
+      <AnimatePresence>
+        {latestBlogs.length > 0 && (
+          <section className="py-24 px-4 relative overflow-hidden">
+            <div className="max-w-7xl mx-auto relative z-10">
+              <div className="flex flex-col md:flex-row md:items-end justify-between gap-8 mb-16">
+                <div className="max-w-2xl">
+                  <span className="px-4 py-1.5 bg-brand-primary text-white text-[10px] font-black uppercase tracking-[0.2em] rounded-full mb-6 inline-block shadow-lg shadow-blue-200">
+                    Resource Center
+                  </span>
+                  <h2 className="text-3xl md:text-5xl font-black text-gray-900 tracking-tight leading-tight">
+                    শিক্ষক ও প্রতিষ্ঠান পরিচালকদের জন্য <span className="text-brand-primary">সেরা পরামর্শ</span>
+                  </h2>
+                </div>
+                <Link to="/blog" className="group flex items-center gap-3 text-brand-primary font-black uppercase tracking-widest text-xs hover:gap-5 transition-all">
+                  সবগুলো পড়ুন <ArrowRightIcon className="w-5 h-5 transition-transform" />
                 </Link>
-              ))}
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                {latestBlogs.map((blog, idx) => (
+                  <motion.div
+                    key={blog.id}
+                    initial={{ opacity: 0, y: 30 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: idx * 0.1 }}
+                  >
+                    <Link 
+                      to={`/blog/${blog.slug}`}
+                      className="group flex flex-col h-full bg-white/70 backdrop-blur-sm rounded-[2.5rem] border border-gray-100 overflow-hidden hover:shadow-2xl hover:-translate-y-2 transition-all duration-500"
+                    >
+                      <div className="relative h-60 overflow-hidden bg-gray-50 flex items-center justify-center">
+                        <div className="absolute inset-0 bg-blue-600/10 group-hover:bg-blue-600/0 transition-colors duration-500" />
+                        {blog.coverImage ? (
+                          <img src={blog.coverImage} alt={blog.title} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" referrerPolicy="no-referrer" />
+                        ) : (
+                          <BookOpen className="w-16 h-16 text-blue-200" />
+                        )}
+                        <div className="absolute bottom-6 left-6">
+                          {blog.tags?.[0] && (
+                            <span className="px-4 py-1.5 bg-white shadow-xl text-[10px] font-black uppercase tracking-widest text-brand-primary rounded-xl">
+                              {blog.tags[0]}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="p-8 flex-1 flex flex-col">
+                        <div className="flex items-center gap-2 text-[10px] font-black text-gray-400 uppercase tracking-[0.15em] mb-4">
+                          <Calendar className="w-3.5 h-3.5 text-brand-primary" />
+                          {new Date(blog.createdAt?.seconds * 1000).toLocaleDateString()}
+                        </div>
+                        <h3 className="text-xl font-black text-gray-900 mb-4 group-hover:text-brand-primary transition-colors line-clamp-2 leading-snug">
+                          {blog.title}
+                        </h3>
+                        <p className="text-gray-500 text-sm font-medium line-clamp-2 mb-8 leading-relaxed">
+                          {blog.excerpt}
+                        </p>
+                        <div className="mt-auto pt-6 border-t border-gray-50 flex items-center gap-2 text-xs font-black text-brand-primary group-hover:gap-4 transition-all">
+                          Read Full Article <ArrowRightIcon className="w-4 h-4" />
+                        </div>
+                      </div>
+                    </Link>
+                  </motion.div>
+                ))}
+              </div>
             </div>
-          </div>
-        </section>
-      )}
+          </section>
+        )}
+      </AnimatePresence>
 
       {/* Reviews Section */}
       <section id="reviews" className="py-24 px-4 bg-blue-600">

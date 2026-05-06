@@ -32,7 +32,8 @@ import {
   MoreHorizontal,
   Clock,
   CreditCard,
-  Info
+  Info,
+  BrainCircuit
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../../lib/auth';
@@ -73,7 +74,8 @@ export function ManageInstitutions() {
     email: '',
     password: '',
     plan: 'free',
-    tokens: 100
+    tokens: 100,
+    aiCredits: 50
   });
 
   useEffect(() => {
@@ -194,7 +196,8 @@ export function ManageInstitutions() {
         subscriptionPlan: selectedInst.subscriptionPlan,
         subscriptionExpiry: selectedInst.subscriptionExpiry || null,
         superAdminNote: selectedInst.superAdminNote || '',
-        isVerified: selectedInst.isVerified || false
+        isVerified: selectedInst.isVerified || false,
+        aiCredits: Number(selectedInst.aiCredits || 0)
       });
 
       // Update credits
@@ -235,6 +238,7 @@ export function ManageInstitutions() {
         role: 'admin',
         institutionId: uid,
         subscriptionPlan: newInst.plan,
+        aiCredits: Number(newInst.aiCredits || 50),
         createdAt: new Date().toISOString()
       });
 
@@ -246,7 +250,7 @@ export function ManageInstitutions() {
       });
 
       setIsCreateModalOpen(false);
-      setNewInst({ name: '', email: '', password: '', plan: 'free', tokens: 100 });
+      setNewInst({ name: '', email: '', password: '', plan: 'free', tokens: 100, aiCredits: 50 });
       setToast({
         message: "Institution created successfully",
         type: 'success',
@@ -464,6 +468,7 @@ export function ManageInstitutions() {
                         <DetailRow label="Registration Date" value={selectedInst.createdAt ? formatDate(selectedInst.createdAt) : 'N/A'} icon={Calendar} />
                         <DetailRow label="Subscription Plan" value={selectedInst.subscriptionPlan || 'Free'} icon={Zap} />
                         <DetailRow label="Plan Expiry" value={selectedInst.subscriptionExpiry ? formatDate(selectedInst.subscriptionExpiry) : 'No Expiry'} icon={Clock} />
+                        <DetailRow label="AI Credits" value={selectedInst.aiCredits || 0} icon={BrainCircuit} />
                       </div>
                     </div>
                   </div>
@@ -707,6 +712,19 @@ export function ManageInstitutions() {
                       </div>
                     </div>
 
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-2">AI Credits Balance</label>
+                      <div className="relative">
+                        <BrainCircuit className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+                        <input 
+                          type="number"
+                          value={selectedInst.aiCredits || 0}
+                          onChange={(e) => setSelectedInst({ ...selectedInst, aiCredits: e.target.value })}
+                          className="w-full pl-12 pr-5 py-4 bg-gray-50 dark:bg-gray-800 border-2 border-transparent rounded-2xl focus:border-indigo-500 focus:bg-white dark:focus:bg-gray-900 outline-none transition-all font-bold text-gray-900 dark:text-white"
+                        />
+                      </div>
+                    </div>
+
                     <div className="space-y-4 pt-4 border-t border-gray-100 dark:border-gray-800">
                       <div className="flex items-center justify-between p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-2xl border border-indigo-100 dark:border-indigo-800/50">
                         <div className="flex items-center gap-3">
@@ -846,6 +864,7 @@ export function ManageInstitutions() {
                 <th className="px-6 py-4 text-[11px] font-black text-gray-400 uppercase tracking-widest leading-none">Activity</th>
                 <th className="px-6 py-4 text-[11px] font-black text-gray-400 uppercase tracking-widest leading-none">Subscription</th>
                 <th className="px-6 py-4 text-[11px] font-black text-gray-400 uppercase tracking-widest leading-none">SMS</th>
+                <th className="px-6 py-4 text-[11px] font-black text-gray-400 uppercase tracking-widest leading-none">AI Credits</th>
                 <th className="px-6 py-4 text-[11px] font-black text-gray-400 uppercase tracking-widest leading-none">Last Active</th>
                 <th className="px-6 py-4 text-[11px] font-black text-gray-400 uppercase tracking-widest leading-none">Actions</th>
               </tr>
@@ -957,6 +976,12 @@ export function ManageInstitutions() {
                     <div className="flex items-center gap-2">
                       <Zap className="w-4 h-4 text-emerald-500 fill-emerald-50" />
                       <span className="text-sm font-bold text-gray-900 dark:text-white">{inst.smsBalance}</span>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400">
+                      <BrainCircuit className="w-4 h-4" />
+                      <span className="text-sm font-bold">{inst.aiCredits || 0}</span>
                     </div>
                   </td>
                   <td className="px-6 py-4">
@@ -1097,7 +1122,7 @@ export function ManageInstitutions() {
                     </select>
                   </div>
                   <div className="space-y-2">
-                    <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">Initial Tokens</label>
+                    <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">Initial SMS Tokens</label>
                     <input 
                       type="number"
                       value={newInst.tokens}
@@ -1105,6 +1130,15 @@ export function ManageInstitutions() {
                       className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-800 border-none rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
                     />
                   </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">Initial AI Credits</label>
+                  <input 
+                    type="number"
+                    value={newInst.aiCredits || 50}
+                    onChange={(e) => setNewInst({ ...newInst, aiCredits: Number(e.target.value) })}
+                    className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-800 border-none rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+                  />
                 </div>
                 <button 
                   type="submit"
@@ -1162,6 +1196,16 @@ export function ManageInstitutions() {
                     type="number"
                     value={selectedInst.smsBalance}
                     onChange={(e) => setSelectedInst({ ...selectedInst, smsBalance: e.target.value })}
+                    className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border-none rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">AI Credit Balance</label>
+                  <input 
+                    type="number"
+                    value={selectedInst.aiCredits || 0}
+                    onChange={(e) => setSelectedInst({ ...selectedInst, aiCredits: e.target.value })}
                     className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border-none rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
                   />
                 </div>

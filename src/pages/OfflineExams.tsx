@@ -61,6 +61,7 @@ interface Student {
 interface Batch {
   id: string;
   name: string;
+  classTeacherId?: string;
 }
 
 export function OfflineExams() {
@@ -376,10 +377,17 @@ export function OfflineExams() {
     const unsubscribeBatches = onSnapshot(
       query(collection(db, 'batches'), where('institutionId', '==', instId)), 
       (snapshot) => {
-        const batchData = snapshot.docs.map(doc => ({
+        let batchData = snapshot.docs.map(doc => ({
           id: doc.id,
-          name: doc.data().name
-        })) as Batch[];
+          name: doc.data().name,
+          classTeacherId: doc.data().classTeacherId
+        })) as any[];
+        
+        // Filter for teachers
+        if (user?.role === 'teacher' && user.teacherId) {
+          batchData = batchData.filter(b => b.classTeacherId === user.teacherId);
+        }
+        
         setBatches(batchData);
         if (batchData.length > 0 && !newExam.batchId) {
           setNewExam(prev => ({ ...prev, batchId: batchData[0].id }));
@@ -706,6 +714,12 @@ export function OfflineExams() {
   };
 
   const filteredExams = React.useMemo(() => exams.filter(e => {
+    // Teacher filtering
+    if (user?.role === 'teacher' && user.teacherId) {
+      const assignedBatchIds = batches.filter(b => b.classTeacherId === user.teacherId).map(b => b.id);
+      if (!assignedBatchIds.includes(e.batchId)) return false;
+    }
+
     const matchesSearch = e.title.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesTab = viewTab === 'active' ? e.status === 'pending' : e.status === 'completed';
     
@@ -1699,19 +1713,21 @@ export function OfflineExams() {
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
                 <h4 className="text-lg font-bold text-gray-900">{t('offlineExams.manage.results.title')}</h4>
                 <div className="flex flex-wrap gap-2 w-full sm:w-auto">
-                  <button 
-                    onClick={handleTogglePublish}
-                    disabled={isSaving}
-                    className={cn(
-                      "flex-1 sm:flex-none px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 shadow-md disabled:opacity-50",
-                      selectedExam?.isPublished 
-                        ? "bg-amber-600 text-white hover:bg-amber-700 shadow-amber-100" 
-                        : "bg-indigo-600 text-white hover:bg-indigo-700 shadow-indigo-100"
-                    )}
-                  >
-                    {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Globe className="w-4 h-4" />}
-                    {selectedExam?.isPublished ? "Unpublish from Website" : "Publish on Website"}
-                  </button>
+                  {user?.role === 'admin' && (
+                    <button 
+                      onClick={handleTogglePublish}
+                      disabled={isSaving}
+                      className={cn(
+                        "flex-1 sm:flex-none px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 shadow-md disabled:opacity-50",
+                        selectedExam?.isPublished 
+                          ? "bg-amber-600 text-white hover:bg-amber-700 shadow-amber-100" 
+                          : "bg-indigo-600 text-white hover:bg-indigo-700 shadow-indigo-100"
+                      )}
+                    >
+                      {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Globe className="w-4 h-4" />}
+                      {selectedExam?.isPublished ? "Unpublish from Website" : "Publish on Website"}
+                    </button>
+                  )}
                   <button 
                     onClick={handleSaveResults}
                     disabled={isSaving}
@@ -1883,7 +1899,7 @@ export function OfflineExams() {
                                 <Award className="w-5 h-5" />
                               </button>
                               <button
-                                onClick={() => alert(i18n?.language === 'bn' ? 'শীঘ্রই আসছে (Coming Soon)' : 'Coming Soon')}
+                                onClick={() => navigate('/ai-evaluator', { state: { examId: selectedExam?.id } })}
                                 className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-all"
                                 title="এআই খাতা মূল্যায়ন (AI Paper Analysis)"
                               >
@@ -2019,7 +2035,7 @@ export function OfflineExams() {
                           </button>
                         )}
                         <button
-                          onClick={() => alert(i18n?.language === 'bn' ? 'শীঘ্রই আসছে (Coming Soon)' : 'Coming Soon')}
+                          onClick={() => navigate('/ai-evaluator', { state: { examId: selectedExam?.id } })}
                           className="flex-1 py-1.5 bg-purple-50 text-purple-600 rounded-lg text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-2"
                         >
                           <Sparkles className="w-3 h-3" /> AI Analyze

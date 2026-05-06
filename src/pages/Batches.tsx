@@ -100,10 +100,15 @@ export function Batches() {
       where('institutionId', '==', instId)
     );
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const batchData = snapshot.docs.map(doc => ({
+      let batchData = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       })) as Batch[];
+
+      // Filter for teachers
+      if (user?.role === 'teacher' && user.teacherId) {
+        batchData = batchData.filter(b => b.classTeacherId === user.teacherId);
+      }
 
       // Sort client-side to avoid index requirements
       const sortedData = batchData.sort((a, b) => {

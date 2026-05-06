@@ -220,6 +220,11 @@ service cloud.firestore {
       return (userDoc != null && 'institutionId' in userDoc.data) ? userDoc.data.institutionId : null;
     }
 
+    function getTeacherId() {
+      let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
+      return (userDoc != null && 'teacherId' in userDoc.data) ? userDoc.data.teacherId : null;
+    }
+
     function isMemberOf(institutionId) {
       return isAuthenticated() && (
         isAdmin() || 
@@ -235,6 +240,11 @@ service cloud.firestore {
          (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'teacher' || 
           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'staff'))
       );
+    }
+
+    function isAssignedToBatch(batchId) {
+      let batch = get(/databases/$(database)/documents/batches/$(batchId));
+      return isInstitutionAdmin() || (isTeacher() && batch != null && batch.data.classTeacherId == getTeacherId());
     }
 
     function hasRequiredFields(fields) {
@@ -385,46 +395,46 @@ service cloud.firestore {
     }
 
     match /students/{studentId} {
-      allow get: if true;
+      allow get: if isMemberOf(resource.data.institutionId) && (isInstitutionAdmin() || isAssignedToBatch(resource.data.batchId));
       allow list: if isTeacher() && isMemberOf(resource.data.institutionId);
-      allow create: if isTeacher() && isMemberOf(request.resource.data.institutionId) && isValidStudent(request.resource.data);
-      allow update: if isTeacher() && isMemberOf(resource.data.institutionId) && isValidStudent(request.resource.data);
+      allow create: if isTeacher() && isMemberOf(request.resource.data.institutionId) && isAssignedToBatch(request.resource.data.batchId) && isValidStudent(request.resource.data);
+      allow update: if isTeacher() && isMemberOf(resource.data.institutionId) && isAssignedToBatch(resource.data.batchId) && isValidStudent(request.resource.data);
       allow delete: if isInstitutionAdmin() && isMemberOf(resource.data.institutionId);
     }
 
     match /fees/{feeId} {
-      allow read: if isTeacher() && isMemberOf(resource.data.institutionId);
-      allow create: if isTeacher() && isMemberOf(request.resource.data.institutionId) && isValidFee(request.resource.data);
-      allow update: if isTeacher() && isMemberOf(resource.data.institutionId) && isValidFee(request.resource.data);
+      allow read: if isInstitutionAdmin() && isMemberOf(resource.data.institutionId);
+      allow create: if isInstitutionAdmin() && isMemberOf(request.resource.data.institutionId) && isValidFee(request.resource.data);
+      allow update: if isInstitutionAdmin() && isMemberOf(resource.data.institutionId) && isValidFee(request.resource.data);
       allow delete: if isInstitutionAdmin() && isMemberOf(resource.data.institutionId);
     }
 
     match /attendance/{attendanceId} {
       allow read: if isTeacher() && isMemberOf(resource.data.institutionId);
-      allow create: if isTeacher() && isMemberOf(request.resource.data.institutionId) && isValidAttendance(request.resource.data);
-      allow update: if isTeacher() && isMemberOf(resource.data.institutionId) && isValidAttendance(request.resource.data);
+      allow create: if isTeacher() && isMemberOf(request.resource.data.institutionId) && isAssignedToBatch(request.resource.data.batchId) && isValidAttendance(request.resource.data);
+      allow update: if isTeacher() && isMemberOf(resource.data.institutionId) && isAssignedToBatch(resource.data.batchId) && isValidAttendance(request.resource.data);
       allow delete: if isInstitutionAdmin() && isMemberOf(resource.data.institutionId);
     }
 
     match /batches/{batchId} {
       allow get: if true;
       allow list: if true; // Publicly listable for institution profiles
-      allow create: if isTeacher() && isMemberOf(request.resource.data.institutionId) && isValidBatch(request.resource.data);
-      allow update: if isTeacher() && isMemberOf(resource.data.institutionId) && isValidBatch(request.resource.data);
+      allow create: if isInstitutionAdmin() && isMemberOf(request.resource.data.institutionId) && isValidBatch(request.resource.data);
+      allow update: if (isInstitutionAdmin() || (isTeacher() && resource.data.classTeacherId == getTeacherId())) && isMemberOf(resource.data.institutionId) && isValidBatch(request.resource.data);
       allow delete: if isInstitutionAdmin() && isMemberOf(resource.data.institutionId);
     }
 
     match /batch_content/{contentId} {
       allow read: if true;
-      allow create: if isTeacher() && 
+      allow create: if isTeacher() && isAssignedToBatch(request.resource.data.batchId) && 
                       (request.resource.data.institutionId == request.auth.uid || 
                        (getInstitutionId() != null && request.resource.data.institutionId == getInstitutionId())) &&
                       isValidBatchContent(request.resource.data);
-      allow update: if isTeacher() && 
+      allow update: if isTeacher() && isAssignedToBatch(resource.data.batchId) &&
                       (resource.data.institutionId == request.auth.uid || 
                        (getInstitutionId() != null && resource.data.institutionId == getInstitutionId())) &&
                       isValidBatchContent(request.resource.data);
-      allow delete: if isTeacher() && 
+      allow delete: if isTeacher() && isAssignedToBatch(resource.data.batchId) &&
                       (resource.data.institutionId == request.auth.uid || 
                        (getInstitutionId() != null && resource.data.institutionId == getInstitutionId()));
     }
@@ -432,9 +442,9 @@ service cloud.firestore {
     match /offline_exams/{examId} {
       allow get: if true; // Publicly readable for results
       allow list: if true; // Publicly listable for checking results
-      allow create: if isTeacher() && (request.resource.data.institutionId == (getInstitutionId() != null ? getInstitutionId() : request.auth.uid)) && isValidOfflineExam(request.resource.data);
-      allow update: if isTeacher() && resource.data.institutionId == (getInstitutionId() != null ? getInstitutionId() : request.auth.uid) && isValidOfflineExam(request.resource.data);
-      allow delete: if isTeacher() && resource.data.institutionId == (getInstitutionId() != null ? getInstitutionId() : request.auth.uid);
+      allow create: if isTeacher() && isAssignedToBatch(request.resource.data.batchId) && (request.resource.data.institutionId == (getInstitutionId() != null ? getInstitutionId() : request.auth.uid)) && isValidOfflineExam(request.resource.data);
+      allow update: if isTeacher() && isAssignedToBatch(resource.data.batchId) && resource.data.institutionId == (getInstitutionId() != null ? getInstitutionId() : request.auth.uid) && isValidOfflineExam(request.resource.data);
+      allow delete: if isInstitutionAdmin() && resource.data.institutionId == (getInstitutionId() != null ? getInstitutionId() : request.auth.uid);
     }
 
     match /blogs/{blogId} {
@@ -463,7 +473,7 @@ service cloud.firestore {
 
     match /teachers/{teacherId} {
       allow read: if true; // Publicly readable for profiles
-      allow create, update, delete: if isTeacher();
+      allow create, update, delete: if isInstitutionAdmin();
     }
 
     match /teacher_attendance/{attendanceId} {

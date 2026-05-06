@@ -12,13 +12,15 @@ import {
   Building2,
   UserSquare2,
   MessageSquare,
+  Sparkles,
   Settings,
   LogOut,
   Bell,
   ShieldCheck,
   TrendingUp,
   HelpCircle,
-  Zap
+  Zap,
+  Library
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useTranslation } from 'react-i18next';
@@ -76,6 +78,8 @@ export function BottomNav() {
     { icon: ShieldCheck, label: 'System Health', path: '/super-admin/health' },
   ] : [
     { icon: GraduationCap, label: t('nav.offlineExams'), path: '/offline-exams' },
+    { icon: Sparkles, label: t('nav.aiEvaluator'), path: '/ai-evaluator' },
+    { icon: Library, label: t('nav.library'), path: '/library' },
     { icon: Building2, label: t('nav.institution'), path: '/institution' },
     { icon: UserSquare2, label: t('nav.teachers'), path: '/teachers' },
     { icon: MessageSquare, label: t('nav.messages'), path: '/messages' },

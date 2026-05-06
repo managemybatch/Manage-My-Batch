@@ -300,16 +300,62 @@ export function Fees() {
   };
 
   const [isSendingReminder, setIsSendingReminder] = useState<string | null>(null);
+  const [isBulkNotifying, setIsBulkNotifying] = useState(false);
+
+  const getDuesDetails = (student: Student) => {
+    const dues = getStudentDues(student);
+    const mAmount = dues.monthly.length * student.monthlyFee;
+    const eAmount = dues.exams.reduce((sum: number, e: any) => sum + (e.examFee || 0), 0);
+    const oAmount = dues.other.reduce((sum: number, o: any) => sum + o.amount, 0);
+    const totalDue = mAmount + eAmount + oAmount;
+    return { dues, totalDue };
+  };
+
+  const handleBulkNotify = async () => {
+    if (!instData?.smsConfig?.apiUrl) {
+      alert("SMS API is not configured. Bulk notifications work best with SMS API. You can still send reminders individually via WhatsApp.");
+      return;
+    }
+
+    if (!window.confirm(`Are you sure you want to send SMS payment reminders to ${filteredStudents.length} students?`)) {
+      return;
+    }
+
+    setIsBulkNotifying(true);
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const student of filteredStudents) {
+      const { dues, totalDue } = getDuesDetails(student);
+      if (totalDue <= 0) continue;
+
+      const instName = instData?.name || 'Our Center';
+      const template = instData?.messageTemplates?.due_reminder_sms || 
+        "Reminder: Dear Guardian, total due for {{studentName}} is ৳{{amount}} (Months: {{months}}). Please clear the dues to avoid any inconvenience. - {{institutionName}}";
+      
+      const message = template
+        .replace('{{studentName}}', student.name)
+        .replace('{{amount}}', String(totalDue))
+        .replace('{{months}}', dues.monthly.join(', '))
+        .replace('{{institutionName}}', instName);
+
+      try {
+        const res = await sendSMS(instData.smsConfig, student.guardianPhone, message);
+        if (res.success) successCount++;
+        else failCount++;
+      } catch (e) {
+        failCount++;
+      }
+    }
+
+    setIsBulkNotifying(false);
+    setSuccessMessage(`Bulk Notification Complete! Sent: ${successCount}, Failed: ${failCount}`);
+    setIsSuccessModalOpen(true);
+  };
 
   const handleSendReminder = async (student: Student) => {
-    const dues = getStudentDues(student);
-    const hasDues = dues.monthly.length > 0 || dues.exams.length > 0 || dues.other.length > 0;
-    if (!hasDues) return;
-
-    const monthlyAmount = dues.monthly.length * student.monthlyFee;
-    const examsAmount = dues.exams.reduce((sum: number, e: any) => sum + (e.examFee || 0), 0);
-    const otherAmount = dues.other.reduce((sum: number, o: any) => sum + o.amount, 0);
-    const totalDue = monthlyAmount + examsAmount + otherAmount;
+    const { dues, totalDue } = getDuesDetails(student);
+    if (totalDue <= 0) return;
 
     const instName = instData?.name || 'Our Center';
     
@@ -742,15 +788,27 @@ export function Fees() {
         <>
           {/* Search & Filter */}
       <div className="flex flex-col md:flex-row gap-4 items-center justify-between bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
-        <div className="relative w-full md:w-96 group">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4 group-focus-within:text-indigo-500 transition-colors" />
-          <input
-            type="text"
-            placeholder={t('fees.searchPlaceholder')}
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
-          />
+        <div className="flex gap-3 w-full md:w-auto">
+          <div className="relative flex-1 md:w-96 group">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4 group-focus-within:text-indigo-500 transition-colors" />
+            <input
+              type="text"
+              placeholder={t('fees.searchPlaceholder')}
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+            />
+          </div>
+          {activeTab === 'dues' && filteredStudents.length > 0 && (
+            <button 
+              onClick={handleBulkNotify}
+              disabled={isBulkNotifying}
+              className="px-6 py-2.5 bg-rose-600 text-white rounded-xl text-xs font-black shadow-lg shadow-rose-100 flex items-center gap-2 hover:bg-rose-700 transition-all disabled:opacity-50"
+            >
+              {isBulkNotifying ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+              Notify All ({filteredStudents.length})
+            </button>
+          )}
         </div>
         <div className="flex items-center gap-2 w-full md:w-auto">
           <select 

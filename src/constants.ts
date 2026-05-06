@@ -9,6 +9,7 @@ export interface SubscriptionPlan {
   price: string;
   studentLimit: number;
   batchLimit: number;
+  aiCreditLimit: number;
   features: string[];
 }
 
@@ -16,12 +17,14 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
   {
     id: 'free',
     name: 'Free',
-    price: '৳0',
+    price: '0',
     studentLimit: 50,
     batchLimit: 3,
+    aiCreditLimit: 50,
     features: [
       'Up to 50 students',
       'Up to 3 batches',
+      '50 AI Credits (One-time trial)',
       'Basic student management',
       'Public profile & Admission form'
     ]
@@ -29,12 +32,14 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
   {
     id: 'basic',
     name: 'Basic',
-    price: '৳399',
+    price: '399',
     studentLimit: 150,
     batchLimit: 10,
+    aiCreditLimit: 1500,
     features: [
       'Up to 150 students',
       'Up to 10 batches',
+      '1,500 AI Credits',
       'Premium message token support',
       'Advanced reporting'
     ]
@@ -42,12 +47,14 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
   {
     id: 'standard',
     name: 'Standard',
-    price: '৳999',
+    price: '999',
     studentLimit: 450,
     batchLimit: 30,
+    aiCreditLimit: 5000,
     features: [
       'Up to 450 students',
       'Up to 30 batches',
+      '5,000 AI Credits',
       'Priority support',
       'Full messaging features'
     ]
@@ -55,12 +62,14 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
   {
     id: 'advanced',
     name: 'Advanced',
-    price: '৳1999',
+    price: '1999',
     studentLimit: 1000,
     batchLimit: 50,
+    aiCreditLimit: 15000,
     features: [
       'Up to 1000 students',
       'Up to 50 batches',
+      '15,000 AI Credits',
       'Dedicated account manager',
       'Custom features'
     ]

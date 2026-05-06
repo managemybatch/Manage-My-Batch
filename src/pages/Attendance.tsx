@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { ClipboardCheck, Search, Filter, CheckCircle2, XCircle, Clock, Loader2, Link as LinkIcon, Users, Save, ChevronRight, ArrowLeft, Copy, ExternalLink, Trash2, Calendar, FileText, Download, MessageCircle, MoreVertical } from 'lucide-react';
+import { ClipboardCheck, Search, Filter, CheckCircle2, XCircle, Clock, Loader2, Link as LinkIcon, Users, Save, ChevronRight, ArrowLeft, Copy, ExternalLink, Trash2, Calendar, FileText, Download, MessageCircle, MoreVertical, Send } from 'lucide-react';
 import { Table, TableRow, TableCell } from '../components/Table';
 import { cn } from '../lib/utils';
-import { collection, onSnapshot, query, addDoc, serverTimestamp, where, getDocs, writeBatch, doc, deleteDoc, orderBy } from 'firebase/firestore';
+import { collection, onSnapshot, query, addDoc, serverTimestamp, where, getDocs, writeBatch, doc, deleteDoc, orderBy, getDoc } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { useAuth } from '../lib/auth';
+import { sendSMS } from '../lib/sms';
 import { Modal } from '../components/Modal';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { useTranslation } from 'react-i18next';
@@ -92,6 +93,8 @@ export function Attendance() {
   const [attendance, setAttendance] = useState<Record<string, AttendanceRecord>>({});
   const [markingLoading, setMarkingLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [autoSMS, setAutoSMS] = useState(false);
+  const [instData, setInstData] = useState<any>(null);
   
   // Link State
   const [generatedLink, setGeneratedLink] = useState<string | null>(null);
@@ -119,10 +122,16 @@ export function Attendance() {
     const unsubscribeBatches = onSnapshot(
       query(collection(db, 'batches'), where('institutionId', '==', instId)),
       (snapshot) => {
-        const batchData = snapshot.docs.map(doc => ({
+        let batchData = snapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data()
         })) as Batch[];
+        
+        // If teacher, only show assigned batches
+        if (user.role === 'teacher' && user.teacherId) {
+          batchData = batchData.filter(b => b.classTeacherId === user.teacherId);
+        }
+        
         setBatches(batchData);
         setLoading(false);
       }
@@ -161,6 +170,16 @@ export function Attendance() {
       unsubscribeTeachers();
       unsubscribeSubmissions();
     };
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+    const fetchInst = async () => {
+      const docRef = doc(db, 'institutions', user.institutionId || user.uid);
+      const snap = await getDoc(docRef);
+      if (snap.exists()) setInstData(snap.data());
+    };
+    fetchInst();
   }, [user]);
 
   const handleStartManualAttendance = async (batch: Batch) => {
@@ -236,7 +255,13 @@ export function Attendance() {
       const batch = writeBatch(db);
       const instId = user.institutionId || user.uid;
       
+      const absenteeIds: string[] = [];
+
       Object.values(attendance).forEach((record: AttendanceRecord) => {
+        if (record.status === 'absent') {
+          absenteeIds.push(record.studentId);
+        }
+
         if (record.id) {
           const docRef = doc(db, 'attendance', record.id);
           const { id, ...recordData } = record;
@@ -257,6 +282,25 @@ export function Attendance() {
       });
       
       await batch.commit();
+
+      // Trigger Auto-SMS if enabled and config exists
+      if (autoSMS && instData?.smsConfig?.apiUrl && absenteeIds.length > 0) {
+        const template = instData?.messageTemplates?.absent_notification_sms || 
+          "Attendance Alert: Your child {{studentName}} is ABSENT today from {{batchName}} at {{institutionName}}.";
+        
+        absenteeIds.forEach(sId => {
+          const student = students.find(s => s.id === sId);
+          if (student && (student as any).guardianPhone) {
+            const msg = template
+              .replace('{{studentName}}', student.name)
+              .replace('{{batchName}}', selectedBatch.name)
+              .replace('{{institutionName}}', instData.name || 'Our Center');
+            
+            sendSMS(instData.smsConfig, (student as any).guardianPhone, msg).catch(console.error);
+          }
+        });
+      }
+
       setSuccessMessage('Attendance saved successfully!');
       setIsSuccessModalOpen(true);
       setSelectedBatch(null);
@@ -506,6 +550,19 @@ export function Attendance() {
             {t('attendance.back')}
           </button>
           <div className="flex items-center gap-3">
+            {instData?.smsConfig?.apiUrl && (
+              <label className="flex items-center gap-2 px-4 py-2.5 bg-amber-50 border border-amber-100 rounded-xl cursor-pointer group hover:bg-amber-100 transition-all">
+                <input 
+                  type="checkbox" 
+                  checked={autoSMS}
+                  onChange={(e) => setAutoSMS(e.target.checked)}
+                  className="w-4 h-4 text-amber-600 rounded border-amber-300 focus:ring-amber-500"
+                />
+                <span className="text-xs font-black text-amber-700 uppercase tracking-widest flex items-center gap-2">
+                  <Send className="w-3 h-3" /> Auto-SMS Absentees
+                </span>
+              </label>
+            )}
             <div className="bg-white px-4 py-2 rounded-xl border border-gray-100 shadow-sm flex items-center gap-2">
               <span className="text-sm font-bold text-gray-700">{t('attendance.date')}: {today}</span>
             </div>

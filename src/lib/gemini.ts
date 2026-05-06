@@ -126,10 +126,103 @@ ${questions.map(q => `
 
   const text = response.text || '';
 
+  if (!text) {
+    throw new Error("AI-এর কাছ থেকে কোনো উত্তর পাওয়া যায়নি। সম্ভবত ইমেজগুলো স্পষ্ট নয়।");
+  }
+
   try {
     return JSON.parse(text);
   } catch (error) {
     console.error("Failed to parse AI response:", text);
     throw new Error("AI-এর উত্তর প্রসেস করতে সমস্যা হয়েছে। আবার চেষ্টা করুন।");
+  }
+}
+
+export async function extractQuestions(
+  images: string[] // base64 strings
+): Promise<Partial<QuestionDefinition>[]> {
+  const genAI = getGenAI();
+
+  const prompt = `
+You are a highly skilled document digitization assistant specializing in educational exam papers.
+Your task is to analyze the provided images (or PDF) of an exam paper and extract all questions into a clear, structured JSON format.
+
+**CORE RULES:**
+1. **Accuracy First:** Extract the text exactly as it appears on the paper. 
+2. **Handle Multiple Pages:** Correctly identify when a question continues from one page to the next.
+3. **Structure:** Identify main questions (1, 2, 3...) and sub-questions (a, b, c... or i, ii, iii...). 
+4. **Marks Extraction:** Look for marks indicated in parentheses or brackets at the end of questions (e.g., [5] or (10)). If not found, use a reasonable default.
+5. **Contextual Intelligence:** 
+   - If it's a math paper, the "Expected Answer" should include the expected numerical result or formula.
+   - If it's a language paper (Bangla/English), include key points the answer should cover.
+6. **Rubric Generation:** Create a set of grading criteria that a human teacher would use (e.g., "Award full marks for a correct explanation", "Deduct 0.5 for spelling errors").
+
+**JSON FORMAT REQUIRED:**
+{
+  "questions": [
+    {
+      "number": "string (e.g., '1', '1.a', 'Q1')",
+      "text": "Full question text in the original language",
+      "maxMarks": number,
+      "expectedAnswer": "Brief clear answer or key points",
+      "gradingRubric": "Specific criteria for marking this question in Bangla"
+    }
+  ]
+}
+
+**IMPORTANT:** Respond ONLY with the JSON object. Do not include any conversational text.
+`;
+
+  const imageParts = images.map(img => {
+    const isPdf = img.includes('application/pdf');
+    return {
+      inlineData: {
+        mimeType: isPdf ? "application/pdf" : "image/jpeg",
+        data: img.split(',')[1] || img
+      }
+    };
+  });
+
+  const response = await genAI.models.generateContent({
+    model: "gemini-3.1-pro-preview",
+    contents: { 
+      parts: [
+        { text: prompt },
+        ...imageParts
+      ] 
+    },
+    config: {
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          questions: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                number: { type: Type.STRING },
+                text: { type: Type.STRING },
+                maxMarks: { type: Type.NUMBER },
+                expectedAnswer: { type: Type.STRING },
+                gradingRubric: { type: Type.STRING }
+              },
+              required: ["number", "text", "maxMarks", "expectedAnswer", "gradingRubric"]
+            }
+          }
+        },
+        required: ["questions"]
+      }
+    }
+  });
+
+  const text = response.text || '';
+
+  try {
+    const data = JSON.parse(text);
+    return data.questions;
+  } catch (error) {
+    console.error("Failed to parse AI response:", text);
+    throw new Error("AI-এর মাধ্যমে প্রশ্ন এক্সট্রাক্ট করতে সমস্যা হয়েছে।");
   }
 }

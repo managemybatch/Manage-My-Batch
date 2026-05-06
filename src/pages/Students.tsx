@@ -56,6 +56,7 @@ interface Batch {
   monthlyFee: number;
   grade: string;
   section?: string;
+  classTeacherId?: string;
 }
 
 export function Students() {
@@ -671,6 +672,12 @@ export function Students() {
   };
 
   const filteredStudents = students.filter(s => {
+    // Teacher filtering
+    if (user?.role === 'teacher' && user.teacherId) {
+      const assignedBatchIds = batches.filter(b => b.classTeacherId === user.teacherId).map(b => b.id);
+      if (!assignedBatchIds.includes(s.batchId)) return false;
+    }
+
     const name = s.name || '';
     const roll = String(s.rollNo || '');
     const matchesSearch = name.toLowerCase().includes(searchTerm.toLowerCase()) ||

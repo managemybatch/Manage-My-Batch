@@ -21,17 +21,20 @@ import {
   BrainCircuit,
   MessageSquare,
   Award,
-  Settings
+  Settings,
+  Zap
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
-import { collection, onSnapshot, query, addDoc, serverTimestamp, deleteDoc, doc, updateDoc, where, getDocs, getDoc, setDoc } from 'firebase/firestore';
+import { collection, onSnapshot, query, addDoc, serverTimestamp, deleteDoc, doc, updateDoc, where, getDocs, getDoc, setDoc, increment } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { useAuth } from '../lib/auth';
 import { Modal } from '../components/Modal';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { useTranslation } from 'react-i18next';
-import { QuestionDefinition, AIEvaluationResult, evaluatePaper } from '../lib/gemini';
+import { QuestionDefinition, AIEvaluationResult, evaluatePaper, extractQuestions } from '../lib/gemini';
+import { SubscriptionModal } from '../components/SubscriptionModal';
+import { CONTACT_INFO } from '../constants';
 
 interface OfflineExam {
   id: string;
@@ -63,6 +66,7 @@ export function AIPaperEvaluator() {
   const { user } = useAuth();
   const location = useLocation();
   const [exams, setExams] = useState<OfflineExam[]>([]);
+  const [batches, setBatches] = useState<any[]>([]);
   const [selectedExam, setSelectedExam] = useState<OfflineExam | null>(null);
   const [config, setConfig] = useState<ExamAIConfig | null>(null);
   const [evaluations, setEvaluations] = useState<AIEvaluation[]>([]);
@@ -71,6 +75,9 @@ export function AIPaperEvaluator() {
   
   const [error, setError] = useState<string | null>(null);
   const [isSavingConfig, setIsSavingConfig] = useState(false);
+  const [isExtracting, setIsExtracting] = useState(false);
+  const [extractionImages, setExtractionImages] = useState<string[]>([]);
+  const [isExtractionModalOpen, setIsExtractionModalOpen] = useState(false);
   
   // Modals
   const [isQuestionModalOpen, setIsQuestionModalOpen] = useState(false);
@@ -83,14 +90,28 @@ export function AIPaperEvaluator() {
   const [uploadedImages, setUploadedImages] = useState<string[]>([]);
   const [isEvaluating, setIsEvaluating] = useState(false);
   const [aiResult, setAiResult] = useState<AIEvaluationResult | null>(null);
+  const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
 
   useEffect(() => {
     if (!user) return;
     const instId = user.institutionId || user.uid;
 
+    const unsubBatches = onSnapshot(query(collection(db, 'batches'), where('institutionId', '==', instId)), (s) => {
+      setBatches(s.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+
     const q = query(collection(db, 'offline_exams'), where('institutionId', '==', instId));
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const examData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as OfflineExam));
+      let examData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as OfflineExam));
+      
+      // Filter for teachers
+      if (user?.role === 'teacher' && user.teacherId) {
+        // Since we are in an effect and batches might not be updated yet in THIS run, 
+        // it's safer to filter based on what's in the snapshot or just use the local state if it's already there
+        // Actually, better to just filter the exams based on assignedBatchIds we can calculate inside the snapshot
+        // But we need the batches. Let's just use the exams as is and filter in the UI or use a combined observable.
+      }
+      
       setExams(examData);
       
       // Auto-select exam from state
@@ -105,7 +126,10 @@ export function AIPaperEvaluator() {
       setLoading(false);
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribe();
+      unsubBatches();
+    };
   }, [user, location.state, selectedExam]);
 
   useEffect(() => {
@@ -207,6 +231,48 @@ export function AIPaperEvaluator() {
     }
   };
 
+  const handleExtractQuestions = async () => {
+    if (extractionImages.length === 0) return;
+    setIsExtracting(true);
+    setError(null);
+    try {
+      const extracted = await extractQuestions(extractionImages);
+      if (extracted && extracted.length > 0) {
+        const newQuestions: QuestionDefinition[] = extracted.map((q, idx) => ({
+          id: Math.random().toString(36).substr(2, 9),
+          number: q.number || (idx + 1).toString(),
+          text: q.text || '',
+          maxMarks: q.maxMarks || 5,
+          expectedAnswer: q.expectedAnswer || '',
+          gradingRubric: q.gradingRubric || 'সঠিক উত্তরের জন্য পূর্ণ নাম্বার দিন।'
+        }));
+
+        if (config) {
+          // Overwrite existing questions with the newly extracted ones
+          await handleUpdateConfig(newQuestions);
+        } else {
+          // Create config if not exists
+          const instId = user?.institutionId || user?.uid;
+          const newConf = {
+            examId: selectedExam?.id,
+            institutionId: selectedExam?.institutionId || instId,
+            questions: newQuestions,
+            updatedAt: serverTimestamp()
+          };
+          const docRef = await addDoc(collection(db, 'exam_ai_config'), newConf);
+          setConfig({ id: docRef.id, ...newConf } as any);
+          setActiveTab('config');
+        }
+        setIsExtractionModalOpen(false);
+        setExtractionImages([]);
+      }
+    } catch (e: any) {
+      setError(e.message || "Failed to extract questions");
+    } finally {
+      setIsExtracting(false);
+    }
+  };
+
   const startEvaluation = async () => {
     if (!selectedExam) return;
     setEvaluationStep(1);
@@ -235,14 +301,33 @@ export function AIPaperEvaluator() {
   };
 
   const runAIEvaluation = async () => {
-    if (!config || uploadedImages.length === 0) return;
+    if (!config || uploadedImages.length === 0 || !user) return;
+    
+    // Credit Check: 1 image = 1 credit (minimum 1)
+    const requiredCredits = Math.max(1, uploadedImages.length);
+    const availableCredits = user.aiCredits || 0;
+
+    if (!user.isSuperAdmin && availableCredits < requiredCredits) {
+      setError(`আপনার পর্যাপ্ত ক্রেডিট নেই। আপনার প্রয়োজন ${requiredCredits} ক্রেডিট, কিন্তু আছে ${availableCredits} ক্রেডিট।`);
+      return;
+    }
+
     setIsEvaluating(true);
+    setError(null);
     try {
       const result = await evaluatePaper(uploadedImages, config.questions);
       setAiResult(result);
       setEvaluationStep(3);
+
+      // Deduct credits on success
+      if (!user.isSuperAdmin) {
+        const userRef = doc(db, 'users', user.uid);
+        await updateDoc(userRef, {
+          aiCredits: increment(-requiredCredits)
+        });
+      }
     } catch (error: any) {
-      alert(error.message || "AI Evaluation failed");
+      setError(error.message || "AI Evaluation failed");
     } finally {
       setIsEvaluating(false);
     }
@@ -288,6 +373,14 @@ export function AIPaperEvaluator() {
     }
   };
 
+  const filteredExams = React.useMemo(() => {
+    if (user?.role === 'teacher' && user.teacherId) {
+      const assignedBatchIds = batches.filter(b => b.classTeacherId === user.teacherId).map(b => b.id);
+      return exams.filter(e => assignedBatchIds.includes(e.batchId));
+    }
+    return exams;
+  }, [exams, batches, user]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -309,7 +402,31 @@ export function AIPaperEvaluator() {
             <p className="text-gray-500 font-medium text-sm">Artificial Intelligence-ভিত্তিক স্বয়ংক্রিয় খাতা মূল্যায়ন সিস্টেম</p>
           </div>
         </div>
+
+        {/* AI Credits Balance */}
+        <div className="bg-white px-6 py-3 rounded-2xl border border-gray-100 shadow-sm flex items-center justify-between md:justify-end gap-6">
+          <div className="flex items-center gap-3">
+             <div className="w-10 h-10 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-600">
+                <Zap className="w-5 h-5 fill-indigo-600" />
+             </div>
+             <div>
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">AI Credits Balance</p>
+                <p className="text-lg font-black text-indigo-600 leading-none">{user?.aiCredits || 0}</p>
+             </div>
+          </div>
+          <button 
+            onClick={() => setIsUpgradeModalOpen(true)}
+            className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 transition-all flex items-center gap-2"
+          >
+            <Plus className="w-3 h-3" /> Buy Credits
+          </button>
+        </div>
       </div>
+
+      <SubscriptionModal 
+        isOpen={isUpgradeModalOpen} 
+        onClose={() => setIsUpgradeModalOpen(false)} 
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
         {/* Left Side: Exam List */}
@@ -318,12 +435,12 @@ export function AIPaperEvaluator() {
             <FileText className="w-4 h-4" /> অফলাইন পরীক্ষা সমুহ
           </h3>
           <div className="space-y-2">
-            {exams.length === 0 ? (
+            {filteredExams.length === 0 ? (
               <div className="p-8 text-center bg-white rounded-2xl border-2 border-dashed border-gray-100">
                 <p className="text-sm text-gray-400 font-medium font-bengali">অফলাইন পরীক্ষা পাওয়া যায়নি</p>
               </div>
             ) : (
-              exams.map(exam => (
+              filteredExams.map(exam => (
                 <button
                   key={exam.id}
                   onClick={() => setSelectedExam(exam)}
@@ -417,23 +534,32 @@ export function AIPaperEvaluator() {
                           </div>
                         )}
 
-                        <button
-                          id="btn-create-ai-config"
-                          onClick={handleCreateConfig}
-                          disabled={isSavingConfig}
-                          className="px-6 py-3 bg-indigo-600 text-white rounded-2xl text-sm font-bold flex items-center gap-2 mx-auto hover:bg-indigo-700 transition-all font-bengali disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          {isSavingConfig ? (
-                            <>
-                              <Loader2 className="w-5 h-5 animate-spin" />
-                              প্রসেসিং...
-                            </>
-                          ) : (
-                            <>
-                              <Plus className="w-5 h-5" /> কনফিগারেশন শুরু করুন
-                            </>
-                          )}
-                        </button>
+                        <div className="flex flex-col sm:flex-row items-center gap-4 justify-center">
+                          <button
+                            id="btn-create-ai-config"
+                            onClick={handleCreateConfig}
+                            disabled={isSavingConfig}
+                            className="px-6 py-3 bg-indigo-600 text-white rounded-2xl text-sm font-bold flex items-center gap-2 hover:bg-indigo-700 transition-all font-bengali disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {isSavingConfig ? (
+                              <>
+                                <Loader2 className="w-5 h-5 animate-spin" />
+                                প্রসেসিং...
+                              </>
+                            ) : (
+                              <>
+                                <Plus className="w-5 h-5" /> ম্যানুয়ালি সেটআপ করুন
+                              </>
+                            )}
+                          </button>
+                          
+                          <button
+                            onClick={() => setIsExtractionModalOpen(true)}
+                            className="px-6 py-3 bg-white text-indigo-600 border-2 border-indigo-100 rounded-2xl text-sm font-bold flex items-center gap-2 hover:bg-indigo-50 hover:border-indigo-200 transition-all font-bengali"
+                          >
+                            <ImageIcon className="w-5 h-5" /> প্রশ্নপত্র স্ক্যান করুন
+                          </button>
+                        </div>
                       </div>
                     ) : (
                       <div className="space-y-8">
@@ -442,22 +568,30 @@ export function AIPaperEvaluator() {
                             <h3 className="text-lg font-bold text-gray-900 font-bengali">প্রশ্ন ও মূল্যায়ন নীতিমালা</h3>
                             <p className="text-gray-500 text-xs font-medium">প্রতিটি প্রশ্নের জন্য সঠিক উত্তর এবং মূল্যায়ন নীতিমালা লিখুন।</p>
                           </div>
-                          <button
-                            onClick={() => {
-                              const newQuestions = [...config.questions, {
-                                id: Math.random().toString(36).substr(2, 9),
-                                number: (config.questions.length + 1).toString(),
-                                text: '',
-                                maxMarks: 5,
-                                expectedAnswer: '',
-                                gradingRubric: 'বানান বা তথ্যে ভুল করলে নাম্বার কাটুন।'
-                              }];
-                              handleUpdateConfig(newQuestions);
-                            }}
-                            className="p-2 bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-100 transition-all"
-                          >
-                            <Plus className="w-5 h-5" />
-                          </button>
+                          <div className="flex items-center gap-3">
+                            <button
+                              onClick={() => setIsExtractionModalOpen(true)}
+                              className="px-4 py-2 bg-indigo-50 text-indigo-600 rounded-xl text-xs font-bold flex items-center gap-2 hover:bg-indigo-100 transition-all font-bengali"
+                            >
+                              <ImageIcon className="w-4 h-4" /> প্রশ্নপত্র স্ক্যান করুন
+                            </button>
+                            <button
+                              onClick={() => {
+                                const newQuestions = [...config.questions, {
+                                  id: Math.random().toString(36).substr(2, 9),
+                                  number: (config.questions.length + 1).toString(),
+                                  text: '',
+                                  maxMarks: 5,
+                                  expectedAnswer: '',
+                                  gradingRubric: 'বানান বা তথ্যে ভুল করলে নাম্বার কাটুন।'
+                                }];
+                                handleUpdateConfig(newQuestions);
+                              }}
+                              className="p-2 bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-100 transition-all"
+                            >
+                              <Plus className="w-5 h-5" />
+                            </button>
+                          </div>
                         </div>
 
                         <div className="space-y-4">
@@ -635,6 +769,96 @@ export function AIPaperEvaluator() {
         </div>
       </div>
 
+      {/* Question Extraction Modal */}
+      <Modal
+        isOpen={isExtractionModalOpen}
+        onClose={() => setIsExtractionModalOpen(false)}
+        title="প্রশ্নপত্র স্ক্যান করুন (AI Question Extract)"
+        maxWidth="2xl"
+      >
+        <div className="space-y-6 p-4">
+          <div className="bg-indigo-50 p-6 rounded-2xl text-center space-y-3">
+            <div className="p-3 bg-white rounded-full w-fit mx-auto shadow-sm">
+              <ImageIcon className="w-8 h-8 text-indigo-600" />
+            </div>
+            <h3 className="font-bold text-indigo-900 font-bengali">প্রশ্নপত্রের ছবি আপলোড করুন</h3>
+            <p className="text-xs text-indigo-600 font-medium">আপনার প্রশ্নপত্রটি স্ক্যান বা ছবি তুলে এখানে দিন। AI স্বয়ংক্রিয়ভাবে প্রশ্নগুলো এক্সট্রাক্ট করে ড্রাফট তৈরি করবে।</p>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            {extractionImages.map((img, idx) => (
+              <div key={idx} className="aspect-[3/4] rounded-2xl bg-gray-100 relative group overflow-hidden border border-gray-100 flex items-center justify-center">
+                {img.includes('application/pdf') ? (
+                  <div className="flex flex-col items-center gap-2 text-indigo-400">
+                    <FileText className="w-12 h-12" />
+                    <span className="text-[10px] font-bold">PDF Document</span>
+                  </div>
+                ) : (
+                  <img src={img} className="w-full h-full object-cover" />
+                )}
+                <button
+                  onClick={() => setExtractionImages(prev => prev.filter((_, i) => i !== idx))}
+                  className="absolute top-2 right-2 p-1.5 bg-red-500 text-white rounded-lg opacity-0 group-hover:opacity-100 transition-all shadow-lg"
+                >
+                  <Trash2 className="w-3 h-3" />
+                </button>
+              </div>
+            ))}
+            <label className="aspect-[3/4] rounded-2xl border-2 border-dashed border-indigo-100 bg-indigo-50/20 flex flex-col items-center justify-center gap-2 cursor-pointer hover:bg-indigo-50/50 transition-all">
+              <Camera className="w-8 h-8 text-indigo-400" />
+              <span className="text-[10px] font-black text-indigo-700 uppercase tracking-widest text-center">Add Page</span>
+              <input 
+                type="file" 
+                multiple 
+                accept="image/*,application/pdf" 
+                className="hidden" 
+                onChange={(e) => {
+                  const files = e.target.files;
+                  if (!files) return;
+                  Array.from(files).forEach(file => {
+                    const reader = new FileReader();
+                    reader.onloadend = () => setExtractionImages(prev => [...prev, reader.result as string]);
+                    reader.readAsDataURL(file);
+                  });
+                }} 
+              />
+            </label>
+          </div>
+
+          {error && (
+            <div className="p-4 bg-red-50 border border-red-100 rounded-2xl flex items-center gap-3 text-red-600 text-sm font-medium">
+              <AlertCircle className="w-5 h-5 flex-shrink-0" />
+              <p>{error}</p>
+            </div>
+          )}
+
+          <div className="flex gap-4">
+            <button
+              onClick={() => setIsExtractionModalOpen(false)}
+              className="flex-1 px-6 py-3 bg-gray-50 text-gray-500 rounded-2xl font-bold font-bengali hover:bg-gray-100 transition-all"
+            >
+              বন্ধ করুন
+            </button>
+            <button
+              disabled={extractionImages.length === 0 || isExtracting}
+              onClick={handleExtractQuestions}
+              className="flex-[2] px-6 py-3 bg-indigo-600 text-white rounded-2xl font-bold font-bengali hover:bg-indigo-700 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              {isExtracting ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  প্রসেসিং...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-5 h-5" /> এক্সট্রাক্ট শুরু করুন
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
       {/* Main Evaluator Modal */}
       <Modal
         isOpen={isEvaluationModalOpen}
@@ -663,6 +887,12 @@ export function AIPaperEvaluator() {
            </div>
 
            <div className="min-h-[400px]">
+             {error && (
+               <div className="mb-6 p-4 bg-red-50 border border-red-100 rounded-2xl flex items-center gap-3 text-red-600 text-sm font-medium animate-in fade-in slide-in-from-top-2">
+                 <AlertCircle className="w-5 h-5 flex-shrink-0" />
+                 <p>{error}</p>
+               </div>
+             )}
              {evaluationStep === 1 && (
                <div className="space-y-6 animate-in slide-in-from-right-4 duration-300 capitalize">
                  <h3 className="text-center text-lg font-bold text-gray-900 font-bengali mb-8">শিক্ষার্থী সিলেক্ট করুন</h3>

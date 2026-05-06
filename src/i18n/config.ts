@@ -407,6 +407,8 @@ const resources = {
         fees: "Fees",
         attendance: "Attendance",
         offlineExams: "Offline Exams",
+        aiEvaluator: "AI Evaluator",
+        library: "Digital Library",
         institution: "Institution",
         teachers: "Teachers",
         settings: "Settings",
@@ -538,8 +540,9 @@ const resources = {
         },
         profile: {
           title: "Coaching Profile",
-          shareLink: "Share Profile Link",
-          downloadBio: "Download Bio",
+          viewWebsite: "View Website",
+          copyWebsiteLink: "Copy Website Link",
+          quickNotice: "Quick Notice",
           established: "Established",
           stats: {
             students: "Total Students",
@@ -1105,6 +1108,8 @@ bn: {
         fees: "ফি",
         attendance: "উপস্থিতি",
         offlineExams: "অফলাইন পরীক্ষা",
+        aiEvaluator: "এআই খাতা মূল্যায়ন",
+        library: "ডিজিটাল লাইব্রেরি",
         institution: "প্রতিষ্ঠান",
         teachers: "শিক্ষক",
         settings: "সেটিংস",
@@ -1236,8 +1241,9 @@ bn: {
         },
         profile: {
           title: "কোচিং প্রোফাইল",
-          shareLink: "প্রোফাইল লিঙ্ক শেয়ার করুন",
-          downloadBio: "বায়ো ডাউনলোড করুন",
+          viewWebsite: "ওয়েবসাইট দেখুন",
+          copyWebsiteLink: "ওয়েবসাইট লিঙ্ক কপি করুন",
+          quickNotice: "দ্রুত নোটিশ",
           established: "প্রতিষ্ঠিত",
           stats: {
             students: "মোট ছাত্র",

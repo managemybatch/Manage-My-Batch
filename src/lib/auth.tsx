@@ -19,6 +19,7 @@ interface UserProfile {
   photoURL: string;
   role: 'admin' | 'teacher' | 'staff' | 'super_admin';
   isSuperAdmin?: boolean;
+  teacherId?: string;
   institution?: string;
   institutionId?: string;
   subscriptionPlan?: 'free' | 'basic' | 'standard' | 'advanced';
@@ -28,6 +29,8 @@ interface UserProfile {
   phone?: string;
   institutionName?: string;
   monthlySmsSent?: number;
+  aiCredits?: number;
+  hasReceivedInitialCredits?: boolean;
 }
 
 interface AuthContextType {
@@ -51,8 +54,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     testConnection();
     let unsubscribeDoc: (() => void) | null = null;
+    
+    // Safety timeout to prevent infinite loading if Firebase initialization hangs
+    const loadingTimeout = setTimeout(() => {
+      if (loading) {
+        console.warn("Auth initialization timed out after 10 seconds. Forcing loading to false.");
+        setLoading(false);
+      }
+    }, 10000);
 
     const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
+      clearTimeout(loadingTimeout);
       if (firebaseUser) {
         // Listen for user profile changes in Firestore
         unsubscribeDoc = onSnapshot(doc(db, 'users', firebaseUser.uid), async (userDoc) => {
@@ -114,6 +126,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 isSuperAdmin,
                 institutionId: firebaseUser.uid,
                 subscriptionPlan: 'free',
+                aiCredits: 50,
+                hasReceivedInitialCredits: true,
                 dismissedNotifications: []
               };
               await setDoc(doc(db, 'users', firebaseUser.uid), newProfile);
@@ -171,6 +185,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         institution: institutionName,
         institutionId: firebaseUser.uid,
         subscriptionPlan: 'free',
+        aiCredits: 50,
+        hasReceivedInitialCredits: true,
         dismissedNotifications: []
       };
       

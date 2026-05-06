@@ -307,7 +307,11 @@ export function Institution() {
 
     // Fetch Batches
     const unsubBatchesList = onSnapshot(query(collection(db, 'batches'), where('institutionId', '==', instId)), (s) => {
-      setBatches(s.docs.map(d => ({ id: d.id, ...d.data() })));
+      let batchData = s.docs.map(d => ({ id: d.id, ...d.data() }));
+      if (user?.role === 'teacher' && user.teacherId) {
+        batchData = batchData.filter((b: any) => b.classTeacherId === user.teacherId);
+      }
+      setBatches(batchData);
     });
 
     return () => {
@@ -693,18 +697,28 @@ export function Institution() {
         </div>
         <div className="flex items-center gap-3">
           <button 
-            onClick={shareProfile}
-            className="flex items-center gap-2 px-4 py-2.5 bg-indigo-50 text-indigo-700 font-bold rounded-xl hover:bg-indigo-100 transition-all"
+            onClick={() => {
+              const instId = user?.institutionId || user?.uid;
+              const url = institution?.slug 
+                ? `${window.location.origin}/i/${institution.slug}`
+                : `${window.location.origin}/public/institution/${instId}`;
+              window.open(url, '_blank');
+            }}
+            className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100"
           >
-            <Share2 className="w-4 h-4" /> {t('institution.profile.shareLink')}
+            <ExternalLink className="w-4 h-4" /> {t('institution.profile.viewWebsite')}
           </button>
           <button 
-            onClick={downloadBio}
-            disabled={downloading}
-            className="flex items-center gap-2 px-4 py-2.5 bg-gray-900 text-white font-bold rounded-xl hover:bg-gray-800 disabled:opacity-50 transition-all shadow-lg shadow-gray-200"
+            onClick={shareProfile}
+            className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 text-gray-700 font-bold rounded-xl hover:bg-gray-50 transition-all shadow-sm"
           >
-            {downloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-            {downloading ? 'Generating...' : t('institution.profile.downloadBio')}
+            <Clipboard className="w-4 h-4" /> {t('institution.profile.copyWebsiteLink')}
+          </button>
+          <button 
+            onClick={() => setShowNoticeModal(true)}
+            className="flex items-center gap-2 px-4 py-2.5 bg-amber-500 text-white font-bold rounded-xl hover:bg-amber-600 transition-all shadow-lg shadow-amber-100"
+          >
+            <Megaphone className="w-4 h-4" /> {t('institution.profile.quickNotice')}
           </button>
         </div>
       </div>

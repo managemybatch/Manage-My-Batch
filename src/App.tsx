@@ -10,6 +10,7 @@ import { Attendance } from './pages/Attendance';
 import { Batches } from './pages/Batches';
 import { OfflineExams } from './pages/OfflineExams';
 import { AIPaperEvaluator } from './pages/AIPaperEvaluator';
+import { DigitalLibrary } from './pages/DigitalLibrary';
 import { Messages } from './pages/Messages';
 import { Settings } from './pages/Settings';
 import { Institution } from './pages/Institution';
@@ -53,8 +54,12 @@ function AuthenticatedLayout() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 p-6">
+        <div className="w-16 h-16 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mb-6 shadow-xl shadow-indigo-100"></div>
+        <h1 className="text-2xl font-black text-indigo-900 tracking-tight italic mb-2">Manage My Batch</h1>
+        <p className="text-gray-500 font-bold uppercase tracking-widest text-[10px] animate-pulse">
+          {localStorage.getItem('i18nextLng')?.startsWith('bn') ? 'লোড হচ্ছে...' : 'App is loading...'}
+        </p>
       </div>
     );
   }
@@ -94,10 +99,19 @@ function AppRoutes() {
         <Route path="/attendance" element={<Attendance />} />
         <Route path="/offline-exams" element={<OfflineExams />} />
         <Route path="/ai-evaluator" element={<AIPaperEvaluator />} />
+        <Route path="/library" element={<DigitalLibrary />} />
         <Route path="/messages" element={<Messages />} />
         <Route path="/institution" element={<Institution />} />
-        <Route path="/teachers" element={<Teachers />} />
-        <Route path="/marketing" element={<Marketing />} />
+
+        {/* Admin only routes */}
+        {(user?.role === 'admin' || user?.isSuperAdmin) && (
+          <>
+            <Route path="/fees" element={<Fees />} />
+            <Route path="/teachers" element={<Teachers />} />
+            <Route path="/marketing" element={<Marketing />} />
+          </>
+        )}
+
         <Route path="/settings" element={<Settings />} />
         <Route path="/help" element={<Help />} />
         <Route path="/support" element={<SupportChat />} />

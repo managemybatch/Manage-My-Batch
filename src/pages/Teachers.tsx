@@ -22,6 +22,7 @@ interface Teacher {
   paymentStatus: 'paid' | 'unpaid';
   joinDate: string;
   photoURL?: string;
+  hasAccount?: boolean;
 }
 
 interface Schedule {
@@ -123,6 +124,9 @@ export function Teachers() {
   const [selectedApplication, setSelectedApplication] = useState<JobApplication | null>(null);
   const [showCopyToast, setShowCopyToast] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [showCreateAccountModal, setShowCreateAccountModal] = useState(false);
+  const [selectedTeacherForAccount, setSelectedTeacherForAccount] = useState<Teacher | null>(null);
+  const [accountPassword, setAccountPassword] = useState('');
 
   useEffect(() => {
     if (toast) {
@@ -158,7 +162,9 @@ export function Teachers() {
             salary: t.salary,
             paymentStatus: t.paymentStatus,
             joinDate: t.joinDate,
-            photoURL: t.photoUrl
+            photoURL: t.photoUrl,
+            hasAccount: t.hasAccount,
+            accountId: t.accountId
           };
         });
         setTeachers(mappedTeachers as Teacher[]);
@@ -412,6 +418,7 @@ export function Teachers() {
           paymentStatus: 'unpaid',
           joinDate: new Date().toISOString().split('T')[0],
           institutionId: instId,
+          hasAccount: false,
           createdAt: serverTimestamp()
         });
       }
@@ -421,6 +428,43 @@ export function Teachers() {
       console.error('Teacher save error:', error);
       handleFirestoreError(error, OperationType.WRITE, 'teachers');
       setToast({ message: error.message || 'Failed to save teacher.', type: 'error' });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleTeacherCreateAccount = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedTeacherForAccount || !accountPassword || isSaving) return;
+    
+    setIsSaving(true);
+    try {
+      const uid = await createStaffAccount(selectedTeacherForAccount.email, accountPassword);
+      
+      // Create user profile
+      const instId = user?.institutionId || user?.uid;
+      await setDoc(doc(db, 'users', uid), {
+        uid,
+        email: selectedTeacherForAccount.email.toLowerCase(),
+        displayName: selectedTeacherForAccount.name,
+        role: 'teacher',
+        teacherId: selectedTeacherForAccount.id,
+        institutionId: instId,
+        institutionName: user?.institutionName || '',
+        createdAt: serverTimestamp()
+      });
+
+      // Link teacher doc
+      await updateDoc(doc(db, 'teachers', selectedTeacherForAccount.id), {
+        hasAccount: true,
+        accountId: uid
+      });
+
+      setToast({ message: 'Teacher account created successfully!', type: 'success' });
+      setShowCreateAccountModal(false);
+      setAccountPassword('');
+    } catch (error: any) {
+      setToast({ message: error.message || 'Failed to create account.', type: 'error' });
     } finally {
       setIsSaving(false);
     }
@@ -716,7 +760,24 @@ export function Teachers() {
                             {teacher.name.charAt(0)}
                           </div>
                           <div>
-                            <h4 className="font-bold text-gray-900">{teacher.name}</h4>
+                            <div className="flex items-center gap-2">
+                              <h4 className="font-bold text-gray-900">{teacher.name}</h4>
+                              {teacher.hasAccount ? (
+                                <div className="w-4 h-4 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center" title="Has Login Account">
+                                  <CheckCircle2 className="w-3 h-3" />
+                                </div>
+                              ) : (
+                                <button 
+                                  onClick={() => {
+                                    setSelectedTeacherForAccount(teacher);
+                                    setShowCreateAccountModal(true);
+                                  }}
+                                  className="text-[10px] font-bold text-indigo-600 hover:underline"
+                                >
+                                  Create Account
+                                </button>
+                              )}
+                            </div>
                             <p className="text-xs text-indigo-600 font-bold uppercase tracking-wider">{teacher.subject}</p>
                           </div>
                         </div>
@@ -1658,6 +1719,61 @@ export function Teachers() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <Modal
+        isOpen={showCreateAccountModal}
+        onClose={() => setShowCreateAccountModal(false)}
+        title="Create Teacher Login Account"
+      >
+        <div className="p-6 space-y-6">
+          <div className="bg-indigo-50 p-4 rounded-xl flex gap-3 text-indigo-700">
+            <Info className="w-5 h-5 shrink-0" />
+            <p className="text-sm font-medium">This will create a dedicated login account for <strong>{selectedTeacherForAccount?.name}</strong>. They can use their email to login and manage their assigned batches.</p>
+          </div>
+
+          <form onSubmit={handleTeacherCreateAccount} className="space-y-4">
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">Email (Immutable)</label>
+              <input 
+                type="email" 
+                value={selectedTeacherForAccount?.email}
+                disabled
+                className="w-full px-4 py-3 bg-gray-100 border border-gray-200 rounded-xl text-sm font-bold text-gray-500 cursor-not-allowed"
+              />
+            </div>
+            
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">Set Password</label>
+              <input 
+                type="password" 
+                required
+                value={accountPassword}
+                onChange={(e) => setAccountPassword(e.target.value)}
+                placeholder="Enter strong password..."
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all font-mono"
+              />
+            </div>
+
+            <div className="flex gap-4 pt-4">
+              <button 
+                type="button"
+                onClick={() => setShowCreateAccountModal(false)}
+                className="flex-1 py-3 bg-gray-100 text-gray-600 font-bold rounded-xl hover:bg-gray-200 transition-all"
+              >
+                Cancel
+              </button>
+              <button 
+                type="submit"
+                disabled={isSaving}
+                className="flex-[2] py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 flex items-center justify-center gap-2"
+              >
+                {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
+                Create Account
+              </button>
+            </div>
+          </form>
+        </div>
+      </Modal>
 
       <ConfirmModal
         isOpen={isDeleteModalOpen}

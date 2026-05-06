@@ -216,11 +216,17 @@ export function Dashboard() {
     }
 
     // Fetch all fees
-    const qFees = query(
+    let qFees = query(
       collection(db, 'fees'),
       where('institutionId', '==', instId)
     );
+    
+    // If teacher, they shouldn't see all fees, but for stats calculation we might need to hide it anyway
     const unsubFees = onSnapshot(qFees, (snapshot) => {
+      if (user.role === 'teacher') {
+        setStats(prev => ({ ...prev, totalCollected: 0 }));
+        return;
+      }
       const feeData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setFees(feeData);
       
@@ -231,67 +237,96 @@ export function Dashboard() {
       setStats(prev => ({ ...prev, totalCollected }));
     });
 
-    // Fetch all students
-    const qStudents = query(
-      collection(db, 'students'),
-      where('institutionId', '==', instId)
-    );
-    const unsubStudents = onSnapshot(qStudents, (snapshot) => {
-      const studentData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setStudents(studentData);
-      setStats(prev => ({ ...prev, students: studentData.length }));
-    });
-
+    // Fetch batches first to get assigned IDs for teachers
     const qBatches = query(
       collection(db, 'batches'),
       where('institutionId', '==', instId)
     );
+    
     const unsubBatches = onSnapshot(qBatches, (snapshot) => {
-      setStats(prev => ({ ...prev, batches: snapshot.size }));
-    });
-
-    const qExams = query(
-      collection(db, 'offline_exams'),
-      where('institutionId', '==', instId)
-    );
-    const unsubExams = onSnapshot(qExams, (snapshot) => {
-      setStats(prev => ({ ...prev, offlineExams: snapshot.size }));
-      const pending = snapshot.docs.filter(doc => doc.data().status === 'pending').length;
-      setStats(prev => ({ ...prev, pendingResults: pending }));
+      let batchData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      let assignedBatchIds: string[] = [];
       
-      const recent = snapshot.docs
-        .map(doc => ({ id: doc.id, ...doc.data() }))
-        .sort((a: any, b: any) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0))
-        .slice(0, 5);
-      setRecentExams(recent);
-    });
-
-    const qAttendance = query(
-      collection(db, 'attendance'),
-      where('institutionId', '==', instId)
-    );
-    const unsubAttendance = onSnapshot(qAttendance, (snapshot) => {
-      if (snapshot.size > 0) {
-        const present = snapshot.docs.filter(doc => doc.data().status === 'present').length;
-        const rate = Math.round((present / snapshot.size) * 100);
-        setStats(prev => ({ ...prev, attendanceRate: rate }));
+      if (user.role === 'teacher' && user.teacherId) {
+        batchData = batchData.filter((b: any) => b.classTeacherId === user.teacherId);
+        assignedBatchIds = batchData.map(b => b.id);
       }
       
-      const recent = snapshot.docs
-        .map(doc => ({ id: doc.id, ...doc.data() }))
-        .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())
-        .slice(0, 5);
-      setRecentAttendance(recent);
+      setStats(prev => ({ ...prev, batches: batchData.length }));
+
+      // Now fetch students and filter if teacher
+      const qStudents = query(
+        collection(db, 'students'),
+        where('institutionId', '==', instId)
+      );
+      
+      const unsubStudents = onSnapshot(qStudents, (s) => {
+        let studentData = s.docs.map(d => ({ id: d.id, ...d.data() }));
+        if (user.role === 'teacher') {
+          studentData = studentData.filter((st: any) => assignedBatchIds.includes(st.batchId));
+        }
+        setStudents(studentData);
+        setStats(prev => ({ ...prev, students: studentData.length }));
+      });
+
+      // Fetch exams and filter if teacher
+      const qExams = query(
+        collection(db, 'offline_exams'),
+        where('institutionId', '==', instId)
+      );
+      const unsubExams = onSnapshot(qExams, (snap) => {
+        let examData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        if (user.role === 'teacher') {
+          examData = examData.filter((e: any) => assignedBatchIds.includes(e.batchId));
+        }
+        
+        setStats(prev => ({ ...prev, offlineExams: examData.length }));
+        const pending = examData.filter((e: any) => e.status === 'pending').length;
+        setStats(prev => ({ ...prev, pendingResults: pending }));
+        
+        const recent = examData
+          .sort((a: any, b: any) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0))
+          .slice(0, 5);
+        setRecentExams(recent);
+      });
+
+      // Fetch attendance and filter if teacher
+      const qAttendance = query(
+        collection(db, 'attendance'),
+        where('institutionId', '==', instId)
+      );
+      const unsubAttendance = onSnapshot(qAttendance, (snap) => {
+        let attData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        if (user.role === 'teacher') {
+          attData = attData.filter((a: any) => assignedBatchIds.includes(a.batchId));
+        }
+        
+        if (attData.length > 0) {
+          const present = attData.filter((a: any) => a.status === 'present').length;
+          const rate = Math.round((present / attData.length) * 100);
+          setStats(prev => ({ ...prev, attendanceRate: rate }));
+        } else {
+          setStats(prev => ({ ...prev, attendanceRate: 0 }));
+        }
+        
+        const recent = attData
+          .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())
+          .slice(0, 5);
+        setRecentAttendance(recent);
+      });
+
+      return () => {
+        unsubStudents();
+        unsubExams();
+        unsubAttendance();
+      };
     });
 
     setLoading(false);
 
     return () => {
       unsubFees();
-      unsubStudents();
       unsubBatches();
-      unsubExams();
-      unsubAttendance();
     };
   }, [user]);
 
@@ -445,7 +480,7 @@ export function Dashboard() {
       )}
 
       {/* Due List Red Notice */}
-      {studentsWithDues.length > 0 && (
+      {user?.role === 'admin' && studentsWithDues.length > 0 && (
         <motion.div 
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
@@ -475,7 +510,7 @@ export function Dashboard() {
 
       {/* System Notifications */}
       <AnimatePresence>
-        {(systemNotifications.length > 0 || expiryNotification || holidayNotification) && (
+        {(systemNotifications.length > 0 || (user?.role === 'admin' && (expiryNotification || holidayNotification))) && (
           <div className="space-y-4">
             <h3 className="text-sm font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2 px-2">
               <Bell className="w-4 h-4" /> {t('common.notifications')}
@@ -628,57 +663,59 @@ export function Dashboard() {
       )}
 
       {/* Batch Creation & Upgrade Prompt */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-indigo-600 rounded-2xl p-4 md:p-6 text-white relative overflow-hidden shadow-lg shadow-indigo-100"
-        >
-          <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 opacity-50" />
-          <div className="relative z-10 flex flex-col gap-3">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-white/20 backdrop-blur-md rounded-lg flex items-center justify-center flex-shrink-0">
-                <Plus className="w-4 h-4" />
+      {user?.role === 'admin' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-indigo-600 rounded-2xl p-4 md:p-6 text-white relative overflow-hidden shadow-lg shadow-indigo-100"
+          >
+            <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 opacity-50" />
+            <div className="relative z-10 flex flex-col gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 bg-white/20 backdrop-blur-md rounded-lg flex items-center justify-center flex-shrink-0">
+                  <Plus className="w-4 h-4" />
+                </div>
+                <h2 className="text-base font-bold leading-tight">{t('dashboard.startBatchTitle')}</h2>
               </div>
-              <h2 className="text-base font-bold leading-tight">{t('dashboard.startBatchTitle')}</h2>
+              <p className="text-indigo-100 text-xs opacity-90 line-clamp-1">
+                {t('dashboard.startBatchDesc')}
+              </p>
+              <Link 
+                to="/batches"
+                className="w-fit px-4 py-2 bg-white text-indigo-600 rounded-lg font-bold hover:bg-indigo-50 transition-all shadow-md flex items-center gap-2 text-xs"
+              >
+                <Plus className="w-3 h-3" /> {t('dashboard.createBatch')}
+              </Link>
             </div>
-            <p className="text-indigo-100 text-xs opacity-90 line-clamp-1">
-              {t('dashboard.startBatchDesc')}
-            </p>
-            <Link 
-              to="/batches"
-              className="w-fit px-4 py-2 bg-white text-indigo-600 rounded-lg font-bold hover:bg-indigo-50 transition-all shadow-md flex items-center gap-2 text-xs"
-            >
-              <Plus className="w-3 h-3" /> {t('dashboard.createBatch')}
-            </Link>
-          </div>
-        </motion.div>
+          </motion.div>
 
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-gradient-to-br from-amber-500 to-orange-600 rounded-2xl p-4 md:p-6 text-white relative overflow-hidden shadow-lg shadow-amber-100"
-        >
-          <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 opacity-50" />
-          <div className="relative z-10 flex flex-col gap-3">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-white/20 backdrop-blur-md rounded-lg flex items-center justify-center flex-shrink-0">
-                <Zap className="w-4 h-4 fill-white" />
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-gradient-to-br from-amber-500 to-orange-600 rounded-2xl p-4 md:p-6 text-white relative overflow-hidden shadow-lg shadow-amber-100"
+          >
+            <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 opacity-50" />
+            <div className="relative z-10 flex flex-col gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 bg-white/20 backdrop-blur-md rounded-lg flex items-center justify-center flex-shrink-0">
+                  <Zap className="w-4 h-4 fill-white" />
+                </div>
+                <h2 className="text-base font-bold leading-tight">{t('Upgrade to Premium')}</h2>
               </div>
-              <h2 className="text-base font-bold leading-tight">{t('Upgrade to Premium')}</h2>
+              <p className="text-amber-50 text-xs opacity-90 line-clamp-1">
+                {t('Unlock limits & premium features.')}
+              </p>
+              <button 
+                onClick={() => setIsUpgradeModalOpen(true)}
+                className="w-fit px-4 py-2 bg-white text-amber-600 rounded-lg font-bold hover:bg-amber-50 transition-all shadow-md flex items-center gap-2 text-xs"
+              >
+                <Zap className="w-3 h-3 fill-amber-600" /> {t('Upgrade Now')}
+              </button>
             </div>
-            <p className="text-amber-50 text-xs opacity-90 line-clamp-1">
-              {t('Unlock limits & premium features.')}
-            </p>
-            <button 
-              onClick={() => setIsUpgradeModalOpen(true)}
-              className="w-fit px-4 py-2 bg-white text-amber-600 rounded-lg font-bold hover:bg-amber-50 transition-all shadow-md flex items-center gap-2 text-xs"
-            >
-              <Zap className="w-3 h-3 fill-amber-600" /> {t('Upgrade Now')}
-            </button>
-          </div>
-        </motion.div>
-      </div>
+          </motion.div>
+        </div>
+      )}
 
       {/* Stats Grid */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-3 md:gap-4">
@@ -687,80 +724,108 @@ export function Dashboard() {
         <StatItem label={t('dashboard.stats.offlineExams')} value={stats.offlineExams} icon={FileText} color="amber" to="/offline-exams" />
         <StatItem label={t('dashboard.stats.pendingResults')} value={stats.pendingResults} icon={AlertCircle} color="rose" to="/offline-exams" />
         <StatItem label={t('dashboard.stats.attendanceRate')} value={`${stats.attendanceRate}%`} icon={ClipboardCheck} color="indigo" to="/attendance" />
-        <StatItem label={t('dashboard.stats.totalCollected')} value={formatCurrency(stats.totalCollected)} icon={CreditCard} color="emerald" to="/fees" />
-        <StatItem label={t('dashboard.stats.studentsWithDues')} value={studentsWithDues.length} icon={AlertCircle} color="rose" to="/fees?tab=dues" />
+        {user?.role === 'admin' && (
+          <>
+            <StatItem label={t('dashboard.stats.totalCollected')} value={formatCurrency(stats.totalCollected)} icon={CreditCard} color="emerald" to="/fees" />
+            <StatItem label={t('dashboard.stats.studentsWithDues')} value={studentsWithDues.length} icon={AlertCircle} color="rose" to="/fees?tab=dues" />
+          </>
+        )}
       </div>
 
       {/* Plan Usage Section */}
-      <div className="bg-white rounded-3xl p-8 border border-gray-100 shadow-sm">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-600">
-              <Zap className="w-6 h-6 fill-indigo-600" />
-            </div>
-            <div>
-              <h3 className="text-xl font-bold text-gray-900">{t('Subscription Plan')}</h3>
-              <p className="text-sm text-gray-500 font-medium">
-                {t('Current Plan')}: <span className="text-indigo-600 font-bold uppercase">{user?.subscriptionPlan || 'Free'}</span>
-              </p>
-            </div>
-          </div>
-          <button 
-            onClick={() => setIsUpgradeModalOpen(true)}
-            className="px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 flex items-center gap-2"
-          >
-            <Zap className="w-4 h-4 fill-white" /> {t('Upgrade Plan')}
-          </button>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {/* Student Limit */}
-          <div className="space-y-3">
-            <div className="flex justify-between items-end">
-              <div>
-                <p className="text-sm font-bold text-gray-900">{t('Student Limit')}</p>
-                <p className="text-xs text-gray-500 font-medium">{stats.students} / {currentPlan.studentLimit} {t('Students')}</p>
+      {user?.role === 'admin' && (
+        <div className="bg-white rounded-3xl p-8 border border-gray-100 shadow-sm">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-600">
+                <Zap className="w-6 h-6 fill-indigo-600" />
               </div>
-              <p className="text-sm font-black text-indigo-600">
-                {Math.round((stats.students / currentPlan.studentLimit) * 100)}%
-              </p>
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">{t('Subscription Plan')}</h3>
+                <p className="text-sm text-gray-500 font-medium">
+                  {t('Current Plan')}: <span className="text-indigo-600 font-bold uppercase">{user?.subscriptionPlan || 'Free'}</span>
+                </p>
+              </div>
             </div>
-            <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
-              <motion.div 
-                initial={{ width: 0 }}
-                animate={{ width: `${Math.min(100, (stats.students / currentPlan.studentLimit) * 100)}%` }}
-                className={cn(
-                  "h-full transition-all duration-1000",
-                  (stats.students / currentPlan.studentLimit) > 0.9 ? "bg-rose-500" : "bg-indigo-600"
-                )}
-              />
-            </div>
+            <button 
+              onClick={() => setIsUpgradeModalOpen(true)}
+              className="px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 flex items-center gap-2"
+            >
+              <Zap className="w-4 h-4 fill-white" /> {t('Upgrade Plan')}
+            </button>
           </div>
 
-          {/* Batch Limit */}
-          <div className="space-y-3">
-            <div className="flex justify-between items-end">
-              <div>
-                <p className="text-sm font-bold text-gray-900">{t('Batch Limit')}</p>
-                <p className="text-xs text-gray-500 font-medium">{stats.batches} / {currentPlan.batchLimit} {t('Batches')}</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            {/* Student Limit */}
+            <div className="space-y-3">
+              <div className="flex justify-between items-end">
+                <div>
+                  <p className="text-sm font-bold text-gray-900">{t('Student Limit')}</p>
+                  <p className="text-xs text-gray-500 font-medium">{stats.students} / {currentPlan.studentLimit} {t('Students')}</p>
+                </div>
+                <p className="text-sm font-black text-indigo-600">
+                  {Math.round((stats.students / currentPlan.studentLimit) * 100)}%
+                </p>
               </div>
-              <p className="text-sm font-black text-emerald-600">
-                {Math.round((stats.batches / currentPlan.batchLimit) * 100)}%
-              </p>
+              <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
+                <motion.div 
+                  initial={{ width: 0 }}
+                  animate={{ width: `${Math.min(100, (stats.students / currentPlan.studentLimit) * 100)}%` }}
+                  className={cn(
+                    "h-full transition-all duration-1000",
+                    (stats.students / currentPlan.studentLimit) > 0.9 ? "bg-rose-500" : "bg-indigo-600"
+                  )}
+                />
+              </div>
             </div>
-            <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
-              <motion.div 
-                initial={{ width: 0 }}
-                animate={{ width: `${Math.min(100, (stats.batches / currentPlan.batchLimit) * 100)}%` }}
-                className={cn(
-                  "h-full transition-all duration-1000",
-                  (stats.batches / currentPlan.batchLimit) > 0.9 ? "bg-rose-500" : "bg-emerald-600"
-                )}
-              />
+
+            {/* AI Credits Limit */}
+            <div className="space-y-3">
+              <div className="flex justify-between items-end">
+                <div>
+                  <p className="text-sm font-bold text-gray-900">{t('AI Credits Usage')}</p>
+                  <p className="text-xs text-gray-500 font-medium">{user?.aiCredits || 0} {t('Credits Remaining')}</p>
+                </div>
+                <div className="text-right">
+                   <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">{t('Limit')}: {currentPlan.aiCreditLimit}</p>
+                </div>
+              </div>
+              <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
+                <motion.div 
+                  initial={{ width: 0 }}
+                  animate={{ width: `${Math.min(100, ((user?.aiCredits || 0) / currentPlan.aiCreditLimit) * 100)}%` }}
+                  className={cn(
+                    "h-full transition-all duration-1000 bg-purple-600"
+                  )}
+                />
+              </div>
+            </div>
+
+            {/* Batch Limit */}
+            <div className="space-y-3">
+              <div className="flex justify-between items-end">
+                <div>
+                  <p className="text-sm font-bold text-gray-900">{t('Batch Limit')}</p>
+                  <p className="text-xs text-gray-500 font-medium">{stats.batches} / {currentPlan.batchLimit} {t('Batches')}</p>
+                </div>
+                <p className="text-sm font-black text-emerald-600">
+                  {Math.round((stats.batches / currentPlan.batchLimit) * 100)}%
+                </p>
+              </div>
+              <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
+                <motion.div 
+                  initial={{ width: 0 }}
+                  animate={{ width: `${Math.min(100, (stats.batches / currentPlan.batchLimit) * 100)}%` }}
+                  className={cn(
+                    "h-full transition-all duration-1000",
+                    (stats.batches / currentPlan.batchLimit) > 0.9 ? "bg-rose-500" : "bg-emerald-600"
+                  )}
+                />
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Quick Actions */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -778,13 +843,15 @@ export function Dashboard() {
           to="/offline-exams" 
           color="bg-amber-50 text-amber-600"
         />
-        <QuickAction 
-          title={t('dashboard.quickActions.feeManagement')} 
-          description={t('dashboard.quickActions.feeManagementDesc')} 
-          icon={CreditCard} 
-          to="/fees" 
-          color="bg-rose-50 text-rose-600"
-        />
+        {user?.role === 'admin' && (
+          <QuickAction 
+            title={t('dashboard.quickActions.feeManagement')} 
+            description={t('dashboard.quickActions.feeManagementDesc')} 
+            icon={CreditCard} 
+            to="/fees" 
+            color="bg-rose-50 text-rose-600"
+          />
+        )}
         <QuickAction 
           title={t('dashboard.quickActions.students')} 
           description={t('dashboard.quickActions.studentsDesc')} 

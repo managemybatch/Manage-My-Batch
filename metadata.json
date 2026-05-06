@@ -1,5 +1,7 @@
 {
   "name": "Manage My Batch",
   "description": "Comprehensive Education Management System for Schools, Madrasas, and Coaching Centers. Manage students, automated fee collection, digital attendance, and exam results in one platform.",
-  "requestFramePermissions": []
+  "requestFramePermissions": [
+    "camera"
+  ]
 }

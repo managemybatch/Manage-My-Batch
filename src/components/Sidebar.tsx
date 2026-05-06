@@ -19,7 +19,7 @@ import {
   ShieldCheck,
   Building2,
   Bell,
-  Lock as LucideLock
+  Library
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useAuth } from '../lib/auth';
@@ -72,7 +72,8 @@ export function Sidebar() {
     { icon: Users, label: t('nav.students'), path: '/students' },
     { icon: ClipboardCheck, label: t('nav.attendance'), path: '/attendance' },
     { icon: GraduationCap, label: t('nav.offlineExams'), path: '/offline-exams' },
-    { icon: Sparkles, label: i18n?.language === 'bn' ? 'এআই খাতা মূল্যায়ন' : 'AI Evaluator', path: '/ai-evaluator' },
+    { icon: Sparkles, label: t('nav.aiEvaluator'), path: '/ai-evaluator' },
+    { icon: Library, label: t('nav.library'), path: '/library' },
     { icon: MessageSquare, label: t('nav.messages'), path: '/messages' },
     { icon: CreditCard, label: t('nav.fees'), path: '/fees' },
     { icon: School, label: t('nav.institution'), path: '/institution' },
@@ -80,6 +81,19 @@ export function Sidebar() {
     { icon: Zap, label: t('nav.marketing'), path: '/marketing', badge: birthdayCount > 0 ? birthdayCount : undefined },
     { icon: Settings, label: t('nav.settings'), path: '/settings' },
     { icon: HelpCircle, label: t('Help'), path: '/help' },
+  ];
+
+  const teacherItems: NavItem[] = [
+    { icon: LayoutDashboard, label: t('nav.dashboard'), path: '/dashboard' },
+    { icon: Layers, label: t('nav.batches'), path: '/batches' },
+    { icon: Users, label: t('nav.students'), path: '/students' },
+    { icon: ClipboardCheck, label: t('nav.attendance'), path: '/attendance' },
+    { icon: GraduationCap, label: t('nav.offlineExams'), path: '/offline-exams' },
+    { icon: Sparkles, label: t('nav.aiEvaluator'), path: '/ai-evaluator' },
+    { icon: School, label: 'Student Zone', path: '/institution' },
+    { icon: Library, label: t('nav.library'), path: '/library' },
+    { icon: MessageSquare, label: t('nav.messages'), path: '/messages' },
+    { icon: Settings, label: t('nav.settings'), path: '/settings' },
   ];
 
   const superAdminItems: NavItem[] = [
@@ -93,7 +107,11 @@ export function Sidebar() {
     { icon: Settings, label: t('nav.settings'), path: '/settings' },
   ];
 
-  const menuItems = user?.isSuperAdmin ? superAdminItems : regularItems;
+  const menuItems = user?.isSuperAdmin 
+    ? superAdminItems 
+    : user?.role === 'teacher' 
+      ? teacherItems 
+      : regularItems;
 
   return (
     <aside className="hidden lg:flex w-72 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 h-screen flex-col sticky top-0 transition-colors duration-300">
@@ -111,43 +129,26 @@ export function Sidebar() {
       
       <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
         {menuItems.map((item) => (
-          item.path === '/ai-evaluator' ? (
-            <button
-              key={item.path}
-              onClick={() => alert(i18n?.language === 'bn' ? 'শীঘ্রই আসছে (Coming Soon)' : 'Coming Soon')}
-              className="flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 group w-full text-left text-gray-400 dark:text-gray-500 cursor-not-allowed opacity-80"
-            >
-              <item.icon className="w-5 h-5" />
-              <span className="flex-1 flex items-center gap-2">
-                {item.label} 
-                <span className="text-[10px] font-bold px-1.5 py-0.5 bg-gray-100 dark:bg-gray-800 rounded text-gray-500 border border-gray-200 dark:border-gray-700 uppercase tracking-tighter">
-                  {i18n?.language === 'bn' ? 'শীঘ্রই' : 'Soon'}
-                </span>
+          <NavLink
+            key={item.path}
+            to={item.path}
+            className={({ isActive }) =>
+              cn(
+                "flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 group",
+                isActive 
+                  ? "bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 font-medium" 
+                  : "text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-100"
+              )
+            }
+          >
+            <item.icon className={cn("w-5 h-5", "group-hover:scale-110 transition-transform")} />
+            <span className="flex-1">{item.label}</span>
+            {item.badge && (
+              <span className="bg-red-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full min-w-[18px] text-center shadow-lg shadow-red-200 animate-pulse">
+                {item.badge}
               </span>
-              <LucideLock className="w-3.5 h-3.5 opacity-50" />
-            </button>
-          ) : (
-            <NavLink
-              key={item.path}
-              to={item.path}
-              className={({ isActive }) =>
-                cn(
-                  "flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 group",
-                  isActive 
-                    ? "bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 font-medium" 
-                    : "text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-100"
-                )
-              }
-            >
-              <item.icon className={cn("w-5 h-5", "group-hover:scale-110 transition-transform")} />
-              <span className="flex-1">{item.label}</span>
-              {item.badge && (
-                <span className="bg-red-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full min-w-[18px] text-center shadow-lg shadow-red-200 animate-pulse">
-                  {item.badge}
-                </span>
-              )}
-            </NavLink>
-          )
+            )}
+          </NavLink>
         ))}
       </nav>
 

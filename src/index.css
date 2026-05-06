@@ -7,10 +7,24 @@
 @theme {
   --font-sans: "Inter", "Noto Sans Bengali", "Hind Siliguri", ui-sans-serif, system-ui, sans-serif;
   --font-bengali: "Hind Siliguri", "Noto Sans Bengali", sans-serif;
+  --color-brand-primary: #2563eb;
+  --color-brand-secondary: #4f46e5;
+}
+
+@layer utilities {
+  .bg-grid-slate-100 {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32' width='32' height='32' fill='none' stroke='rgb(241 245 249 / 0.1)'%3E%3Cpath d='M0 .5H31.5V32'/%3E%3C/svg%3E");
+  }
+  .bg-dot-slate-200 {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32' width='32' height='32' fill='none' %3E%3Ccircle fill='rgb(226 232 240 / 0.4)' cx='10' cy='10' r='1.5'%3E%3C/circle%3E%3C/svg%3E");
+  }
 }
 
 @layer base {
   html {
     scroll-behavior: smooth;
+  }
+  body {
+    @apply bg-slate-50 text-slate-900 antialiased;
   }
 }

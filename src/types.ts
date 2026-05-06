@@ -27,6 +27,8 @@ export interface Teacher {
   paymentStatus: 'paid' | 'unpaid';
   joinDate: string;
   photoURL?: string;
+  accountId?: string;
+  hasAccount?: boolean;
 }
 
 export interface Batch {
