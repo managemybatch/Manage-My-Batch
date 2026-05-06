@@ -32,7 +32,7 @@ import { BANGLADESH_HOLIDAYS_2026, getUpcomingHolidays, getHolidayForDate } from
 import { Link } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { cn, formatCurrency } from '../lib/utils';
-import { collection, getDocs, query, where, orderBy, limit, onSnapshot, doc, updateDoc } from 'firebase/firestore';
+import { collection, getDocs, query, where, orderBy, limit, onSnapshot, doc, updateDoc, setDoc } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { useAuth } from '../lib/auth';
 import { useTranslation, Trans } from 'react-i18next';
@@ -60,6 +60,7 @@ export function Dashboard() {
   const [expiryNotification, setExpiryNotification] = useState<any | null>(null);
   const [selectedNotification, setSelectedNotification] = useState<any | null>(null);
   const [smsBalance, setSmsBalance] = useState(0);
+  const [aiBalance, setAiBalance] = useState(0);
   const [holidayNotification, setHolidayNotification] = useState<any | null>(null);
 
   useEffect(() => {
@@ -99,9 +100,23 @@ export function Dashboard() {
     });
 
     // Listen for SMS tokens
-    const unsubCredits = onSnapshot(doc(db, 'credits', instId), (doc) => {
-      if (doc.exists()) {
-        setSmsBalance(doc.data().balance || 0);
+    const unsubCredits = onSnapshot(doc(db, 'credits', instId), (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setSmsBalance(data.balance || 0);
+        setAiBalance(data.aiBalance || 0);
+      } else if (user) {
+        // Safety net: initialize credits doc if it doesn't exist
+        const initialCredits = {
+          userId: instId,
+          balance: 100,
+          aiBalance: user.aiCredits || 50,
+          totalSent: 0,
+          lastUpdated: new Date().toISOString()
+        };
+        setDoc(doc(db, 'credits', instId), initialCredits, { merge: true });
+        setSmsBalance(initialCredits.balance);
+        setAiBalance(initialCredits.aiBalance);
       }
     });
 
@@ -784,7 +799,7 @@ export function Dashboard() {
               <div className="flex justify-between items-end">
                 <div>
                   <p className="text-sm font-bold text-gray-900">{t('AI Credits Usage')}</p>
-                  <p className="text-xs text-gray-500 font-medium">{user?.aiCredits || 0} {t('Credits Remaining')}</p>
+                  <p className="text-xs text-gray-500 font-medium">{aiBalance} {t('Credits Remaining')}</p>
                 </div>
                 <div className="text-right">
                    <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">{t('Limit')}: {currentPlan.aiCreditLimit}</p>
@@ -793,7 +808,7 @@ export function Dashboard() {
               <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
                 <motion.div 
                   initial={{ width: 0 }}
-                  animate={{ width: `${Math.min(100, ((user?.aiCredits || 0) / currentPlan.aiCreditLimit) * 100)}%` }}
+                  animate={{ width: `${Math.min(100, (aiBalance / currentPlan.aiCreditLimit) * 100)}%` }}
                   className={cn(
                     "h-full transition-all duration-1000 bg-purple-600"
                   )}

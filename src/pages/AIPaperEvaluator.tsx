@@ -90,11 +90,23 @@ export function AIPaperEvaluator() {
   const [uploadedImages, setUploadedImages] = useState<string[]>([]);
   const [isEvaluating, setIsEvaluating] = useState(false);
   const [aiResult, setAiResult] = useState<AIEvaluationResult | null>(null);
+  const [aiCredits, setAiCredits] = useState<number>(0);
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
 
   useEffect(() => {
     if (!user) return;
     const instId = user.institutionId || user.uid;
+
+    // Listen to shared credits for the institution
+    const unsubCredits = onSnapshot(doc(db, 'credits', instId), (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setAiCredits(data.aiBalance || 0);
+      } else {
+        // Fallback to user profile if credits doc doesn't exist
+        setAiCredits(user.aiCredits || 0);
+      }
+    });
 
     const unsubBatches = onSnapshot(query(collection(db, 'batches'), where('institutionId', '==', instId)), (s) => {
       setBatches(s.docs.map(d => ({ id: d.id, ...d.data() })));
@@ -129,6 +141,7 @@ export function AIPaperEvaluator() {
     return () => {
       unsubscribe();
       unsubBatches();
+      unsubCredits();
     };
   }, [user, location.state, selectedExam]);
 
@@ -305,7 +318,7 @@ export function AIPaperEvaluator() {
     
     // Credit Check: 1 image = 1 credit (minimum 1)
     const requiredCredits = Math.max(1, uploadedImages.length);
-    const availableCredits = user.aiCredits || 0;
+    const availableCredits = aiCredits;
 
     if (!user.isSuperAdmin && availableCredits < requiredCredits) {
       setError(`আপনার পর্যাপ্ত ক্রেডিট নেই। আপনার প্রয়োজন ${requiredCredits} ক্রেডিট, কিন্তু আছে ${availableCredits} ক্রেডিট।`);
@@ -319,13 +332,21 @@ export function AIPaperEvaluator() {
       setAiResult(result);
       setEvaluationStep(3);
 
-      // Deduct credits on success
-      if (!user.isSuperAdmin) {
-        const userRef = doc(db, 'users', user.uid);
-        await updateDoc(userRef, {
-          aiCredits: increment(-requiredCredits)
-        });
-      }
+        // Deduct credits on success
+        if (!user.isSuperAdmin) {
+          const instId = user.institutionId || user.uid;
+          const creditsRef = doc(db, 'credits', instId);
+          await updateDoc(creditsRef, {
+            aiBalance: increment(-requiredCredits),
+            lastUpdated: new Date().toISOString()
+          });
+          
+          // Also sync to user profile for redundancy
+          const userRef = doc(db, 'users', user.uid);
+          await updateDoc(userRef, {
+            aiCredits: increment(-requiredCredits)
+          });
+        }
     } catch (error: any) {
       setError(error.message || "AI Evaluation failed");
     } finally {
@@ -411,7 +432,7 @@ export function AIPaperEvaluator() {
              </div>
              <div>
                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">AI Credits Balance</p>
-                <p className="text-lg font-black text-indigo-600 leading-none">{user?.aiCredits || 0}</p>
+                <p className="text-lg font-black text-indigo-600 leading-none">{aiCredits}</p>
              </div>
           </div>
           <button 

@@ -131,6 +131,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 dismissedNotifications: []
               };
               await setDoc(doc(db, 'users', firebaseUser.uid), newProfile);
+              
+              // Initialize credits document
+              await setDoc(doc(db, 'credits', firebaseUser.uid), {
+                userId: firebaseUser.uid,
+                balance: 100,
+                aiBalance: 50,
+                totalSent: 0,
+                lastUpdated: new Date().toISOString()
+              });
             }
           } catch (err) {
             console.error("Error processing user profile:", err);
@@ -191,6 +200,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       };
       
       await setDoc(doc(db, 'users', firebaseUser.uid), newProfile);
+
+      // Initialize credits document
+      await setDoc(doc(db, 'credits', firebaseUser.uid), {
+        userId: firebaseUser.uid,
+        balance: 100,
+        aiBalance: 50,
+        totalSent: 0,
+        lastUpdated: new Date().toISOString()
+      });
     } catch (error: any) {
       console.error("Signup failed:", error);
       setAuthError(error.message);

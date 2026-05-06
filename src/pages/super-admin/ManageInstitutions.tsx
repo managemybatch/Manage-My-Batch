@@ -120,11 +120,12 @@ export function ManageInstitutions() {
       const studentCount = studentsCount.data().count;
       const batchCount = batchesCount.data().count;
       const smsBalance = creditsDoc.exists() ? creditsDoc.data().balance || 0 : 0;
+      const aiBalance = creditsDoc.exists() ? creditsDoc.data().aiBalance || 0 : 0;
       const activityScore = Math.min(100, (studentCount * 2) + (batchCount * 5));
 
       setInstitutions(prev => prev.map(inst => 
         inst.id === instId 
-          ? { ...inst, studentCount, batchCount, smsBalance, activityScore } 
+          ? { ...inst, studentCount, batchCount, smsBalance, aiCredits: aiBalance, activityScore } 
           : inst
       ));
     } catch (err) {
@@ -161,7 +162,8 @@ export function ManageInstitutions() {
           ...prev,
           studentCount: studentsCount.data().count,
           batchCount: batchesCount.data().count,
-          smsBalance: creditsDoc.exists() ? creditsDoc.data().balance || 0 : 0
+          smsBalance: creditsDoc.exists() ? creditsDoc.data().balance || 0 : 0,
+          aiCredits: creditsDoc.exists() ? creditsDoc.data().aiBalance || 0 : (prev.aiCredits || 0)
         }));
       } else if (activeTab === 'students') {
         const snap = await getDocs(query(collection(db, 'students'), where('institutionId', '==', selectedInst.id), limit(200)));
@@ -204,6 +206,7 @@ export function ManageInstitutions() {
       await setDoc(doc(db, 'credits', selectedInst.id), {
         userId: selectedInst.id,
         balance: Number(selectedInst.smsBalance),
+        aiBalance: Number(selectedInst.aiCredits || 0),
         lastUpdated: new Date().toISOString()
       }, { merge: true });
 
@@ -246,6 +249,7 @@ export function ManageInstitutions() {
       await setDoc(doc(db, 'credits', uid), {
         userId: uid,
         balance: Number(newInst.tokens),
+        aiBalance: Number(newInst.aiCredits || 50),
         lastUpdated: new Date().toISOString()
       });
 

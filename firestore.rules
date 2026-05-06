@@ -352,10 +352,11 @@ service cloud.firestore {
     }
 
     function isValidCreditBalance(data) {
-      return hasRequiredFields(['userId', 'balance', 'totalSent', 'lastUpdated']) &&
-        data.userId is string &&
+      return data.userId is string &&
         data.balance is number &&
-        data.totalSent is number;
+        (!('lastUpdated' in data) || data.lastUpdated is string || data.lastUpdated is timestamp) &&
+        (!('totalSent' in data) || data.totalSent is number) &&
+        (!('aiBalance' in data) || data.aiBalance is number);
     }
 
     function isValidInstitution(data) {
@@ -559,8 +560,8 @@ service cloud.firestore {
 
     match /credits/{userId} {
       allow read: if isOwner(userId) || isAdmin() || getInstitutionId() == userId;
-      allow create: if isOwner(userId) && isValidCreditBalance(request.resource.data) && request.resource.data.balance == 100;
-      allow update: if (isAdmin() || isOwner(userId) || getInstitutionId() == userId) && isValidCreditBalance(request.resource.data) && (isAdmin() || request.resource.data.balance <= resource.data.balance);
+      allow create: if isAdmin() || (isOwner(userId) && isValidCreditBalance(request.resource.data));
+      allow update: if (isAdmin() || isOwner(userId) || getInstitutionId() == userId) && isValidCreditBalance(request.resource.data);
     }
 
     match /{path=**} {
