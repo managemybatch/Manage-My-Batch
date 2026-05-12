@@ -26,17 +26,19 @@ import {
   Sparkles,
   Cake,
   BoxIcon,
-  Flag
+  Flag,
+  HelpCircle
 } from 'lucide-react';
 import { BANGLADESH_HOLIDAYS_2026, getUpcomingHolidays, getHolidayForDate } from '../data/holidays';
 import { Link } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { cn, formatCurrency } from '../lib/utils';
+import { cn, formatCurrency, formatDate } from '../lib/utils';
 import { collection, getDocs, query, where, orderBy, limit, onSnapshot, doc, updateDoc, setDoc } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { useAuth } from '../lib/auth';
 import { useTranslation, Trans } from 'react-i18next';
 import { SubscriptionModal } from '../components/SubscriptionModal';
+import { CreditPricingModal } from '../components/CreditPricingModal';
 import { Modal } from '../components/Modal';
 import { 
   GRADES, 
@@ -59,9 +61,9 @@ export function Dashboard() {
   const [systemNotifications, setSystemNotifications] = useState<any[]>([]);
   const [expiryNotification, setExpiryNotification] = useState<any | null>(null);
   const [selectedNotification, setSelectedNotification] = useState<any | null>(null);
-  const [smsBalance, setSmsBalance] = useState(0);
   const [aiBalance, setAiBalance] = useState(0);
   const [holidayNotification, setHolidayNotification] = useState<any | null>(null);
+  const [showPricing, setShowPricing] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -72,7 +74,7 @@ export function Dashboard() {
 
     const unsubInst = onSnapshot(doc(db, 'institutions', instId), (doc) => {
       if (doc.exists()) setInstData(doc.data());
-    });
+    }, (error) => handleFirestoreError(error, OperationType.GET, `institutions/${instId}`));
 
     const unsubscribe = onSnapshot(q, (snap) => {
       const notifs = snap.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
@@ -96,29 +98,27 @@ export function Dashboard() {
 
       setSystemNotifications(visibleNotifs);
     }, (error) => {
-      console.error("Error fetching system notifications:", error);
+      handleFirestoreError(error, OperationType.LIST, 'super_notifications');
     });
 
-    // Listen for SMS tokens
+    // Listen for AI credits
     const unsubCredits = onSnapshot(doc(db, 'credits', instId), (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
-        setSmsBalance(data.balance || 0);
         setAiBalance(data.aiBalance || 0);
       } else if (user) {
         // Safety net: initialize credits doc if it doesn't exist
         const initialCredits = {
           userId: instId,
-          balance: 100,
-          aiBalance: user.aiCredits || 50,
+          balance: 0,
+          aiBalance: 5,
           totalSent: 0,
           lastUpdated: new Date().toISOString()
         };
         setDoc(doc(db, 'credits', instId), initialCredits, { merge: true });
-        setSmsBalance(initialCredits.balance);
         setAiBalance(initialCredits.aiBalance);
       }
-    });
+    }, (error) => handleFirestoreError(error, OperationType.GET, 'credits'));
 
     return () => {
       unsubscribe();
@@ -203,7 +203,6 @@ export function Dashboard() {
       console.error("Error dismissing notification:", error);
     }
   };
-  const currentPlan = SUBSCRIPTION_PLANS.find(p => p.id === user?.subscriptionPlan) || SUBSCRIPTION_PLANS[0];
   const [stats, setStats] = useState({
     students: 0,
     batches: 0,
@@ -212,13 +211,135 @@ export function Dashboard() {
     attendanceRate: 0,
     totalCollected: 0,
   });
-  const [loading, setLoading] = useState(true);
-  const [recentExams, setRecentExams] = useState<any[]>([]);
-  const [recentAttendance, setRecentAttendance] = useState<any[]>([]);
   const [studentsWithDues, setStudentsWithDues] = useState<any[]>([]);
   const [students, setStudents] = useState<any[]>([]);
   const [fees, setFees] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [recentExams, setRecentExams] = useState<any[]>([]);
+  const [recentAttendance, setRecentAttendance] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [actionItems, setActionItems] = useState<any[]>([]);
+  const [isActionCenterLoading, setIsActionCenterLoading] = useState(true);
+
+  // Daily Action Center Logic
+  useEffect(() => {
+    if (!user || students.length === 0) return;
+
+    const calculateActions = async () => {
+      setIsActionCenterLoading(true);
+      const items: any[] = [];
+      const instId = user.institutionId || user.uid;
+
+      // 1. Birthday Actions
+      const birthdays = getTodayBirthdays();
+      birthdays.forEach(s => {
+        items.push({
+          id: `bday-${s.id}`,
+          type: 'birthday',
+          priority: 'medium',
+          title: `It's ${s.name.split(' ')[0]}'s Birthday! 🎂`,
+          desc: "Send a greeting card to make them feel special.",
+          actionLabel: "Generate Card",
+          onClick: () => {
+             setSelectedStudentForBirthday(s);
+             setIsBirthdayModalOpen(true);
+          },
+          icon: Cake,
+          color: 'purple'
+        });
+      });
+
+      // 2. Due Actions (Priority: High)
+      if (studentsWithDues.length > 0) {
+        items.push({
+          id: 'dues-summary',
+          type: 'dues',
+          priority: 'high',
+          title: `${studentsWithDues.length} Students have Dues 💸`,
+          desc: "Send fee reminders to maintain your cash flow.",
+          actionLabel: "View Dues",
+          to: "/fees?tab=dues",
+          icon: CreditCard,
+          color: 'rose'
+        });
+      }
+
+      // 3. Consecutive Absence Action (Experimental/Smart)
+      // We'll look for students absent in their last 2-3 attendance records
+      try {
+        const qAtt = query(
+          collection(db, 'attendance'),
+          where('institutionId', '==', instId),
+          orderBy('date', 'desc'),
+          limit(students.length * 3) // Check last 3 records for each student approx
+        );
+        const attSnap = await getDocs(qAtt);
+        const attRecords = attSnap.docs.map(d => d.data());
+        
+        // Group by student
+        const studentAbsences: Record<string, number> = {};
+        const studentLatestDate: Record<string, string> = {};
+
+        attRecords.forEach((rec: any) => {
+          if (!studentAbsences[rec.studentId]) studentAbsences[rec.studentId] = 0;
+          
+          // Only count consecutive absences from most recent
+          if (rec.status === 'absent') {
+             // If we haven't hit a 'present' yet for this student
+             if (studentAbsences[rec.studentId] >= 0) {
+                studentAbsences[rec.studentId]++;
+             }
+          } else {
+             // Hit a 'present', stop counting
+             studentAbsences[rec.studentId] = -1; 
+          }
+        });
+
+        const chronicAbsentees = Object.entries(studentAbsences)
+          .filter(([_, count]) => count >= 2)
+          .map(([id, _]) => students.find(s => s.id === id))
+          .filter(Boolean);
+
+        if (chronicAbsentees.length > 0) {
+          items.push({
+            id: 'absent-alert',
+            type: 'absence',
+            priority: 'high',
+            title: `${chronicAbsentees.length} Chronic Absentees ⚠️`,
+            desc: "These students missed multiple classes. Call parents to prevent dropout.",
+            actionLabel: "Check Attendance",
+            to: "/attendance",
+            icon: AlertTriangle,
+            color: 'amber'
+          });
+        }
+      } catch (err) {
+        console.error("Error calculating chronic absences:", err);
+      }
+
+      // 4. No Batches Action
+      if (stats.batches === 0) {
+        items.push({
+          id: 'setup-batches',
+          type: 'setup',
+          priority: 'high',
+          title: "Create your first Batch",
+          desc: "You need to set up a batch to start taking attendance.",
+          actionLabel: "Get Started",
+          to: "/batches",
+          icon: Layers,
+          color: 'indigo'
+        });
+      }
+
+      setActionItems(items);
+      setIsActionCenterLoading(false);
+    };
+
+    calculateActions();
+  }, [user, students, studentsWithDues, stats.batches]);
+
+  const currentPlan = SUBSCRIPTION_PLANS.find(p => p.id === user?.subscriptionPlan) || SUBSCRIPTION_PLANS[0];
 
   useEffect(() => {
     if (!user) return;
@@ -282,7 +403,7 @@ export function Dashboard() {
         }
         setStudents(studentData);
         setStats(prev => ({ ...prev, students: studentData.length }));
-      });
+      }, (error) => handleFirestoreError(error, OperationType.LIST, 'students'));
 
       // Fetch exams and filter if teacher
       const qExams = query(
@@ -303,7 +424,7 @@ export function Dashboard() {
           .sort((a: any, b: any) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0))
           .slice(0, 5);
         setRecentExams(recent);
-      });
+      }, (error) => handleFirestoreError(error, OperationType.LIST, 'offline_exams'));
 
       // Fetch attendance and filter if teacher
       const qAttendance = query(
@@ -328,7 +449,7 @@ export function Dashboard() {
           .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())
           .slice(0, 5);
         setRecentAttendance(recent);
-      });
+      }, (error) => handleFirestoreError(error, OperationType.LIST, 'attendance'));
 
       return () => {
         unsubStudents();
@@ -427,6 +548,34 @@ export function Dashboard() {
 
   return (
     <div className="space-y-8 pb-12">
+      {/* Campaign Welcome Banner */}
+      {user?.isPromoUser && (
+        <motion.div 
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-indigo-50 border-2 border-indigo-200 rounded-3xl p-6 flex flex-col md:flex-row items-center justify-between gap-6 shadow-sm mb-6"
+        >
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-indigo-200">
+              <Gift className="w-8 h-8" />
+            </div>
+            <div>
+              <h2 className="text-xl font-black text-indigo-900">Welcome to Launch Campaign! 🚀</h2>
+              <p className="text-indigo-600 font-medium text-sm">
+                You currently have <span className="font-black text-indigo-700">3 Months FREE</span> access to Standard features. 
+                After that, enjoy the platform for just <span className="font-black text-indigo-700 font-mono">৳99/month</span> for the rest of 2026.
+              </p>
+            </div>
+          </div>
+          <div className="text-right">
+             <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest leading-none mb-1">Your Trial Ends On</p>
+             <p className="text-lg font-black text-indigo-600 leading-none">
+                {user.subscriptionExpiry ? formatDate(user.subscriptionExpiry) : '—'}
+             </p>
+          </div>
+        </motion.div>
+      )}
+
       {/* Header & Search */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -447,80 +596,103 @@ export function Dashboard() {
         </div>
       </div>
 
-      {/* Birthday Banner */}
-      {getTodayBirthdays().length > 0 && (
-        <motion.div 
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-3xl p-6 md:p-8 text-white relative overflow-hidden shadow-xl shadow-indigo-100"
-        >
-          <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -mr-32 -mt-32" />
-          <div className="absolute bottom-0 left-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -ml-32 -mb-32" />
-          
-          <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
-            <div className="flex items-center gap-6">
-              <div className="w-20 h-20 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center text-white relative">
-                 <Cake className="w-10 h-10" />
-                 <div className="absolute -top-2 -right-2 w-8 h-8 bg-amber-400 rounded-full flex items-center justify-center text-xs font-black shadow-lg">
-                    {getTodayBirthdays().length}
-                 </div>
-              </div>
-              <div>
-                <h2 className="text-2xl font-black">{t('dashboard.birthdayTitle', { defaultValue: "Happy Birthday!" })}</h2>
-                <p className="text-indigo-100 font-medium">
-                  {getTodayBirthdays().length === 1 
-                    ? `${getTodayBirthdays()[0].name} has a birthday today!` 
-                    : `${getTodayBirthdays().length} students have birthdays today!`}
-                </p>
-              </div>
-            </div>
-            
-            <div className="flex flex-wrap items-center gap-3">
-               {getTodayBirthdays().map(student => (
-                 <button
-                   key={student.id}
-                   onClick={() => {
-                     setSelectedStudentForBirthday(student);
-                     setIsBirthdayModalOpen(true);
-                   }}
-                   className="px-4 py-2 bg-white text-indigo-600 rounded-xl font-bold text-xs hover:bg-indigo-50 transition-all flex items-center gap-2 shadow-sm"
-                 >
-                   <Gift className="w-3.5 h-3.5" />
-                   Generate Card for {student.name.split(' ')[0]}
-                 </button>
-               ))}
-            </div>
+      {/* Daily Action Center (AI Assistant) */}
+      {actionItems.length > 0 && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between px-2">
+            <h3 className="text-sm font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-indigo-500" /> {t('Daily Action Center')}
+            </h3>
+            <span className="text-[10px] font-black bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-full uppercase">AI Powered</span>
           </div>
-        </motion.div>
-      )}
 
-      {/* Due List Red Notice */}
-      {user?.role === 'admin' && studentsWithDues.length > 0 && (
-        <motion.div 
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          className="bg-rose-50 border-2 border-rose-200 rounded-3xl p-6 flex flex-col md:flex-row items-center justify-between gap-6 shadow-sm"
-        >
-          <div className="flex items-center gap-4">
-            <div className="w-14 h-14 bg-rose-100 rounded-2xl flex items-center justify-center text-rose-600 animate-pulse">
-              <AlertCircle className="w-8 h-8" />
-            </div>
-            <div>
-              <h2 className="text-xl font-black text-rose-900">{t('dashboard.dueNotice')}</h2>
-              <p className="text-rose-600 font-medium text-sm">
-                <Trans i18nKey="dashboard.dueNoticeDesc" count={studentsWithDues.length}>
-                  Currently <span className="font-black underline">{studentsWithDues.length}</span> students have monthly fees due. Take action quickly.
-                </Trans>
-              </p>
-            </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {actionItems.map((item) => (
+              <motion.div
+                key={item.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className={cn(
+                  "relative group overflow-hidden p-6 rounded-[2.5rem] border-2 transition-all hover:shadow-xl",
+                  item.color === 'purple' ? "bg-purple-50 border-purple-100 hover:border-purple-200" :
+                  item.color === 'rose' ? "bg-rose-50 border-rose-100 hover:border-rose-200" :
+                  item.color === 'amber' ? "bg-amber-50 border-amber-100 hover:border-amber-200" :
+                  "bg-indigo-50 border-indigo-100 hover:border-indigo-200"
+                )}
+              >
+                <div className="relative z-10 flex flex-col h-full gap-4">
+                  <div className="flex items-center gap-4">
+                    <div className={cn(
+                      "w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg",
+                      item.color === 'purple' ? "bg-purple-600 text-white shadow-purple-200" :
+                      item.color === 'rose' ? "bg-rose-600 text-white shadow-rose-200" :
+                      item.color === 'amber' ? "bg-amber-600 text-white shadow-amber-200" :
+                      "bg-indigo-600 text-white shadow-indigo-200"
+                    )}>
+                      <item.icon className="w-6 h-6" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h4 className={cn(
+                        "font-black text-lg leading-tight",
+                        item.color === 'purple' ? "text-purple-900" :
+                        item.color === 'rose' ? "text-rose-900" :
+                        item.color === 'amber' ? "text-amber-900" :
+                        "text-indigo-900"
+                      )}>{item.title}</h4>
+                      <p className={cn(
+                        "text-xs font-medium mt-0.5",
+                        item.color === 'purple' ? "text-purple-600" :
+                        item.color === 'rose' ? "text-rose-600" :
+                        item.color === 'amber' ? "text-amber-600" :
+                        "text-indigo-600"
+                      )}>{item.desc}</p>
+                    </div>
+                  </div>
+
+                  <div className="mt-auto flex items-center justify-between">
+                    {item.to ? (
+                      <Link
+                        to={item.to}
+                        className={cn(
+                          "px-6 py-2.5 rounded-xl font-bold text-xs transition-all flex items-center gap-2",
+                          item.color === 'purple' ? "bg-purple-600 text-white hover:bg-purple-700" :
+                          item.color === 'rose' ? "bg-rose-600 text-white hover:bg-rose-700" :
+                          item.color === 'amber' ? "bg-amber-600 text-white hover:bg-amber-700" :
+                          "bg-indigo-600 text-white hover:bg-indigo-700"
+                        )}
+                      >
+                        {item.actionLabel} <ChevronRight className="w-3 h-3" />
+                      </Link>
+                    ) : (
+                      <button
+                        onClick={item.onClick}
+                        className={cn(
+                          "px-6 py-2.5 rounded-xl font-bold text-xs transition-all flex items-center gap-2",
+                          item.color === 'purple' ? "bg-purple-600 text-white hover:bg-purple-700" :
+                          item.color === 'rose' ? "bg-rose-600 text-white hover:bg-rose-700" :
+                          item.color === 'amber' ? "bg-amber-600 text-white hover:bg-amber-700" :
+                          "bg-indigo-600 text-white hover:bg-indigo-700"
+                        )}
+                      >
+                        {item.actionLabel} <ChevronRight className="w-3 h-3" />
+                      </button>
+                    )}
+                    {item.priority === 'high' && (
+                      <span className="flex items-center gap-1 text-[10px] font-black text-rose-500 uppercase tracking-widest animate-pulse">
+                        <AlertCircle className="w-3 h-3" /> High Priority
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Decorative Pattern */}
+                <div className="absolute -right-4 -bottom-4 opacity-5 pointer-events-none">
+                  <item.icon className="w-24 h-24 rotate-12" />
+                </div>
+              </motion.div>
+            ))}
           </div>
-          <Link 
-            to="/fees?tab=dues"
-            className="px-8 py-3 bg-rose-600 text-white rounded-xl font-black hover:bg-rose-700 transition-all shadow-lg shadow-rose-200 flex items-center gap-2"
-          >
-            {t('dashboard.viewDueList')} <ChevronRight className="w-4 h-4" />
-          </Link>
-        </motion.div>
+        </div>
       )}
 
       {/* System Notifications */}
@@ -742,7 +914,7 @@ export function Dashboard() {
         {user?.role === 'admin' && (
           <>
             <StatItem label={t('dashboard.stats.totalCollected')} value={formatCurrency(stats.totalCollected)} icon={CreditCard} color="emerald" to="/fees" />
-            <StatItem label={t('dashboard.stats.studentsWithDues')} value={studentsWithDues.length} icon={AlertCircle} color="rose" to="/fees?tab=dues" />
+            <StatItem label="AI Credits" value={aiBalance} icon={Sparkles} color="purple" to="/offline-exams" />
           </>
         )}
       </div>
@@ -801,8 +973,14 @@ export function Dashboard() {
                   <p className="text-sm font-bold text-gray-900">{t('AI Credits Usage')}</p>
                   <p className="text-xs text-gray-500 font-medium">{aiBalance} {t('Credits Remaining')}</p>
                 </div>
-                <div className="text-right">
+                <div className="text-right flex flex-col items-end gap-1">
                    <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">{t('Limit')}: {currentPlan.aiCreditLimit}</p>
+                   <button 
+                     onClick={() => setShowPricing(true)}
+                     className="text-[10px] font-black text-indigo-600 uppercase tracking-widest hover:underline"
+                   >
+                     Top-up
+                   </button>
                 </div>
               </div>
               <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
@@ -1013,34 +1191,35 @@ export function Dashboard() {
         </div>
       </div>
 
-      {/* SMS Tokens Widget */}
-      <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-600">
-            <MessageSquare className="w-6 h-6" />
+      {/* Quick Action Banner */}
+      <div className="bg-white p-8 rounded-[3rem] border border-gray-100 dark:border-gray-800 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-8">
+        <div className="flex items-center gap-6">
+          <div className="w-16 h-16 bg-emerald-50 dark:bg-emerald-900/20 rounded-2xl flex items-center justify-center text-emerald-600">
+            <HelpCircle className="w-8 h-8" />
           </div>
           <div>
-            <h4 className="font-bold text-gray-900">{t('dashboard.smsTokens')}</h4>
-            <p className="text-xs text-gray-500">{t('dashboard.sentThisMonth', { count: user?.monthlySmsSent || 0 })}</p>
+            <h4 className="text-2xl font-bold text-gray-900 dark:text-white">Need Support?</h4>
+            <p className="text-gray-500 dark:text-gray-400">Join our community or chat with us for any help with the app.</p>
           </div>
         </div>
-        <div className="flex items-center gap-8">
-          <div className="text-center">
-            <p className="text-2xl font-black text-gray-900">{smsBalance}</p>
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{t('dashboard.available')}</p>
-          </div>
-          <button 
-            onClick={() => setIsUpgradeModalOpen(true)}
-            className="px-6 py-2.5 bg-gray-900 text-white rounded-xl font-bold text-sm hover:bg-gray-800 transition-all"
+        <div className="flex items-center gap-4">
+          <Link 
+            to="/help"
+            className="px-8 py-4 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-2xl font-bold hover:scale-105 transition-transform"
           >
-            {t('dashboard.buyTokens')}
-          </button>
+            Get Help
+          </Link>
         </div>
       </div>
 
       <SubscriptionModal 
         isOpen={isUpgradeModalOpen} 
         onClose={() => setIsUpgradeModalOpen(false)} 
+      />
+
+      <CreditPricingModal 
+        isOpen={showPricing} 
+        onClose={() => setShowPricing(false)} 
       />
 
       {/* Notification Detail Modal */}

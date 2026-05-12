@@ -107,6 +107,15 @@ export function Signup() {
       <div className="lg:w-1/2 flex flex-col items-center justify-center p-12 bg-gray-50">
         <div className="w-full max-w-md space-y-10">
           <div className="text-center">
+            {/* Campaign Banner */}
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              className="inline-flex items-center gap-2 px-6 py-2 bg-indigo-100 text-indigo-700 rounded-full text-xs font-black uppercase tracking-widest mb-6 border border-indigo-200 animate-pulse"
+            >
+              <Zap className="w-4 h-4 fill-indigo-700" /> লঞ্চ অফার: ৩ মাস ফ্রি! 🚀
+            </motion.div>
+            
             <h2 className="text-4xl font-black text-gray-900 tracking-tight mb-3">
               নতুন অ্যাকাউন্ট তৈরি করুন
             </h2>

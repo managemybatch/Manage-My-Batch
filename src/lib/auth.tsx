@@ -31,6 +31,7 @@ interface UserProfile {
   monthlySmsSent?: number;
   aiCredits?: number;
   hasReceivedInitialCredits?: boolean;
+  isPromoUser?: boolean;
 }
 
 interface AuthContextType {
@@ -126,17 +127,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 isSuperAdmin,
                 institutionId: firebaseUser.uid,
                 subscriptionPlan: 'free',
-                aiCredits: 50,
+                aiCredits: 0,
                 hasReceivedInitialCredits: true,
                 dismissedNotifications: []
               };
               await setDoc(doc(db, 'users', firebaseUser.uid), newProfile);
               
-              // Initialize credits document
+              // Initialize credits document with 0 balance
               await setDoc(doc(db, 'credits', firebaseUser.uid), {
                 userId: firebaseUser.uid,
-                balance: 100,
-                aiBalance: 50,
+                balance: 0,
+                aiBalance: 0,
                 totalSent: 0,
                 lastUpdated: new Date().toISOString()
               });
@@ -185,6 +186,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
       const firebaseUser = userCredential.user;
       
+      const expiryDate = new Date();
+      expiryDate.setMonth(expiryDate.getMonth() + 3);
+
       const newProfile: UserProfile = {
         uid: firebaseUser.uid,
         email: email.toLowerCase(),
@@ -193,19 +197,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         role: 'admin',
         institution: institutionName,
         institutionId: firebaseUser.uid,
-        subscriptionPlan: 'free',
-        aiCredits: 50,
+        subscriptionPlan: 'standard', // Give them Standard features
+        subscriptionExpiry: expiryDate.toISOString(),
+        isPromoUser: true, // Tag them for the 99 BDT offer later
+        aiCredits: 0,
         hasReceivedInitialCredits: true,
         dismissedNotifications: []
       };
       
       await setDoc(doc(db, 'users', firebaseUser.uid), newProfile);
 
-      // Initialize credits document
+      // Initialize credits document with 0 balance
       await setDoc(doc(db, 'credits', firebaseUser.uid), {
         userId: firebaseUser.uid,
-        balance: 100,
-        aiBalance: 50,
+        balance: 0,
+        aiBalance: 0,
         totalSent: 0,
         lastUpdated: new Date().toISOString()
       });

@@ -165,119 +165,141 @@ export function AdmissionForm() {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-6">
-      <div className="max-w-2xl mx-auto space-y-8">
-        <div className="text-center space-y-4">
-          <div className="w-20 h-20 bg-white rounded-2xl flex items-center justify-center text-white text-2xl font-black mx-auto shadow-lg shadow-indigo-100 overflow-hidden ring-4 ring-indigo-50">
+    <div className="min-h-screen bg-gray-50/50 py-12 px-6">
+      <div className="max-w-3xl mx-auto space-y-12">
+        <div className="text-center space-y-6">
+          <motion.div 
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="w-24 h-24 bg-white rounded-[2rem] flex items-center justify-center text-4xl font-black mx-auto shadow-2xl shadow-indigo-100/50 overflow-hidden ring-8 ring-white"
+          >
             {institution.logoURL ? (
               <img src={institution.logoURL} alt="Logo" className="w-full h-full object-contain p-2" referrerPolicy="no-referrer" />
             ) : (
-              <div className="w-full h-full bg-indigo-600 flex items-center justify-center">
+              <div className="w-full h-full bg-indigo-600 text-white flex items-center justify-center">
                 {institution.name.charAt(0)}
               </div>
             )}
+          </motion.div>
+          <div className="space-y-2">
+            <h1 className="text-4xl md:text-5xl font-black text-gray-900 tracking-tight leading-none">{institution.admissionForm.title}</h1>
+            <p className="text-indigo-600 font-black uppercase tracking-[0.3em] text-xs leading-none">{institution.name}</p>
           </div>
-          <div>
-            <h1 className="text-3xl font-black text-gray-900 tracking-tight">{institution.admissionForm.title}</h1>
-            <p className="text-indigo-600 font-bold uppercase tracking-widest text-xs mt-1">{institution.name}</p>
-          </div>
-          <div className="bg-indigo-50 p-4 rounded-2xl border border-indigo-100 text-indigo-700 text-sm leading-relaxed">
+          <div className="bg-indigo-50/50 backdrop-blur-sm p-6 rounded-[2rem] border border-indigo-100 text-indigo-700 text-sm leading-relaxed max-w-xl mx-auto font-medium">
             {institution.admissionForm.instructions || 'অনুগ্রহ করে নিচের ফর্মটি সঠিক তথ্য দিয়ে পূরণ করুন।'}
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="bg-white p-8 md:p-12 rounded-3xl border border-gray-100 shadow-xl shadow-indigo-100/50 space-y-8">
-          {/* Photo Upload Section */}
-          <div className="flex flex-col items-center gap-4 pb-4 border-b border-gray-100">
-            <label className="text-xs font-bold text-gray-500 uppercase tracking-widest">ছাত্রের ছবি (ঐচ্ছিক)</label>
-            <div className="relative group">
-              <div className="w-32 h-32 bg-gray-50 border-2 border-dashed border-gray-200 rounded-3xl flex flex-col items-center justify-center text-gray-400 group-hover:border-indigo-500 group-hover:text-indigo-500 transition-all cursor-pointer overflow-hidden">
-                {photoPreview ? (
-                  <img src={photoPreview} alt="Preview" className="w-full h-full object-cover" />
+        <motion.div
+           initial={{ opacity: 0, y: 20 }}
+           animate={{ opacity: 1, y: 0 }}
+           className="bg-white p-8 md:p-16 rounded-[3.5rem] border border-gray-100 shadow-2xl shadow-indigo-100/30"
+        >
+          <form onSubmit={handleSubmit} className="space-y-10">
+            {/* Photo Upload Section */}
+            <div className="flex flex-col items-center gap-6 pb-10 border-b border-gray-50">
+              <span className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Student Photograph</span>
+              <div className="relative group">
+                <div className="w-40 h-40 bg-gray-50 border-2 border-dashed border-gray-200 rounded-[2.5rem] flex flex-col items-center justify-center text-gray-400 group-hover:border-indigo-500 group-hover:text-indigo-500 transition-all cursor-pointer overflow-hidden ring-8 ring-gray-50/50 group-hover:ring-indigo-50 transition-all">
+                  {photoPreview ? (
+                    <img src={photoPreview} alt="Preview" className="w-full h-full object-cover" />
+                  ) : (
+                    <>
+                      <User className="w-10 h-10 mb-2 opacity-20" />
+                      <span className="text-[10px] font-black uppercase tracking-wider text-center px-4 leading-tight">Upload Image</span>
+                    </>
+                  )}
+                </div>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handlePhotoChange}
+                  className="absolute inset-0 opacity-0 cursor-pointer"
+                />
+              </div>
+              <p className="text-[10px] text-gray-400 font-medium italic">Max size: 1MB. (Optional)</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-10">
+              {ADMISSION_FIELDS.map((field) => {
+                const isVisible = institution.admissionForm.fields?.[field.key] !== false;
+                if (!isVisible) return null;
+
+                return (
+                  <div key={field.key} className={cn("space-y-3", field.textarea ? "md:col-span-2" : "")}>
+                    <label className="flex items-center gap-2 text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">
+                      <field.icon className="w-3.5 h-3.5" /> {field.label}
+                    </label>
+                    <div className="relative group">
+                      {!field.textarea && <field.icon className="absolute left-6 top-1/2 -translate-y-1/2 text-gray-300 w-5 h-5 group-focus-within:text-indigo-500 transition-colors" />}
+                      
+                      {field.key === 'batch' ? (
+                        <select
+                          name="batch"
+                          required={field.required}
+                          className="w-full pl-14 pr-6 py-4 bg-gray-50/50 border border-gray-100 rounded-2xl text-sm font-bold text-gray-900 focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all appearance-none"
+                        >
+                          <option value="">Select a Batch</option>
+                          {batches.filter(b => b.active !== false).map((batch) => (
+                            <option key={batch.id} value={batch.id}>
+                              {batch.name} {batch.grade ? `(${batch.grade})` : ''}
+                            </option>
+                          ))}
+                        </select>
+                      ) : field.textarea ? (
+                        <textarea
+                          name={field.key}
+                          required={field.required}
+                          placeholder={field.placeholder}
+                          rows={4}
+                          className="w-full px-6 py-4 bg-gray-50/50 border border-gray-100 rounded-2xl text-sm font-medium text-gray-900 focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all placeholder:text-gray-300 resize-none"
+                        />
+                      ) : (
+                        <input
+                          name={field.key}
+                          type={field.type || 'text'}
+                          required={field.required}
+                          placeholder={field.placeholder}
+                          className="w-full pl-14 pr-6 py-4 bg-gray-50/50 border border-gray-100 rounded-2xl text-sm font-bold text-gray-900 focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all placeholder:text-gray-300"
+                        />
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="pt-10">
+              <button
+                type="submit"
+                disabled={submitting}
+                className="w-full py-6 bg-indigo-600 text-white rounded-3xl font-black text-xl hover:bg-indigo-700 hover:scale-[1.02] active:scale-[0.98] transition-all shadow-2xl shadow-indigo-200 disabled:opacity-50 disabled:hover:scale-100 flex items-center justify-center gap-3"
+              >
+                {submitting ? (
+                  <>
+                    <Loader2 className="w-6 h-6 animate-spin" /> Submitting...
+                  </>
                 ) : (
                   <>
-                    <User className="w-8 h-8 mb-1" />
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-center px-2">ছবি আপলোড করুন</span>
+                    Submit Application <Send className="w-6 h-6" />
                   </>
                 )}
-              </div>
-              <input 
-                type="file" 
-                accept="image/*"
-                onChange={handlePhotoChange}
-                className="absolute inset-0 opacity-0 cursor-pointer"
-              />
+              </button>
             </div>
-            <p className="text-[10px] text-gray-400">সর্বোচ্চ ১ মেগাবাইট</p>
-          </div>
+          </form>
+        </motion.div>
 
-          <div className="grid grid-cols-1 gap-6">
-            {ADMISSION_FIELDS.map((field) => {
-              const isVisible = institution.admissionForm.fields?.[field.key] !== false;
-              if (!isVisible) return null;
-
-              return (
-                <div key={field.key} className="space-y-2">
-                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">{field.label}</label>
-                  <div className="relative">
-                    {!field.textarea && <field.icon className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />}
-                    {field.textarea ? (
-                      <textarea
-                        name={field.key}
-                        required={field.required}
-                        placeholder={field.placeholder}
-                        rows={3}
-                        className="w-full px-4 py-4 bg-gray-50 border border-gray-200 rounded-2xl text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all resize-none"
-                      />
-                    ) : field.key === 'batch' ? (
-                      <select
-                        name="batch"
-                        required={field.required}
-                        className="w-full pl-12 pr-4 py-4 bg-gray-50 border border-gray-200 rounded-2xl text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all appearance-none"
-                      >
-                        <option value="">ব্যাচ নির্বাচন করুন...</option>
-                        {batches.map(b => (
-                          <option key={b.id} value={b.id}>{b.name} ({b.grade})</option>
-                        ))}
-                      </select>
-                    ) : (
-                      <input
-                        name={field.key}
-                        type={field.type || 'text'}
-                        required={field.required}
-                        placeholder={field.placeholder}
-                        className="w-full pl-12 pr-4 py-4 bg-gray-50 border border-gray-200 rounded-2xl text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
-                      />
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          <button 
-            type="submit" 
-            disabled={submitting}
-            className="w-full py-4 bg-indigo-600 text-white font-bold rounded-2xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 flex items-center justify-center gap-2 disabled:opacity-50"
-          >
-            {submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
-            {submitting ? 'জমাদান করা হচ্ছে...' : 'আবেদন জমা দিন'}
-          </button>
-        </form>
-
-        <div className="flex flex-col items-center gap-2">
-          <div className="w-6 h-6 bg-indigo-600 rounded-lg flex items-center justify-center overflow-hidden">
-            <img 
-              src="https://placehold.co/400x400/4f46e5/white?text=MMB" 
-              alt="MMB Logo" 
-              className="w-full h-full object-cover"
-              referrerPolicy="no-referrer"
-            />
-          </div>
-          <p className="text-center text-gray-400 text-xs">
-            Powered by <span className="font-bold text-indigo-600">Manage My Batch</span> • সুরক্ষিত ও নির্ভরযোগ্য
-          </p>
-        </div>
+        <footer className="text-center space-y-6 pt-12">
+           <div className="flex items-center justify-center gap-3">
+              <div className="w-8 h-8 bg-gray-900 rounded-lg flex items-center justify-center text-white">
+                 <Building className="w-5 h-5" />
+              </div>
+              <span className="font-black text-xl text-gray-900 tracking-tighter">Manage My Batch</span>
+           </div>
+           <p className="text-gray-400 text-[10px] font-black uppercase tracking-[0.3em]">
+              Safe • Reliable • Professional
+           </p>
+        </footer>
       </div>
     </div>
   );

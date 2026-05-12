@@ -19,7 +19,8 @@ import {
   ShieldCheck,
   Building2,
   Bell,
-  Library
+  Library,
+  Book
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useAuth } from '../lib/auth';
@@ -72,6 +73,8 @@ export function Sidebar() {
     { icon: Users, label: t('nav.students'), path: '/students' },
     { icon: ClipboardCheck, label: t('nav.attendance'), path: '/attendance' },
     { icon: GraduationCap, label: t('nav.offlineExams'), path: '/offline-exams' },
+    { icon: Sparkles, label: t('nav.aiStudyAssistant'), path: '/ai-study-assistant' },
+    { icon: Layers, label: t('nav.aiQuestionGenerator'), path: '/ai-question-generator' },
     { icon: Sparkles, label: t('nav.aiEvaluator'), path: '/ai-evaluator' },
     { icon: Library, label: t('nav.library'), path: '/library' },
     { icon: MessageSquare, label: t('nav.messages'), path: '/messages' },
@@ -89,6 +92,8 @@ export function Sidebar() {
     { icon: Users, label: t('nav.students'), path: '/students' },
     { icon: ClipboardCheck, label: t('nav.attendance'), path: '/attendance' },
     { icon: GraduationCap, label: t('nav.offlineExams'), path: '/offline-exams' },
+    { icon: Sparkles, label: t('nav.aiStudyAssistant'), path: '/ai-study-assistant' },
+    { icon: Layers, label: t('nav.aiQuestionGenerator'), path: '/ai-question-generator' },
     { icon: Sparkles, label: t('nav.aiEvaluator'), path: '/ai-evaluator' },
     { icon: School, label: 'Student Zone', path: '/institution' },
     { icon: Library, label: t('nav.library'), path: '/library' },
@@ -99,6 +104,7 @@ export function Sidebar() {
   const superAdminItems: NavItem[] = [
     { icon: LayoutDashboard, label: 'Super Admin', path: '/dashboard' },
     { icon: Building2, label: 'Institutions', path: '/super-admin/institutions' },
+    { icon: Book, label: 'AI Knowledge', path: '/super-admin/knowledge' },
     { icon: MessageSquare, label: 'Support Inbox', path: '/super-admin/support' },
     { icon: HelpCircle, label: 'Manage FAQs', path: '/super-admin/faqs' },
     { icon: FileText, label: 'Manage Blogs', path: '/super-admin/blogs' },

@@ -74,40 +74,58 @@ export interface FirestoreErrorInfo {
   }
 }
 
-export function safeStringify(obj: any) {
-  const cache = new Set();
-  return JSON.stringify(obj, (key, value) => {
-    if (typeof value === 'object' && value !== null) {
-      if (cache.has(value)) {
-        return '[Circular]';
+export function safeStringify(obj: any): string {
+  const cache = new WeakSet();
+  try {
+    return JSON.stringify(obj, (key, value) => {
+      if (typeof value === 'object' && value !== null) {
+        if (cache.has(value)) {
+          return '[Circular]';
+        }
+        cache.add(value);
       }
-      cache.add(value);
-    }
-    return value;
-  });
+      return value;
+    });
+  } catch (err) {
+    console.error('safeStringify failed:', err);
+    return '{"error": "Failed to stringify object due to circularity or complex types"}';
+  }
 }
 
 function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  // Ensure we only extract safe, serializable info from any object
+  const serializeError = (err: any): string => {
+    if (err instanceof Error) return err.message;
+    if (typeof err === 'string') return err;
+    try {
+      return String(err);
+    } catch {
+      return 'Unknown Error Object';
+    }
+  };
+
   const errInfo: FirestoreErrorInfo = {
-    error: error instanceof Error ? error.message : String(error),
+    error: serializeError(error),
     authInfo: {
-      userId: auth.currentUser?.uid,
-      email: auth.currentUser?.email,
-      emailVerified: auth.currentUser?.emailVerified,
-      isAnonymous: auth.currentUser?.isAnonymous,
-      tenantId: auth.currentUser?.tenantId,
-      providerInfo: auth.currentUser?.providerData.map(provider => ({
-        providerId: provider.providerId,
-        displayName: provider.displayName,
-        email: provider.email,
-        photoUrl: provider.photoURL
+      userId: auth.currentUser?.uid || null,
+      email: auth.currentUser?.email || null,
+      emailVerified: auth.currentUser?.emailVerified || false,
+      isAnonymous: auth.currentUser?.isAnonymous || false,
+      tenantId: auth.currentUser?.tenantId || null,
+      providerInfo: auth.currentUser?.providerData?.map(provider => ({
+        providerId: provider.providerId || '',
+        displayName: provider.displayName || null,
+        email: provider.email || null,
+        photoUrl: provider.photoURL || null
       })) || []
     },
     operationType,
-    path
+    path: typeof path === 'string' ? path : (path ? String(path) : null)
   }
-  console.error('Firestore Error: ', safeStringify(errInfo));
-  throw new Error(safeStringify(errInfo));
+  
+  const json = safeStringify(errInfo);
+  console.error('Firestore Error Detailed:', json);
+  throw new Error(json);
 }
 
 export { auth, db, testConnection, handleFirestoreError, firebaseConfig };

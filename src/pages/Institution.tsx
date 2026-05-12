@@ -15,7 +15,11 @@ import { collection, doc, getDoc, setDoc, updateDoc, query, where, getDocs, onSn
 import { motion, AnimatePresence } from 'motion/react';
 import { Modal } from '../components/Modal';
 import { ConfirmModal } from '../components/ConfirmModal';
+import { SubscriptionModal } from '../components/SubscriptionModal';
+import { CreditPricingModal } from '../components/CreditPricingModal';
 import { toPng } from 'html-to-image';
+import { Zap, Sparkles, CreditCard, Rocket } from 'lucide-react';
+import { SUBSCRIPTION_PLANS } from '../constants';
 
 interface WebsiteSection {
   id: string;
@@ -106,12 +110,15 @@ export function Institution() {
   const { user } = useAuth();
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'website' | 'admissionForm' | 'applications' | 'studentZone'>('website');
+  const [activeTab, setActiveTab] = useState<'website' | 'admissionForm' | 'applications' | 'studentZone' | 'billing'>('website');
   const [newFieldName, setNewFieldName] = useState('');
   const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState(false);
   const [institution, setInstitution] = useState<InstitutionData | null>(null);
+  const [aiBalance, setAiBalance] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
+  const [showPricing, setShowPricing] = useState(false);
+  const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
   const bioRef = useRef<HTMLDivElement>(null);
   const [applications, setApplications] = useState<Application[]>([]);
   const [stats, setStats] = useState({ students: 0, teachers: 0, batches: 0 });
@@ -314,6 +321,14 @@ export function Institution() {
       setBatches(batchData);
     });
 
+    // Listen for AI credits
+    const unsubCredits = onSnapshot(doc(db, 'credits', instId), (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setAiBalance(data.aiBalance || 0);
+      }
+    });
+
     return () => {
       unsubInst();
       unsubApps();
@@ -324,6 +339,7 @@ export function Institution() {
       unsubTeachers();
       unsubExams();
       unsubBatchesList();
+      unsubCredits();
     };
   }, [user]);
 
@@ -724,7 +740,7 @@ export function Institution() {
       </div>
 
       <div className="flex items-center gap-2 p-1 bg-gray-100 rounded-2xl w-fit">
-        {(['website', 'admissionForm', 'applications', 'studentZone'] as const).map((tab) => (
+        {(['website', 'admissionForm', 'applications', 'studentZone', 'billing'] as const).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -735,12 +751,113 @@ export function Institution() {
                 : "text-gray-500 hover:text-gray-700"
             )}
           >
-            {t(`institution.tabs.${tab}`)}
+            {tab === 'billing' ? 'Billing & Credits' : t(`institution.tabs.${tab}`)}
           </button>
         ))}
       </div>
 
       <AnimatePresence mode="wait">
+        {activeTab === 'billing' && (
+          <motion.div
+            key="billing"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="space-y-8"
+          >
+            <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm space-y-8">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-gray-50">
+                <div className="flex items-center gap-4">
+                  <div className="w-14 h-14 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-indigo-100">
+                    <CreditCard className="w-7 h-7" />
+                  </div>
+                  <div>
+                    <h3 className="text-2xl font-black text-gray-900 tracking-tight">Billing & Subscriptions</h3>
+                    <p className="text-gray-500 font-medium">Manage your plan and AI credits here.</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                {/* Subscription Plan Card */}
+                <div className="p-8 rounded-[2.5rem] bg-indigo-50 border border-indigo-100 relative overflow-hidden group">
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-600/5 rounded-full blur-3xl -mr-16 -mt-16 group-hover:scale-150 transition-transform duration-700" />
+                  <div className="relative z-10 flex flex-col h-full gap-6">
+                    <div className="flex items-center gap-4 text-indigo-600">
+                      <Rocket className="w-6 h-6" />
+                      <span className="text-xs font-black uppercase tracking-widest leading-none pt-1">Current Plan</span>
+                    </div>
+                    <div>
+                      <h4 className="text-4xl font-black text-indigo-900 tracking-tight uppercase">{user?.subscriptionPlan || 'Free'}</h4>
+                      <p className="text-sm font-bold text-indigo-600/60 mt-1 uppercase tracking-widest">Active Subscription</p>
+                    </div>
+                    <div className="mt-auto pt-6 border-t border-indigo-100/50">
+                      <button 
+                         onClick={() => setIsUpgradeModalOpen(true)}
+                         className="flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 active:scale-[0.98]"
+                      >
+                        <Zap className="w-4 h-4 fill-white" /> Upgrade Plan
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* AI Credits Card */}
+                <div className="p-8 rounded-[2.5rem] bg-purple-50 border border-purple-100 relative overflow-hidden group">
+                   <div className="absolute top-0 right-0 w-32 h-32 bg-purple-600/5 rounded-full blur-3xl -mr-16 -mt-16 group-hover:scale-150 transition-transform duration-700" />
+                   <div className="relative z-10 flex flex-col h-full gap-6">
+                     <div className="flex items-center gap-4 text-purple-600">
+                       <Sparkles className="w-6 h-6" />
+                       <span className="text-xs font-black uppercase tracking-widest leading-none pt-1">AI Common Credits</span>
+                     </div>
+                     <div>
+                       <h4 className="text-4xl font-black text-purple-900 tracking-tight">{aiBalance.toLocaleString()}</h4>
+                       <p className="text-sm font-bold text-purple-600/60 mt-1 uppercase tracking-widest">Available Balance</p>
+                     </div>
+                     <div className="mt-auto pt-6 border-t border-purple-100/50">
+                       <button 
+                          onClick={() => setShowPricing(true)}
+                          className="flex items-center gap-2 px-6 py-3 bg-purple-600 text-white rounded-xl font-bold hover:bg-purple-700 transition-all shadow-lg shadow-purple-200 active:scale-[0.98]"
+                       >
+                         <Plus className="w-4 h-4" /> Top-up Credits
+                       </button>
+                     </div>
+                   </div>
+                </div>
+              </div>
+
+              <div className="p-8 rounded-3xl bg-gray-50 border border-gray-100">
+                <div className="flex items-center gap-2 text-gray-400 mb-4 px-1">
+                  <Info className="w-4 h-4" />
+                  <span className="text-xs font-bold uppercase tracking-widest">Usage Information</span>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                   <div className="p-4 bg-white rounded-2xl shadow-sm border border-gray-100">
+                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Student Limit</p>
+                      <p className="text-lg font-black text-gray-900">{stats.students} / {(SUBSCRIPTION_PLANS.find(p => p.id === user?.subscriptionPlan) || SUBSCRIPTION_PLANS[0]).studentLimit}</p>
+                   </div>
+                   <div className="p-4 bg-white rounded-2xl shadow-sm border border-gray-100">
+                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Batch Limit</p>
+                      <p className="text-lg font-black text-gray-900">{stats.batches} / {(SUBSCRIPTION_PLANS.find(p => p.id === user?.subscriptionPlan) || SUBSCRIPTION_PLANS[0]).batchLimit}</p>
+                   </div>
+                   <div className="p-4 bg-white rounded-2xl shadow-sm border border-gray-100">
+                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Monthly Plan</p>
+                      <p className="text-lg font-black text-gray-900">৳{(SUBSCRIPTION_PLANS.find(p => p.id === user?.subscriptionPlan) || SUBSCRIPTION_PLANS[0]).price}/month</p>
+                   </div>
+                </div>
+              </div>
+            </div>
+
+            <SubscriptionModal 
+              isOpen={isUpgradeModalOpen} 
+              onClose={() => setIsUpgradeModalOpen(false)} 
+            />
+            <CreditPricingModal 
+              isOpen={showPricing} 
+              onClose={() => setShowPricing(false)} 
+            />
+          </motion.div>
+        )}
         {activeTab === 'studentZone' && (
           <motion.div
             key="studentZone"

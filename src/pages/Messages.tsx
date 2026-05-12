@@ -59,11 +59,9 @@ export function Messages() {
   const { t } = useTranslation();
   const { user } = useAuth();
   const location = useLocation();
-  const [credits, setCredits] = useState<CreditBalance | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
-  const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
   
   // Form state
   const [recipientType, setRecipientType] = useState<'batch' | 'group' | 'individual' | 'teacher' | 'applicant'>(
@@ -83,6 +81,7 @@ export function Messages() {
   const [applicants, setApplicants] = useState<any[]>([]);
   const [instData, setInstData] = useState<any>(null);
   const [isSavingTemplates, setIsSavingTemplates] = useState(false);
+  const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
 
   const [messageTemplates, setMessageTemplates] = useState({
     payment_success_whatsapp: '',
@@ -156,34 +155,6 @@ export function Messages() {
     };
     fetchInstData();
 
-    const fetchCredits = async () => {
-      try {
-        const docRef = doc(db, 'credits', instId);
-        const docSnap = await getDoc(docRef);
-        
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          setCredits({
-            userId: data.userId,
-            balance: data.balance,
-            totalSent: data.totalSent,
-            lastUpdated: data.lastUpdated
-          } as CreditBalance);
-        } else {
-          const initialCredits = {
-            userId: instId,
-            balance: 100,
-            totalSent: 0,
-            lastUpdated: new Date().toISOString()
-          };
-          await setDoc(docRef, initialCredits);
-          setCredits(initialCredits as CreditBalance);
-        }
-      } catch (error) {
-        handleFirestoreError(error, OperationType.GET, 'credits');
-      }
-    };
-
     const fetchMessages = async () => {
       try {
         const q = query(
@@ -249,21 +220,8 @@ export function Messages() {
       }
     };
 
-    fetchCredits();
     fetchMessages();
     fetchData();
-
-    const unsubCredits = onSnapshot(doc(db, 'credits', instId), (doc) => {
-      if (doc.exists()) {
-        const data = doc.data();
-        setCredits({
-          userId: data.userId,
-          balance: data.balance,
-          totalSent: data.totalSent,
-          lastUpdated: data.lastUpdated
-        } as CreditBalance);
-      }
-    }, (error) => handleFirestoreError(error, OperationType.GET, 'credits'));
 
     const unsubMessages = onSnapshot(
       query(collection(db, 'messages'), where('institutionId', '==', instId), orderBy('createdAt', 'desc'), limit(50)),
@@ -290,17 +248,13 @@ export function Messages() {
     );
 
     return () => {
-      unsubCredits();
       unsubMessages();
     };
   }, [user]);
 
-  const handleSendMessage = async (e: React.FormEvent) => {
+    const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user || !credits || credits.balance <= 0) {
-      alert(t('messages.error.noCredits'));
-      return;
-    }
+    if (!user) return;
 
     if (!recipientId || !content.trim()) return;
 
@@ -354,11 +308,6 @@ export function Messages() {
       await addDoc(collection(db, 'messages'), messageData);
 
       if (sendStatus === 'delivered') {
-        await updateDoc(doc(db, 'credits', instId), {
-          balance: increment(-1),
-          totalSent: increment(1),
-          lastUpdated: serverTimestamp()
-        });
         alert('Message sent successfully!');
       } else {
         alert(`Message failed: ${sendError}`);
@@ -460,7 +409,7 @@ export function Messages() {
             exit={{ opacity: 0, y: -10 }}
             className="space-y-8"
           >
-            {/* Credits Card (from screenshot) */}
+            {/* Info Card */}
             <div className="bg-white dark:bg-gray-900 rounded-3xl p-8 border border-gray-100 dark:border-gray-800 shadow-sm flex flex-col md:flex-row items-center justify-between gap-8">
               <div className="flex items-center gap-6">
                 <div className="w-16 h-16 bg-indigo-50 dark:bg-indigo-900/20 rounded-2xl flex items-center justify-center">
@@ -468,30 +417,12 @@ export function Messages() {
                 </div>
                 <div>
                   <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-                    {t('messages.credits')}
+                    {t('messages.title')}
                   </h2>
                   <p className="text-gray-500 dark:text-gray-400">
-                    {t('messages.sentThisMonth', { count: credits?.totalSent || 0 })}
+                    Connect with your students and teachers instantly.
                   </p>
                 </div>
-              </div>
-              
-              <div className="flex items-center gap-12">
-                <div className="text-center">
-                  <p className="text-4xl font-black text-gray-900 dark:text-white">
-                    {credits?.balance || 0}
-                  </p>
-                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    {t('messages.available')}
-                  </p>
-                </div>
-                
-                <button 
-                  onClick={() => setIsUpgradeModalOpen(true)}
-                  className="bg-gray-900 dark:bg-white text-white dark:text-gray-900 px-10 py-5 rounded-2xl font-bold text-xl hover:scale-105 transition-transform shadow-lg shadow-gray-200 dark:shadow-none"
-                >
-                  {t('messages.buyTokens')}
-                </button>
               </div>
             </div>
 
@@ -648,15 +579,12 @@ export function Messages() {
                   <p className="text-[10px] text-gray-400">
                     {content.length} characters
                   </p>
-                  <p className="text-[10px] text-indigo-500 font-medium">
-                    1 message = 1 token
-                  </p>
                 </div>
               </div>
 
               <button
                 type="submit"
-                disabled={sending || !recipientId || !content.trim() || (credits?.balance || 0) <= 0}
+                disabled={sending || !recipientId || !content.trim()}
                 className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-300 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-indigo-200 dark:shadow-none"
               >
                 {sending ? (

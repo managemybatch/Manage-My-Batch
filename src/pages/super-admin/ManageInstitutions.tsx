@@ -90,16 +90,31 @@ export function ManageInstitutions() {
         where('role', '==', 'admin'),
         limit(100)
       );
-      const usersSnapshot = await getDocs(usersQuery);
-      const users = usersSnapshot.docs.map(doc => ({ 
-        id: doc.id, 
-        ...doc.data(),
-        // Initialize placeholders for lazy data
-        studentCount: null,
-        batchCount: null,
-        smsBalance: 0,
-        activityScore: 0
-      }));
+      
+      const [usersSnapshot, creditsSnapshot] = await Promise.all([
+        getDocs(usersQuery),
+        getDocs(collection(db, 'credits'))
+      ]);
+
+      const creditsMap = new Map();
+      creditsSnapshot.docs.forEach(doc => {
+        creditsMap.set(doc.id, doc.data());
+      });
+
+      const users = usersSnapshot.docs.map(doc => {
+        const userData = doc.data();
+        const creditData = creditsMap.get(doc.id);
+        return { 
+          id: doc.id, 
+          ...userData,
+          // Authoritative balance from credits collection
+          aiCredits: creditData?.aiBalance ?? userData.aiCredits ?? 0,
+          smsBalance: creditData?.balance ?? userData.smsBalance ?? 0,
+          studentCount: null,
+          batchCount: null,
+          activityScore: 0
+        };
+      });
 
       setInstitutions(users);
     } catch (error) {
@@ -119,13 +134,12 @@ export function ManageInstitutions() {
 
       const studentCount = studentsCount.data().count;
       const batchCount = batchesCount.data().count;
-      const smsBalance = creditsDoc.exists() ? creditsDoc.data().balance || 0 : 0;
       const aiBalance = creditsDoc.exists() ? creditsDoc.data().aiBalance || 0 : 0;
       const activityScore = Math.min(100, (studentCount * 2) + (batchCount * 5));
 
       setInstitutions(prev => prev.map(inst => 
         inst.id === instId 
-          ? { ...inst, studentCount, batchCount, smsBalance, aiCredits: aiBalance, activityScore } 
+          ? { ...inst, studentCount, batchCount, aiCredits: aiBalance, activityScore } 
           : inst
       ));
     } catch (err) {
@@ -162,7 +176,6 @@ export function ManageInstitutions() {
           ...prev,
           studentCount: studentsCount.data().count,
           batchCount: batchesCount.data().count,
-          smsBalance: creditsDoc.exists() ? creditsDoc.data().balance || 0 : 0,
           aiCredits: creditsDoc.exists() ? creditsDoc.data().aiBalance || 0 : (prev.aiCredits || 0)
         }));
       } else if (activeTab === 'students') {
@@ -193,7 +206,13 @@ export function ManageInstitutions() {
     if (!selectedInst) return;
 
     try {
-      // Update user profile
+      await setDoc(doc(db, 'credits', selectedInst.id), {
+        userId: selectedInst.id,
+        aiBalance: Number(selectedInst.aiCredits || 0),
+        lastUpdated: new Date().toISOString()
+      }, { merge: true });
+
+      // Update user cache for aiCredits
       await updateDoc(doc(db, 'users', selectedInst.id), {
         subscriptionPlan: selectedInst.subscriptionPlan,
         subscriptionExpiry: selectedInst.subscriptionExpiry || null,
@@ -201,14 +220,6 @@ export function ManageInstitutions() {
         isVerified: selectedInst.isVerified || false,
         aiCredits: Number(selectedInst.aiCredits || 0)
       });
-
-      // Update credits
-      await setDoc(doc(db, 'credits', selectedInst.id), {
-        userId: selectedInst.id,
-        balance: Number(selectedInst.smsBalance),
-        aiBalance: Number(selectedInst.aiCredits || 0),
-        lastUpdated: new Date().toISOString()
-      }, { merge: true });
 
       setIsEditModalOpen(false);
       setToast({
@@ -241,20 +252,20 @@ export function ManageInstitutions() {
         role: 'admin',
         institutionId: uid,
         subscriptionPlan: newInst.plan,
-        aiCredits: Number(newInst.aiCredits || 50),
+        aiCredits: Number(newInst.aiCredits || 0),
         createdAt: new Date().toISOString()
       });
 
       // 3. Create Credits
       await setDoc(doc(db, 'credits', uid), {
         userId: uid,
-        balance: Number(newInst.tokens),
-        aiBalance: Number(newInst.aiCredits || 50),
+        balance: 0,
+        aiBalance: Number(newInst.aiCredits || 0),
         lastUpdated: new Date().toISOString()
       });
 
       setIsCreateModalOpen(false);
-      setNewInst({ name: '', email: '', password: '', plan: 'free', tokens: 100, aiCredits: 50 });
+      setNewInst({ name: '', email: '', password: '', plan: 'free', tokens: 0, aiCredits: 0 });
       setToast({
         message: "Institution created successfully",
         type: 'success',
@@ -400,7 +411,7 @@ export function ManageInstitutions() {
             { label: 'Total Revenue', value: `৳${selectedInst.totalRevenue?.toLocaleString() || 0}`, icon: CreditCard, color: 'emerald' },
             { label: 'Total Students', value: selectedInst.studentCount, icon: Users, color: 'emerald' },
             { label: 'Total Batches', value: selectedInst.batchCount, icon: Layers, color: 'amber' },
-            { label: 'SMS Balance', value: selectedInst.smsBalance, icon: MessageSquare, color: 'purple' },
+            { label: 'AI Credits', value: selectedInst.aiCredits || 0, icon: BrainCircuit, color: 'purple' },
           ].map((stat, i) => (
             <motion.div 
               initial={{ opacity: 0, y: 10 }}
@@ -486,7 +497,6 @@ export function ManageInstitutions() {
                         <DetailRow label="Total Students" value={selectedInst.studentCount} icon={Users} />
                         <DetailRow label="Active Batches" value={selectedInst.batchCount} icon={Layers} />
                         <DetailRow label="Faculty/Teachers" value={selectedInst.teacherCount} icon={Briefcase} />
-                        <DetailRow label="SMS Tokens Balance" value={selectedInst.smsBalance} icon={MessageSquare} />
                         <DetailRow label="System Status" value={selectedInst.status || 'Active'} icon={Activity} />
                         <DetailRow label="Last Activity" value="Today" icon={Clock} />
                       </div>
@@ -704,19 +714,6 @@ export function ManageInstitutions() {
                     </div>
 
                     <div className="space-y-2">
-                      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-2">SMS Token Balance</label>
-                      <div className="relative">
-                        <MessageSquare className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
-                        <input 
-                          type="number"
-                          value={selectedInst.smsBalance}
-                          onChange={(e) => setSelectedInst({ ...selectedInst, smsBalance: e.target.value })}
-                          className="w-full pl-12 pr-5 py-4 bg-gray-50 dark:bg-gray-800 border-2 border-transparent rounded-2xl focus:border-indigo-500 focus:bg-white dark:focus:bg-gray-900 outline-none transition-all font-bold text-gray-900 dark:text-white"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
                       <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-2">AI Credits Balance</label>
                       <div className="relative">
                         <BrainCircuit className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
@@ -900,6 +897,11 @@ export function ManageInstitutions() {
                           >
                             {inst.displayName}
                           </button>
+                          {inst.isPromoUser && (
+                            <span className="px-1.5 py-0.5 bg-amber-100 text-amber-600 rounded text-[10px] font-black uppercase tracking-tighter shadow-sm animate-pulse">
+                              Promo
+                            </span>
+                          )}
                           {inst.superAdminNote && (
                             <div className="group relative">
                               <Info className="w-3 h-3 text-amber-500 cursor-help" />
@@ -1111,35 +1113,11 @@ export function ManageInstitutions() {
                     className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-800 border-none rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">Initial Plan</label>
-                    <select 
-                      value={newInst.plan}
-                      onChange={(e) => setNewInst({ ...newInst, plan: e.target.value })}
-                      className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-800 border-none rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
-                    >
-                      <option value="free">Free</option>
-                      <option value="basic">Basic</option>
-                      <option value="standard">Standard</option>
-                      <option value="advanced">Advanced</option>
-                    </select>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">Initial SMS Tokens</label>
-                    <input 
-                      type="number"
-                      value={newInst.tokens}
-                      onChange={(e) => setNewInst({ ...newInst, tokens: Number(e.target.value) })}
-                      className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-800 border-none rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
-                    />
-                  </div>
-                </div>
                 <div className="space-y-2">
                   <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">Initial AI Credits</label>
                   <input 
                     type="number"
-                    value={newInst.aiCredits || 50}
+                    value={newInst.aiCredits || 0}
                     onChange={(e) => setNewInst({ ...newInst, aiCredits: Number(e.target.value) })}
                     className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-800 border-none rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
                   />
@@ -1190,16 +1168,6 @@ export function ManageInstitutions() {
                     type="date"
                     value={selectedInst.subscriptionExpiry?.split('T')[0] || ''}
                     onChange={(e) => setSelectedInst({ ...selectedInst, subscriptionExpiry: e.target.value ? new Date(e.target.value).toISOString() : null })}
-                    className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border-none rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">SMS Token Balance</label>
-                  <input 
-                    type="number"
-                    value={selectedInst.smsBalance}
-                    onChange={(e) => setSelectedInst({ ...selectedInst, smsBalance: e.target.value })}
                     className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border-none rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
                   />
                 </div>

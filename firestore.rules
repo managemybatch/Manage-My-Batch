@@ -353,7 +353,7 @@ service cloud.firestore {
 
     function isValidCreditBalance(data) {
       return data.userId is string &&
-        data.balance is number &&
+        (!('balance' in data) || data.balance is number) &&
         (!('lastUpdated' in data) || data.lastUpdated is string || data.lastUpdated is timestamp) &&
         (!('totalSent' in data) || data.totalSent is number) &&
         (!('aiBalance' in data) || data.aiBalance is number);
@@ -378,15 +378,47 @@ service cloud.firestore {
         data.admissionForm is map;
     }
 
+    function isValidSystemKnowledge(data) {
+      return hasRequiredFields(['title', 'class', 'subject', 'contentSummary', 'isActive']) &&
+        data.title is string && data.contentSummary is string;
+    }
+
+    function isValidStudySheet(data) {
+      return hasRequiredFields(['institutionId', 'teacherId', 'title', 'type', 'class', 'subject', 'content', 'createdAt']) &&
+        data.institutionId is string && data.teacherId is string &&
+        data.type in ['sheet', 'plan'] &&
+        data.content is string;
+    }
+
+    function isValidQuestionPaper(data) {
+      return hasRequiredFields(['institutionId', 'teacherId', 'title', 'class', 'subject', 'createdAt']) &&
+        data.institutionId is string && data.teacherId is string;
+    }
+
     // ===============================================================
     // Rules
     // ===============================================================
-
     match /test/connection {
       allow read: if true;
     }
 
-    match /users/{userId} {
+    match /system_knowledge/{knowledgeId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /study_sheets/{sheetId} {
+      allow read: if isTeacher() && isMemberOf(resource.data.institutionId);
+      allow create: if isTeacher() && isMemberOf(request.resource.data.institutionId) && isValidStudySheet(request.resource.data);
+       allow delete: if isInstitutionAdmin() && isMemberOf(resource.data.institutionId);
+     }
+ 
+    match /question_papers/{paperId} {
+      allow read: if isAuthenticated() && (isAdmin() || isMemberOf(resource.data.institutionId));
+      allow create: if isTeacher() && isMemberOf(request.resource.data.institutionId) && isValidQuestionPaper(request.resource.data);
+      allow delete: if isInstitutionAdmin() && isMemberOf(resource.data.institutionId);
+    }
+     match /users/{userId} {
       allow read: if isAuthenticated();
       allow create: if isOwner(userId) && isValidUser(request.resource.data) && 
                       (request.resource.data.role == 'admin' || isAdmin());

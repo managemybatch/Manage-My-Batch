@@ -34,7 +34,10 @@ import { ConfirmModal } from '../components/ConfirmModal';
 import { useTranslation } from 'react-i18next';
 import { QuestionDefinition, AIEvaluationResult, evaluatePaper, extractQuestions } from '../lib/gemini';
 import { SubscriptionModal } from '../components/SubscriptionModal';
+import { CreditPricingModal } from '../components/CreditPricingModal';
 import { CONTACT_INFO } from '../constants';
+
+import { CREDIT_COSTS } from '../constants';
 
 interface OfflineExam {
   id: string;
@@ -92,6 +95,7 @@ export function AIPaperEvaluator() {
   const [aiResult, setAiResult] = useState<AIEvaluationResult | null>(null);
   const [aiCredits, setAiCredits] = useState<number>(0);
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
+  const [showPricing, setShowPricing] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -316,12 +320,8 @@ export function AIPaperEvaluator() {
   const runAIEvaluation = async () => {
     if (!config || uploadedImages.length === 0 || !user) return;
     
-    // Credit Check: 1 image = 1 credit (minimum 1)
-    const requiredCredits = Math.max(1, uploadedImages.length);
-    const availableCredits = aiCredits;
-
-    if (!user.isSuperAdmin && availableCredits < requiredCredits) {
-      setError(`আপনার পর্যাপ্ত ক্রেডিট নেই। আপনার প্রয়োজন ${requiredCredits} ক্রেডিট, কিন্তু আছে ${availableCredits} ক্রেডিট।`);
+    if (aiCredits < (CREDIT_COSTS.AI_MARK_EVALUATION || 2)) {
+      alert('আপনার পর্যাপ্ত AI ব্যালেন্স নেই। অনুগ্রহ করে টপ-আপ করুন।');
       return;
     }
 
@@ -330,25 +330,19 @@ export function AIPaperEvaluator() {
     try {
       const result = await evaluatePaper(uploadedImages, config.questions);
       setAiResult(result);
-      setEvaluationStep(3);
+      
+      // Unified Credit Deduction
+      const instId = user.institutionId || user.uid;
+      await updateDoc(doc(db, 'credits', instId), {
+        aiBalance: increment(-(CREDIT_COSTS.AI_MARK_EVALUATION || 2)),
+        totalSpent: increment(CREDIT_COSTS.AI_MARK_EVALUATION || 2),
+        lastUpdated: serverTimestamp()
+      });
 
-        // Deduct credits on success
-        if (!user.isSuperAdmin) {
-          const instId = user.institutionId || user.uid;
-          const creditsRef = doc(db, 'credits', instId);
-          await updateDoc(creditsRef, {
-            aiBalance: increment(-requiredCredits),
-            lastUpdated: new Date().toISOString()
-          });
-          
-          // Also sync to user profile for redundancy
-          const userRef = doc(db, 'users', user.uid);
-          await updateDoc(userRef, {
-            aiCredits: increment(-requiredCredits)
-          });
-        }
+      setEvaluationStep(3);
     } catch (error: any) {
-      setError(error.message || "AI Evaluation failed");
+      console.error('AI Evaluation error:', error);
+      setError(error.message || "এআই মূল্যায়ন ব্যর্থ হয়েছে");
     } finally {
       setIsEvaluating(false);
     }
@@ -424,29 +418,30 @@ export function AIPaperEvaluator() {
           </div>
         </div>
 
-        {/* AI Credits Balance */}
-        <div className="bg-white px-6 py-3 rounded-2xl border border-gray-100 shadow-sm flex items-center justify-between md:justify-end gap-6">
-          <div className="flex items-center gap-3">
-             <div className="w-10 h-10 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-600">
-                <Zap className="w-5 h-5 fill-indigo-600" />
-             </div>
-             <div>
-                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">AI Credits Balance</p>
-                <p className="text-lg font-black text-indigo-600 leading-none">{aiCredits}</p>
-             </div>
-          </div>
-          <button 
-            onClick={() => setIsUpgradeModalOpen(true)}
-            className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 transition-all flex items-center gap-2"
-          >
-            <Plus className="w-3 h-3" /> Buy Credits
-          </button>
+        <div className="flex items-center gap-4 bg-white p-2 rounded-3xl border border-gray-100 shadow-sm pr-6">
+           <div className="w-12 h-12 bg-amber-50 rounded-2xl flex items-center justify-center text-amber-600 font-black">
+              {aiCredits}
+           </div>
+           <div>
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">AI Balance</p>
+              <button 
+                onClick={() => setShowPricing(true)}
+                className="text-xs font-bold text-indigo-600 hover:underline"
+              >
+                Top-up Credits
+              </button>
+           </div>
         </div>
       </div>
 
       <SubscriptionModal 
         isOpen={isUpgradeModalOpen} 
         onClose={() => setIsUpgradeModalOpen(false)} 
+      />
+
+      <CreditPricingModal 
+        isOpen={showPricing} 
+        onClose={() => setShowPricing(false)} 
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">

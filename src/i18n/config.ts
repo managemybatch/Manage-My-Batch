@@ -414,6 +414,9 @@ const resources = {
         settings: "Settings",
         messages: "Messages",
         marketing: "Marketing",
+        aiStudyAssistant: "AI Study Assistant",
+        aiQuestionGenerator: "AI Question Generator",
+        manageKnowledge: "Manage Knowledge",
         logout: "Logout"
       },
       login: {
@@ -1115,6 +1118,9 @@ bn: {
         settings: "সেটিংস",
         messages: "মেসেজ",
         marketing: "মার্কেটিং",
+        aiStudyAssistant: "AI স্টাডি অ্যাসিস্ট্যান্ট",
+        aiQuestionGenerator: "AI প্রশ্ন জেনারেটর",
+        manageKnowledge: "নলেজ বেস পরিচালনা",
         logout: "লগআউট"
       },
       login: {

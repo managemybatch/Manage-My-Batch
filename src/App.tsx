@@ -25,6 +25,9 @@ import { ManageStaff } from './pages/super-admin/ManageStaff';
 import { RevenueAnalytics } from './pages/super-admin/RevenueAnalytics';
 import { SystemHealth } from './pages/super-admin/SystemHealth';
 import { ManageBlogs } from './pages/super-admin/ManageBlogs';
+import { ManageKnowledge } from './pages/super-admin/ManageKnowledge';
+import { AiStudyAssistant } from './pages/AiStudyAssistant';
+import { AiQuestionGenerator } from './pages/AiQuestionGenerator';
 import { SupportChat } from './pages/SupportChat';
 import { Help } from './pages/Help';
 import { InstitutionProfile } from './pages/public/InstitutionProfile';
@@ -98,6 +101,8 @@ function AppRoutes() {
         <Route path="/fees" element={<Fees />} />
         <Route path="/attendance" element={<Attendance />} />
         <Route path="/offline-exams" element={<OfflineExams />} />
+        <Route path="/ai-study-assistant" element={<AiStudyAssistant />} />
+        <Route path="/ai-question-generator" element={<AiQuestionGenerator />} />
         <Route path="/ai-evaluator" element={<AIPaperEvaluator />} />
         <Route path="/library" element={<DigitalLibrary />} />
         <Route path="/messages" element={<Messages />} />
@@ -119,6 +124,7 @@ function AppRoutes() {
         {/* Super Admin Restricted Routes */}
         <Route path="/super-admin" element={<SuperAdminDashboard />} />
         <Route path="/super-admin/institutions" element={<ManageInstitutions />} />
+        <Route path="/super-admin/knowledge" element={<ManageKnowledge />} />
         <Route path="/super-admin/notifications" element={<SuperNotifications />} />
         <Route path="/super-admin/support" element={<SupportInbox />} />
         <Route path="/super-admin/faqs" element={<ManageFaqs />} />

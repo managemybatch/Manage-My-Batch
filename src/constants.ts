@@ -82,3 +82,10 @@ export const CONTACT_INFO = {
   whatsapp: '01301757000',
   message: 'Send us a message through the app'
 };
+
+export const CREDIT_COSTS = {
+  SMS_PER_SEGMENT: 1,
+  AI_MARK_EVALUATION: 2,
+  AI_STUDY_ASSISTANT: 5,
+  AI_QUESTION_GENERATOR: 10
+};

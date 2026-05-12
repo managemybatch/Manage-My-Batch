@@ -113,24 +113,13 @@ export function OfflineExams() {
       if (doc.exists()) setInstData(doc.data());
     });
 
-    const unsubCredits = onSnapshot(doc(db, 'credits', instId), (doc) => {
-      if (doc.exists()) {
-        setCreditsBalance(doc.data().balance || 0);
-      }
-    });
-
     return () => {
       unsubInst();
-      unsubCredits();
     };
   }, [user]);
 
   const handleSendResultSMS = async (student: any, rankedInfo: any, sendToStudentOnly = false) => {
     if (!user || !instData || !selectedExam) return;
-    if (creditsBalance <= 0) {
-      alert("Insufficient SMS credits. Please buy more tokens.");
-      return;
-    }
     
     setIsSendingSMS(true);
     const instId = user.institutionId || user.uid;
@@ -174,12 +163,6 @@ export function OfflineExams() {
       }
       
       if (sentCount > 0) {
-        await updateDoc(doc(db, 'credits', instId), {
-          balance: increment(-sentCount),
-          totalSent: increment(sentCount),
-          lastUpdated: serverTimestamp()
-        });
-
         setSuccessMessage(`Result SMS sent to ${sentCount} recipient(s)!`);
         setIsSuccessModalOpen(true);
       } else {
@@ -193,16 +176,11 @@ export function OfflineExams() {
     }
   };
 
-  const handleSendAllResultsSMS = async () => {
+    const handleSendAllResultsSMS = async () => {
     const rankedStudents = getRankedStudents();
     if (!rankedStudents.length) return;
-    if (!confirm(`Are you sure you want to send results via SMS to all ${rankedStudents.length} students? This will use your SMS credits.`)) return;
+    if (!confirm(`Are you sure you want to send results via SMS to all ${rankedStudents.length} students?`)) return;
     
-    if (creditsBalance < rankedStudents.length) {
-      alert(`Insufficient credits. You need at least ${rankedStudents.length} credits but have ${creditsBalance}.`);
-      return;
-    }
-
     setIsSendingSMS(true);
     let totalSent = 0;
     const instId = user.institutionId || user.uid;
@@ -238,11 +216,6 @@ export function OfflineExams() {
       }
 
       if (totalSent > 0) {
-        await updateDoc(doc(db, 'credits', instId), {
-          balance: increment(-totalSent),
-          totalSent: increment(totalSent),
-          lastUpdated: serverTimestamp()
-        });
         setSuccessMessage(`Bulk Results SMS sent to ${totalSent} students!`);
         setIsSuccessModalOpen(true);
       }

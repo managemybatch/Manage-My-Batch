@@ -171,7 +171,12 @@ export function Students() {
     if (!user || importData.length === 0) return;
 
     const plan = SUBSCRIPTION_PLANS.find(p => p.id === user.subscriptionPlan) || SUBSCRIPTION_PLANS[0];
-    if (students.length + importData.length > plan.studentLimit && !user.isSuperAdmin) {
+    let studentLimit = plan.studentLimit;
+    if (user.isPromoUser) {
+      studentLimit = 200;
+    }
+
+    if (students.length + importData.length > studentLimit && !user.isSuperAdmin) {
       alert(t('students.limitReached', { defaultValue: `Import would exceed your plan limit of ${plan.studentLimit} students. Please upgrade your plan.` }));
       setIsUpgradeModalOpen(true);
       return;
@@ -435,9 +440,13 @@ export function Students() {
     if (!user || isSaving) return;
 
     const plan = SUBSCRIPTION_PLANS.find(p => p.id === user.subscriptionPlan) || SUBSCRIPTION_PLANS[0];
+    let studentLimit = plan.studentLimit;
+    if (user.isPromoUser) {
+      studentLimit = 200; // Campaign limit
+    }
     
     // Check total student limit
-    if (students.length >= plan.studentLimit && !user.isSuperAdmin) {
+    if (students.length >= studentLimit && !user.isSuperAdmin) {
       setIsUpgradeModalOpen(true);
       return;
     }
