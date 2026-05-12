@@ -50,7 +50,14 @@ export function Help() {
           { id: '2', question: t('help.faqs.q2'), answer: t('help.faqs.a2'), order: 1 },
           { id: '3', question: t('help.faqs.q3'), answer: t('help.faqs.a3'), order: 2 },
           { id: '4', question: t('help.faqs.q4'), answer: t('help.faqs.a4'), order: 3 },
-          { id: '5', question: t('help.faqs.q5'), answer: t('help.faqs.a5'), order: 4 }
+          { id: '5', question: t('help.faqs.q5'), answer: t('help.faqs.a5'), order: 4 },
+          { id: '6', question: t('help.faqs.q6'), answer: t('help.faqs.a6'), order: 5 },
+          { id: '7', question: t('help.faqs.q7'), answer: t('help.faqs.a7'), order: 6 },
+          { id: '8', question: t('help.faqs.q8'), answer: t('help.faqs.a8'), order: 7 },
+          { id: '9', question: t('help.faqs.q9'), answer: t('help.faqs.a9'), order: 8 },
+          { id: '10', question: t('help.faqs.q10'), answer: t('help.faqs.a10'), order: 9 },
+          { id: '11', question: t('help.faqs.q11'), answer: t('help.faqs.a11'), order: 10 },
+          { id: '12', question: t('help.faqs.q12'), answer: t('help.faqs.a12'), order: 11 }
         ];
         setFaqs(defaultFaqs);
       }

@@ -700,7 +700,21 @@ const resources = {
         q4: "How do I take attendance?",
         a4: "Go to the 'Attendance' section, select the batch and date, then mark each student as Present, Absent, or Late. Don't forget to click 'Save Attendance'.",
         q5: "What happens when my subscription expires?",
-        a5: "Your account will automatically revert to the 'Free' plan. You will still have access to your data, but certain limits on student and batch counts will apply."
+        a5: "Your account will automatically revert to the 'Free' plan. You will still have access to your data, but certain limits on student and batch counts will apply.",
+        q6: "How does the AI Question Generator work?",
+        a6: "Navigate to 'AI Question Generator', select your class, subject, and topic. The AI will generate a board-standard question paper (Creative or MCQ) including a marking scheme for you.",
+        q7: "What is the AI Study Assistant?",
+        a7: "The AI Study Assistant helps you generate comprehensive study sheets and lesson plans. Simply provide a topic, and it will create a detailed guide for your students and teachers.",
+        q8: "How can I use the Digital Library?",
+        a8: "In the 'Digital Library' section, you can upload study materials, PDFs, and links. Your students can then access these resources through your institution's public website profile.",
+        q9: "Can I design ID Cards and Admit Cards?",
+        a9: "Yes! In the 'Marketing' section, you can design ID cards. For Admit Cards, go to the 'Offline Exams' section, select an exam, and go to the 'Admit Cards' tab to generate them for all students.",
+        q10: "What is the 99 BDT Launch Campaign?",
+        a10: "For a limited time, new institutions can enjoy all premium features (including AI tools and unlimited students) for just 99 BDT for the first month. Register now to grab this offer!",
+        q11: "How can teachers mark attendance?",
+        a11: "You can generate a 'Public Attendance Link' for any batch in the 'Attendance' section. Share this link with the class teacher, and they can mark attendance from their mobile. You just need to verify and save it from your dashboard.",
+        q12: "Can I generate branded payment receipts?",
+        a12: "Absolutely! When you collect a fee in the 'Fees' section, you can download a professional PDF receipt. It will automatically include your coaching logo, address, and student details."
       }
     }
   }
@@ -1421,7 +1435,21 @@ bn: {
         q4: "আমি কীভাবে উপস্থিতি নেব?",
         a4: "উপস্থিতি সেকশনে যান, ব্যাচ এবং তারিখ নির্বাচন করুন, তারপর প্রতিটি ছাত্রকে উপস্থিত, অনুপস্থিত বা দেরি হিসেবে চিহ্নিত করুন। 'উপস্থিতি সংরক্ষণ করুন' বাটনে ক্লিক করতে ভুলবেন না।",
         q5: "আমার সাবস্ক্রিপশন শেষ হয়ে গেলে কী হবে?",
-        a5: "আপনার অ্যাকাউন্ট স্বয়ংক্রিয়ভাবে 'ফ্রি' প্ল্যানে ফিরে যাবে। আপনি তখনও আপনার ডাটা অ্যাক্সেস করতে পারবেন, তবে ছাত্র এবং ব্যাচ সংখ্যার ওপর নির্দিষ্ট সীমাবদ্ধতা প্রযোজ্য হবে।"
+        a5: "আপনার অ্যাকাউন্ট স্বয়ংক্রিয়ভাবে 'ফ্রি' প্ল্যানে ফিরে যাবে। আপনি তখনও আপনার ডাটা অ্যাক্সেস করতে পারবেন, তবে ছাত্র এবং ব্যাচ সংখ্যার ওপর নির্দিষ্ট সীমাবদ্ধতা প্রযোজ্য হবে।",
+        q6: "AI প্রশ্ন জেনারেটর কীভাবে কাজ করে?",
+        a6: "'AI প্রশ্ন জেনারেটর' সেকশনে গিয়ে আপনার ক্লাস, বিষয় এবং টপিক নির্বাচন করুন। AI আপনার জন্য বোর্ড স্ট্যান্ডার্ড সৃজনশীল বা MCQ প্রশ্নপত্র এবং উত্তরপত্র তৈরি করে দেবে।",
+        q7: "AI স্টাডি অ্যাসিস্ট্যান্ট কী?",
+        a7: "AI স্টাডি অ্যাসিস্ট্যান্ট আপনাকে স্টাডি শীট এবং লেসন প্ল্যান তৈরি করতে সাহায্য করে। শুধু একটি টপিক দিলেই এটি ছাত্র ও শিক্ষকদের জন্য বিস্তারিত গাইড তৈরি করবে।",
+        q8: "আমি কীভাবে ডিজিটাল লাইব্রেরি ব্যবহার করতে পারি?",
+        a8: "'ডিজিটাল লাইব্রেরি' সেকশনে আপনি স্টাডি মেটেরিয়াল, PDF এবং গুরুত্বপূর্ণ লিঙ্ক আপলোড করতে পারেন। আপনার ছাত্ররা আপনার প্রতিষ্ঠানের পাবলিক ওয়েবসাইট প্রোফাইলের মাধ্যমে এগুলো অ্যাক্সেস করতে পারবে।",
+        q9: "আমি কি আইডি কার্ড এবং এডমিট কার্ড ডিজাইন করতে পারি?",
+        a9: "হ্যাঁ! 'মার্কেটিং' সেকশন থেকে আপনি আইডি কার্ড ডিজাইন করতে পারেন। আর এডমিট কার্ডের জন্য 'অফলাইন পরীক্ষা' সেকশনে গিয়ে একটি পরীক্ষা সিলেক্ট করুন এবং 'এডমিট কার্ড' ট্যাব থেকে সবার জন্য কার্ড জেনারেট করুন।",
+        q10: "৯৯ টাকার লঞ্চ ক্যাম্পেইনটি কী?",
+        a10: "সীমিত সময়ের জন্য, নতুন শিক্ষা প্রতিষ্ঠানগুলো মাত্র ৯৯ টাকায় প্রথম মাসের জন্য সব প্রিমিয়াম ফিচার (AI টুলস এবং আনলিমিটেড ছাত্রসহ) উপভোগ করতে পারবে। এই অফারটি নিতে এখনই রেজিস্ট্রেশন করুন!",
+        q11: "শিক্ষকরা কীভাবে হাজিরা নিতে পারবেন?",
+        a11: "'উপস্থিতি' সেকশনে গিয়ে যেকোনো ব্যাচের জন্য 'পাবলিক হাজিরা লিঙ্ক' তৈরি করতে পারেন। এই লিঙ্কটি সংশ্লিষ্ট শিক্ষককে দিলেই তিনি মোবাইল থেকে হাজিরা নিতে পারবেন। আপনি শুধু ড্যাশবোর্ড থেকে সেটি যাচাই করে সেভ করে দেবেন।",
+        q12: "আমি কি লোগোসহ পেমেন্ট রসিদ দিতে পারব?",
+        a12: "অবশ্যই! 'ফি' সেকশনে পেমেন্ট সংগ্রহের পর আপনি প্রফেশনাল PDF রসিদ ডাউনলোড করতে পারবেন। এতে আপনার প্রতিষ্ঠানের লোগো, ঠিকানা এবং ছাত্রের সব তথ্য অটোমেটিক যুক্ত থাকবে।"
       }
     }
   }
