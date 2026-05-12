@@ -12,6 +12,7 @@ export function Signup() {
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [institutionName, setInstitutionName] = React.useState('');
+  const [phone, setPhone] = React.useState('');
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState('');
 
@@ -21,10 +22,14 @@ export function Signup() {
       setError('প্রতিষ্ঠানের নাম দিন।');
       return;
     }
+    if (!phone.trim()) {
+      setError('ফোন নম্বর দিন।');
+      return;
+    }
     setLoading(true);
     setError('');
     try {
-      await signup(email, password, institutionName);
+      await signup(email, password, institutionName, phone);
       navigate('/dashboard');
     } catch (err: any) {
       console.error("Signup error:", err);
@@ -142,6 +147,17 @@ export function Signup() {
                     placeholder="যেমন: আইডিয়াল কোচিং সেন্টার"
                     value={institutionName}
                     onChange={(e) => setInstitutionName(e.target.value)}
+                    className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">ফোন নম্বর</label>
+                  <input 
+                    required
+                    type="tel" 
+                    placeholder="০১xxxxxxxxx"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
                     className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
                   />
                 </div>

@@ -39,7 +39,7 @@ interface AuthContextType {
   loading: boolean;
   authError: string | null;
   loginWithEmail: (email: string, pass: string) => Promise<void>;
-  signup: (email: string, pass: string, institutionName: string) => Promise<void>;
+  signup: (email: string, pass: string, institutionName: string, phone: string) => Promise<void>;
   createStaffAccount: (email: string, pass: string) => Promise<string>;
   logout: () => Promise<void>;
   clearError: () => void;
@@ -180,7 +180,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const signup = async (email: string, pass: string, institutionName: string) => {
+  const signup = async (email: string, pass: string, institutionName: string, phone: string) => {
     try {
       setAuthError(null);
       const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
@@ -202,16 +202,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isPromoUser: true, // Tag them for the 99 BDT offer later
         aiCredits: 0,
         hasReceivedInitialCredits: true,
-        dismissedNotifications: []
+        dismissedNotifications: [],
+        phone: phone
       };
       
+      // Also initialize institution doc if needed, but it's usually done in Institution.tsx on first visit
+      // Let's explicitly create it here to be safe and include the phone
+      await setDoc(doc(db, 'institutions', firebaseUser.uid), {
+        id: firebaseUser.uid,
+        name: institutionName,
+        phone: phone,
+        email: email.toLowerCase(),
+        subscriptionPlan: 'standard',
+        subscriptionExpiry: expiryDate.toISOString(),
+        createdAt: new Date().toISOString()
+      }, { merge: true });
+
       await setDoc(doc(db, 'users', firebaseUser.uid), newProfile);
 
       // Initialize credits document with 0 balance
       await setDoc(doc(db, 'credits', firebaseUser.uid), {
         userId: firebaseUser.uid,
         balance: 0,
-        aiBalance: 0,
+        aiBalance: 5, // Give 5 trial credits as it's common in other parts of the app
         totalSent: 0,
         lastUpdated: new Date().toISOString()
       });

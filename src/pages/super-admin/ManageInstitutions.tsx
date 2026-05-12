@@ -29,6 +29,7 @@ import {
   Eye,
   Archive,
   UserCheck,
+  Phone,
   MoreHorizontal,
   Clock,
   CreditCard,
@@ -72,6 +73,7 @@ export function ManageInstitutions() {
   const [newInst, setNewInst] = useState({
     name: '',
     email: '',
+    phone: '',
     password: '',
     plan: 'free',
     tokens: 100,
@@ -212,13 +214,22 @@ export function ManageInstitutions() {
         lastUpdated: new Date().toISOString()
       }, { merge: true });
 
-      // Update user cache for aiCredits
+      // Update user cache for aiCredits and other fields
       await updateDoc(doc(db, 'users', selectedInst.id), {
+        displayName: selectedInst.displayName,
+        phone: selectedInst.phone || '',
         subscriptionPlan: selectedInst.subscriptionPlan,
         subscriptionExpiry: selectedInst.subscriptionExpiry || null,
         superAdminNote: selectedInst.superAdminNote || '',
         isVerified: selectedInst.isVerified || false,
         aiCredits: Number(selectedInst.aiCredits || 0)
+      });
+
+      // Update institution doc as well
+      await updateDoc(doc(db, 'institutions', selectedInst.id), {
+        name: selectedInst.displayName,
+        phone: selectedInst.phone || '',
+        email: selectedInst.email
       });
 
       setIsEditModalOpen(false);
@@ -249,10 +260,20 @@ export function ManageInstitutions() {
         uid,
         email: newInst.email,
         displayName: newInst.name,
+        phone: newInst.phone,
         role: 'admin',
         institutionId: uid,
         subscriptionPlan: newInst.plan,
         aiCredits: Number(newInst.aiCredits || 0),
+        createdAt: new Date().toISOString()
+      });
+
+      // 2.5 Create Institution Doc
+      await setDoc(doc(db, 'institutions', uid), {
+        id: uid,
+        name: newInst.name,
+        phone: newInst.phone,
+        email: newInst.email,
         createdAt: new Date().toISOString()
       });
 
@@ -265,7 +286,7 @@ export function ManageInstitutions() {
       });
 
       setIsCreateModalOpen(false);
-      setNewInst({ name: '', email: '', password: '', plan: 'free', tokens: 0, aiCredits: 0 });
+      setNewInst({ name: '', email: '', phone: '', password: '', plan: 'free', tokens: 0, aiCredits: 0 });
       setToast({
         message: "Institution created successfully",
         type: 'success',
@@ -479,6 +500,7 @@ export function ManageInstitutions() {
                       <div className="bg-gray-50/50 dark:bg-gray-800/30 p-2 rounded-2xl border border-gray-100 dark:border-gray-800">
                         <DetailRow label="Display Name" value={selectedInst.displayName} icon={UserCheck} />
                         <DetailRow label="Primary Email" value={selectedInst.email} icon={Mail} />
+                        <DetailRow label="Contact Phone" value={selectedInst.phone} icon={Phone} />
                         <DetailRow label="Institution User ID" value={selectedInst.id} icon={Archive} />
                         <DetailRow label="Registration Date" value={selectedInst.createdAt ? formatDate(selectedInst.createdAt) : 'N/A'} icon={Calendar} />
                         <DetailRow label="Subscription Plan" value={selectedInst.subscriptionPlan || 'Free'} icon={Zap} />
@@ -1092,6 +1114,17 @@ export function ManageInstitutions() {
                   />
                 </div>
                 <div className="space-y-2">
+                  <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">Phone Number</label>
+                  <input 
+                    required
+                    type="tel"
+                    value={newInst.phone}
+                    onChange={(e) => setNewInst({ ...newInst, phone: e.target.value })}
+                    placeholder="01xxxxxxxxx"
+                    className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border-none rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+                  />
+                </div>
+                <div className="space-y-2">
                   <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">Email Address</label>
                   <input 
                     required
@@ -1148,6 +1181,28 @@ export function ManageInstitutions() {
                 </button>
               </div>
               <form onSubmit={handleUpdate} className="p-6 space-y-6 overflow-y-auto">
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">Institution Name</label>
+                  <input 
+                    required
+                    type="text"
+                    value={selectedInst.displayName}
+                    onChange={(e) => setSelectedInst({ ...selectedInst, displayName: e.target.value })}
+                    className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border-none rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">Phone Number</label>
+                  <input 
+                    required
+                    type="tel"
+                    value={selectedInst.phone || ''}
+                    onChange={(e) => setSelectedInst({ ...selectedInst, phone: e.target.value })}
+                    className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border-none rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+                  />
+                </div>
+
                 <div className="space-y-2">
                   <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">Subscription Plan</label>
                   <select 
