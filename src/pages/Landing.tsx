@@ -233,7 +233,7 @@ export function Landing() {
             className="inline-flex items-center gap-3 bg-indigo-600 text-white px-6 py-2.5 rounded-full text-sm font-black mb-8 shadow-xl shadow-indigo-200 animate-pulse"
           >
             <Sparkles className="w-4 h-4" />
-            লঞ্চ অফার: মাত্র ৯৯ টাকায় এক মাসের প্রিমিয়াম সার্ভিস! 🚀
+            লঞ্চ ক্যাম্পেইন: নতুন রেজিস্ট্রেশনে ৩ মাস সব কিছু একদম ফ্রি! 🚀
           </motion.div>
           <motion.h1 
             initial={{ opacity: 0, y: 30 }}
@@ -242,7 +242,7 @@ export function Landing() {
             className="text-4xl md:text-7xl font-black text-gray-900 mb-6 leading-[1.1] tracking-tight"
           >
             আপনার প্রতিষ্ঠান এখন <br />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600 uppercase">AI-পাওয়ারড স্মার্ট ডিজিটাল</span>
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600 uppercase">স্মার্ট ও ডিজিটাল</span>
           </motion.h1>
           <motion.p 
             initial={{ opacity: 0, y: 20 }}
@@ -250,7 +250,7 @@ export function Landing() {
             transition={{ duration: 0.6, delay: 0.2 }}
             className="text-lg md:text-xl text-gray-600 mb-10 max-w-3xl mx-auto leading-relaxed font-medium"
           >
-            শিক্ষা প্রতিষ্ঠানের আধুনিক রুপান্তরে আমরা নিয়ে এসেছি AI-ভিত্তিক সলিউশন। প্রশ্নপত্র জেনারেট করা থেকে শুরু করে আইডি কার্ড, এটেনডেন্স এবং ফি কালেকশন - সবকিছু এখন আরও সহজ ও প্রফেশনাল।
+            শিক্ষা প্রতিষ্ঠানের আধুনিক রুপান্তরে আমরা নিয়ে এসেছি স্মার্ট সলিউশন। আইডি কার্ড, এটেনডেন্স এবং ফি কালেকশন - সবকিছু এখন আরও সহজ ও প্রফেশনাল। কোনো খরচ ছাড়াই আজই শুরু করুন আপনার ডিজিটাল যাত্রা।
           </motion.p>
           <motion.div 
             initial={{ opacity: 0, scale: 0.9 }}
@@ -262,7 +262,7 @@ export function Landing() {
               to="/signup"
               className="w-full sm:w-auto bg-blue-600 text-white px-10 py-5 rounded-2xl text-lg font-black hover:bg-blue-700 transition-all shadow-2xl shadow-blue-200 flex items-center justify-center gap-2 group cursor-pointer"
             >
-              ৯৯ টাকায় শুরু করুন
+              ফ্রি রেজিস্ট্রেশন করুন
               <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
             </Link>
             <a 
@@ -290,6 +290,63 @@ export function Landing() {
               />
             </div>
           </motion.div>
+        </div>
+      </section>
+
+      {/* Campaign Section */}
+      <section className="py-24 px-4 bg-gray-50 relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-96 h-96 bg-indigo-100 rounded-full blur-3xl -mr-48 -mt-48 opacity-50"></div>
+        <div className="max-w-7xl mx-auto relative z-10">
+          <div className="bg-white rounded-[3rem] p-8 md:p-16 border border-indigo-100 shadow-2xl shadow-indigo-100 flex flex-col lg:flex-row items-center gap-12">
+            <div className="flex-1 space-y-6">
+              <span className="px-5 py-2 bg-indigo-600 text-white text-xs font-black uppercase tracking-widest rounded-full">
+                খাস অফার
+              </span>
+              <h2 className="text-3xl md:text-5xl font-black text-gray-900 leading-tight tracking-tight">
+                আপনার প্রতিষ্ঠানের জন্য <br />
+                <span className="text-indigo-600">সবকিছুই ৩ মাস ফ্রি!</span>
+              </h2>
+              <p className="text-gray-600 text-lg font-medium leading-relaxed">
+                শিক্ষা প্রতিষ্ঠানকে ডিজিটালাইজ করার এই যাত্রায় আমরা দিচ্ছি বিশেষ সুবিধা। নতুন রেজিস্ট্রেশন করলেই আপনি পাচ্ছেন ৩ মাস সম্পূর্ণ প্রিমিয়াম এক্সেস একদম ফ্রি। কোনো ক্রেডিট কার্ড বা অগ্রিম পেমেন্টের প্রয়োজন নেই।
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4">
+                {[
+                  '৩ মাস সম্পূর্ণ ফ্রি এক্সেস',
+                  'প্রিমিয়াম AI টুলস সমূহ',
+                  'ডিজিটাল আইডি কার্ড জেনারেটর',
+                  'স্মার্ট এটেনডেন্স সিস্টেম',
+                  'ফি ও পেমেন্ট ট্র্যাকিং',
+                  '২৪/৭ কাস্টমার সাপোর্ট'
+                ].map((item, i) => (
+                  <div key={i} className="flex items-center gap-3">
+                    <div className="w-6 h-6 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center flex-shrink-0">
+                      <CheckCircle2 className="w-4 h-4" />
+                    </div>
+                    <span className="text-gray-700 font-bold text-sm tracking-tight">{item}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="flex-shrink-0 w-full lg:w-96 text-center space-y-6 bg-indigo-50 p-10 rounded-[2.5rem] border-2 border-indigo-100 relative">
+              <div className="absolute -top-6 left-1/2 -translate-x-1/2 bg-white px-6 py-2 rounded-full border border-indigo-100 shadow-sm text-[10px] font-black uppercase text-indigo-600 tracking-widest">
+                সীমিত সময়ের অফার
+              </div>
+              <div className="flex flex-col items-center justify-center">
+                <span className="text-gray-400 text-sm font-bold uppercase tracking-widest mb-2">প্রথম ৩ মাস</span>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-7xl font-black text-indigo-900 tracking-tighter">০</span>
+                  <span className="text-2xl font-black text-indigo-400">টাকা</span>
+                </div>
+              </div>
+              <Link 
+                to="/signup"
+                className="w-full py-5 bg-indigo-600 text-white rounded-2xl font-black text-lg hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-200 block"
+              >
+                ফ্রি শুরু করুন
+              </Link>
+              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest leading-relaxed">ট্রায়াল শেষে নাম মাত্র মূল্যে কন্টিনিউ করার সুযোগ</p>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -458,7 +515,7 @@ export function Landing() {
               আপনার প্রতিষ্ঠানের প্রয়োজন অনুযায়ী সেরা প্ল্যানটি বেছে নিন। কোনো লুকানো চার্জ নেই।
               <br />
               <span className="inline-block mt-4 px-4 py-1.5 bg-indigo-100 text-indigo-700 rounded-full text-sm font-black">
-                🔥 লিমিটেড অফার: যেকোনো পেইড প্ল্যান প্রথম মাসে মাত্র ৯৯ টাকা!
+                🔥 লিমিটেড অফার: যেকোনো পেইড প্ল্যান প্রথম ৩ মাস সম্পূর্ণ ফ্রি!
               </span>
             </motion.p>
           </div>
@@ -658,24 +715,28 @@ export function Landing() {
       {/* CTA Section */}
       <section className="py-24 px-4 bg-white">
         <div className="max-w-5xl mx-auto bg-gray-900 rounded-[2rem] p-8 md:p-16 text-center relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-64 h-64 bg-blue-600/20 rounded-full blur-3xl -mr-32 -mt-32"></div>
-          <div className="absolute bottom-0 left-0 w-64 h-64 bg-blue-600/20 rounded-full blur-3xl -ml-32 -mb-32"></div>
+          <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-600/20 rounded-full blur-3xl -mr-32 -mt-32"></div>
+          <div className="absolute bottom-0 left-0 w-64 h-64 bg-indigo-600/20 rounded-full blur-3xl -ml-32 -mb-32"></div>
           
           <h2 className="text-3xl md:text-5xl font-black text-white mb-6 relative z-10">
             আজই আপনার শিক্ষা প্রতিষ্ঠানকে <br />
-            <span className="text-blue-500">ডিজিটাল করুন</span>
+            <span className="text-indigo-500">ডিজিটাল করুন</span>
           </h2>
-          <p className="text-gray-400 text-lg mb-10 max-w-2xl mx-auto relative z-10">
-            কোনো ক্রেডিট কার্ড ছাড়াই রেজিস্ট্রেশন করুন এবং স্কুল, মাদ্রাসা বা কোচিং ম্যানেজমেন্টের সব ফিচার ব্যবহার করে দেখুন। 
+          <p className="text-gray-400 text-lg mb-10 max-w-2xl mx-auto relative z-10 font-medium">
+            রেজিস্ট্রেশন করুন সম্পূর্ণ ফ্রি এবং আপনার শিক্ষা প্রতিষ্ঠানকে দিন এক আধুনিক রূপ। আপনার সব ডাটা নিরাপদে থাকবে এবং যেকোনো সময় সাহায্য পেতে আমরা আছি আপনার পাশে।
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 relative z-10">
             <Link 
               to="/signup"
-              className="w-full sm:w-auto bg-blue-600 text-white px-10 py-4 rounded-full text-lg font-black hover:bg-blue-700 transition-all shadow-xl shadow-blue-500/20 cursor-pointer"
+              className="w-full sm:w-auto bg-blue-600 text-white px-12 py-5 rounded-2xl text-lg font-black hover:bg-blue-700 transition-all shadow-2xl shadow-blue-500/20 cursor-pointer flex items-center justify-center gap-2 group"
             >
-              ফ্রি ট্রায়াল শুরু করুন
+              ফ্রি শুরু করুন
+              <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
             </Link>
           </div>
+          <p className="mt-8 text-gray-500 text-sm font-bold uppercase tracking-widest relative z-10">
+            🔥 ৫০০০+ ইউজার অলরেডি জয়েন করেছেন
+          </p>
         </div>
       </section>
 
