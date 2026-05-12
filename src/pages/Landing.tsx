@@ -18,6 +18,9 @@ import {
   Clock,
   AlertTriangle,
   BookOpen,
+  BrainCircuit,
+  Sparkles,
+  Library,
   User as UserIcon,
   ArrowRight as ArrowRightIcon
 } from 'lucide-react';
@@ -29,11 +32,18 @@ import { useAuth } from '../lib/auth';
 
 const features = [
   {
+    title: 'AI জেনারেটেড সৃজনশীল প্রশ্ন ও লেসন প্ল্যান',
+    description: 'AI ব্যবহার করে মাত্র কয়েক মিনিটে যেকোনো বিষয়ের বোর্ড স্ট্যান্ডার্ড সৃজনশীল প্রশ্ন, লেসন প্ল্যান ও স্টাডি শীট তৈরি করুন।',
+    icon: BrainCircuit,
+    color: 'text-indigo-600',
+    bgColor: 'bg-indigo-100'
+  },
+  {
     title: 'প্রফেশনাল এডমিট ও আইডি কার্ড ডিজাইন',
     description: 'আপনার প্রতিষ্ঠানের লোগো এবং ব্র্যান্ডিং সহ প্রফেশনাল মানের আইডি কার্ড এবং এডমিট কার্ড (উভয় পিঠ) ডিজাইন ও জেনারেট করুন।',
     icon: CreditCard,
-    color: 'text-indigo-600',
-    bgColor: 'bg-indigo-100'
+    color: 'text-blue-600',
+    bgColor: 'bg-blue-100'
   },
   {
     title: 'টিচার-লিঙ্কড স্মার্ট এটেনডেন্স',
@@ -45,7 +55,7 @@ const features = [
   {
     title: 'বিস্তারিত ফি ও পেমেন্ট রিপোর্ট',
     description: 'মাসিক বেতন, পরীক্ষার ফি এবং অন্যান্য বকেয়া ট্র্যাক করুন। লোগো সহ প্রফেশনাল পেমেন্ট রসিদ এবং দৈনন্দিন আয়-ব্যয়ের PDF রিপোর্ট জেনারেট করুন।',
-    icon: CreditCard,
+    icon: BarChart3,
     color: 'text-green-600',
     bgColor: 'bg-green-100'
   },
@@ -53,22 +63,15 @@ const features = [
     title: 'ডিজিটাল কোচিং প্রোফাইল ও ডাটা',
     description: 'স্কুল, মাদ্রাসা ও কোচিং সেন্টারের ছাত্রদের ভর্তি, ডিজিটাল প্রোফাইল এবং একাডেমিক তথ্য নিরাপদে পরিচালনা করুন।',
     icon: Users,
-    color: 'text-blue-600',
-    bgColor: 'bg-blue-100'
+    color: 'text-emerald-600',
+    bgColor: 'bg-emerald-100'
   },
   {
-    title: 'পরীক্ষার রেজাল্ট ও অটোমেটিক মার্কশিট',
-    description: 'সহজে পরীক্ষার মার্কস এন্ট্রি করুন এবং অটোমেটিক প্রগতি রিপোর্ট কার্ড বা ডিজিটাল মার্কশিট তৈরি করুন।',
-    icon: BarChart3,
+    title: 'ডিজিটাল রিসোর্স লাইব্রেরি',
+    description: 'আপনার প্রতিষ্ঠানের সব স্টাডি মেটেরিয়াল, লেকচার শিট ও গুরুত্বপূর্ণ লিঙ্কগুলো ছাত্রদের জন্য এক জায়গায় সাজিয়ে রাখুন।',
+    icon: Library,
     color: 'text-orange-600',
     bgColor: 'bg-orange-100'
-  },
-  {
-    title: 'SMS ও কাস্টম নোটিফিকেশন',
-    description: 'ভর্তি, ফি, উপস্থিতি ও পরীক্ষার নোটিশ অভিভাবকদের পাঠান অটোমেটেড SMS এবং হোয়াটসঅ্যাপ মেসেজের মাধ্যমে।',
-    icon: MessageSquare,
-    color: 'text-pink-600',
-    bgColor: 'bg-pink-100'
   }
 ];
 
@@ -227,10 +230,10 @@ export function Landing() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
-            className="inline-flex items-center gap-2 bg-blue-100 text-blue-700 px-4 py-2 rounded-full text-sm font-bold mb-8"
+            className="inline-flex items-center gap-3 bg-indigo-600 text-white px-6 py-2.5 rounded-full text-sm font-black mb-8 shadow-xl shadow-indigo-200 animate-pulse"
           >
-            <ShieldCheck className="w-4 h-4" />
-            স্কুল, মাদ্রাসা ও কোচিং ম্যানেজমেন্টের আধুনিক সমাধান
+            <Sparkles className="w-4 h-4" />
+            লঞ্চ অফার: মাত্র ৯৯ টাকায় এক মাসের প্রিমিয়াম সার্ভিস! 🚀
           </motion.div>
           <motion.h1 
             initial={{ opacity: 0, y: 30 }}
@@ -238,8 +241,8 @@ export function Landing() {
             transition={{ duration: 0.6, delay: 0.1 }}
             className="text-4xl md:text-7xl font-black text-gray-900 mb-6 leading-[1.1] tracking-tight"
           >
-            শিক্ষা প্রতিষ্ঠানের জন্য <br />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600">স্মার্ট ও প্রফেশনাল ম্যানেজমেন্ট</span>
+            আপনার প্রতিষ্ঠান এখন <br />
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600 uppercase">AI-পাওয়ারড স্মার্ট ডিজিটাল</span>
           </motion.h1>
           <motion.p 
             initial={{ opacity: 0, y: 20 }}
@@ -247,7 +250,7 @@ export function Landing() {
             transition={{ duration: 0.6, delay: 0.2 }}
             className="text-lg md:text-xl text-gray-600 mb-10 max-w-3xl mx-auto leading-relaxed font-medium"
           >
-            আপনার প্রতিষ্ঠানকে দিন একটি প্রফেশনাল রূপ। আইডি কার্ড, এডমিট কার্ড, এটেনডেন্স এবং ফি কালেকশন - সবকিছু এখন আপনার হাতের নাগালে। কোচিং, মাদ্রাসা বা স্কুলের সব জটিল সমস্যা সমাধান করুন এক ক্লিকে।
+            শিক্ষা প্রতিষ্ঠানের আধুনিক রুপান্তরে আমরা নিয়ে এসেছি AI-ভিত্তিক সলিউশন। প্রশ্নপত্র জেনারেট করা থেকে শুরু করে আইডি কার্ড, এটেনডেন্স এবং ফি কালেকশন - সবকিছু এখন আরও সহজ ও প্রফেশনাল।
           </motion.p>
           <motion.div 
             initial={{ opacity: 0, scale: 0.9 }}
@@ -259,7 +262,7 @@ export function Landing() {
               to="/signup"
               className="w-full sm:w-auto bg-blue-600 text-white px-10 py-5 rounded-2xl text-lg font-black hover:bg-blue-700 transition-all shadow-2xl shadow-blue-200 flex items-center justify-center gap-2 group cursor-pointer"
             >
-              এখনই শুরু করুন
+              ৯৯ টাকায় শুরু করুন
               <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
             </Link>
             <a 
@@ -453,6 +456,10 @@ export function Landing() {
               className="text-gray-500 max-w-2xl mx-auto font-medium"
             >
               আপনার প্রতিষ্ঠানের প্রয়োজন অনুযায়ী সেরা প্ল্যানটি বেছে নিন। কোনো লুকানো চার্জ নেই।
+              <br />
+              <span className="inline-block mt-4 px-4 py-1.5 bg-indigo-100 text-indigo-700 rounded-full text-sm font-black">
+                🔥 লিমিটেড অফার: যেকোনো পেইড প্ল্যান প্রথম মাসে মাত্র ৯৯ টাকা!
+              </span>
             </motion.p>
           </div>
 
