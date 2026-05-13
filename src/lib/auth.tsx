@@ -32,6 +32,7 @@ interface UserProfile {
   aiCredits?: number;
   hasReceivedInitialCredits?: boolean;
   isPromoUser?: boolean;
+  isNewUser?: boolean;
 }
 
 interface AuthContextType {
@@ -46,6 +47,10 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+const SUPER_ADMIN_EMAILS = [
+  'managemybatch@gmail.com'
+];
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<UserProfile | null>(null);
@@ -74,14 +79,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (userDoc.exists()) {
               let userData = userDoc.data() as UserProfile;
               
+              // Check for deleted/blacklisted status
+              if (userData.status === 'deleted' || userData.isBlacklisted) {
+                await signOut(auth);
+                setUser(null);
+                setLoading(false);
+                return;
+              }
+
+              // DATA SYNC: Ensure displayName/institution mismatch is fixed
+              // If displayName is missing but institution exists, fix it
+              if (!userData.displayName && (userData.institution || userData.institutionName)) {
+                const name = userData.institution || userData.institutionName;
+                await updateDoc(doc(db, 'users', firebaseUser.uid), { displayName: name });
+                userData.displayName = name!;
+              }
+
+              // Ensure institution doc exists and has the correct name
+              if (userData.role === 'admin' || userData.role === 'super_admin') {
+                try {
+                  const instDoc = await getDoc(doc(db, 'institutions', firebaseUser.uid));
+                  if (!instDoc.exists() || !instDoc.data().name) {
+                    await setDoc(doc(db, 'institutions', firebaseUser.uid), {
+                      id: firebaseUser.uid,
+                      name: userData.displayName || userData.institution || userData.institutionName || firebaseUser.displayName || '',
+                      email: userData.email,
+                      subscriptionPlan: userData.subscriptionPlan || 'basic',
+                      subscriptionExpiry: userData.subscriptionExpiry || null,
+                      createdAt: userData.lastLogin || new Date().toISOString()
+                    }, { merge: true });
+                  }
+                } catch (e) {
+                  console.error("Silent error syncing institution doc:", e);
+                }
+              }
+              
               // Ensure Super Admin status is synced
-              const superAdminEmails = [
-                'managemybatch@gmail.com',
-                'pallistoreinfo@gmail.com',
-                'admin@managemybatch.com'
-              ];
               const userEmail = firebaseUser.email?.toLowerCase() || '';
-              const shouldBeSuperAdmin = superAdminEmails.includes(userEmail);
+              const shouldBeSuperAdmin = SUPER_ADMIN_EMAILS.includes(userEmail);
               
               if (shouldBeSuperAdmin && !userData.isSuperAdmin) {
                 await updateDoc(doc(db, 'users', firebaseUser.uid), { isSuperAdmin: true, role: 'super_admin' });
@@ -109,15 +144,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               setUser(userData);
               setLoading(false);
             } else {
-              // Create new profile
-              const superAdminEmails = [
-                'managemybatch@gmail.com',
-                'pallistoreinfo@gmail.com',
-                'admin@managemybatch.com'
-              ];
               const userEmail = firebaseUser.email?.toLowerCase() || '';
-              const isSuperAdmin = superAdminEmails.includes(userEmail);
               
+              // Check if this email was recently deleted to prevent auto-recreation
+              try {
+                const blacklistDoc = await getDoc(doc(db, 'blacklist', firebaseUser.uid));
+                if (blacklistDoc.exists()) {
+                  await signOut(auth);
+                  setUser(null);
+                  setLoading(false);
+                  return;
+                }
+              } catch (e) {
+                console.error("Blacklist check error:", e);
+              }
+
+              const isSuperAdmin = SUPER_ADMIN_EMAILS.includes(userEmail);
+              
+              const expiryDate = new Date();
+              expiryDate.setMonth(expiryDate.getMonth() + 3);
+
               const newProfile: UserProfile = {
                 uid: firebaseUser.uid,
                 email: userEmail,
@@ -126,18 +172,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 role: isSuperAdmin ? 'super_admin' : 'admin',
                 isSuperAdmin,
                 institutionId: firebaseUser.uid,
-                subscriptionPlan: 'free',
-                aiCredits: 0,
+                subscriptionPlan: 'basic', // Default to basic (200 students) for launch
+                subscriptionExpiry: expiryDate.toISOString(),
+                aiCredits: 1500, // Give full AI credits for trial
                 hasReceivedInitialCredits: true,
-                dismissedNotifications: []
+                dismissedNotifications: [],
+                isNewUser: true // Flag for welcome modal
               };
               await setDoc(doc(db, 'users', firebaseUser.uid), newProfile);
               
-              // Initialize credits document with 0 balance
+              // Also create institution doc to ensure display name is captured
+              await setDoc(doc(db, 'institutions', firebaseUser.uid), {
+                id: firebaseUser.uid,
+                name: firebaseUser.displayName || '', 
+                email: userEmail,
+                subscriptionPlan: 'basic',
+                subscriptionExpiry: expiryDate.toISOString(),
+                createdAt: new Date().toISOString()
+              }, { merge: true });
+              
+              // Initialize credits document with balance matching the plan
               await setDoc(doc(db, 'credits', firebaseUser.uid), {
                 userId: firebaseUser.uid,
                 balance: 0,
-                aiBalance: 0,
+                aiBalance: 1500,
                 totalSent: 0,
                 lastUpdated: new Date().toISOString()
               });
@@ -197,10 +255,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         role: 'admin',
         institution: institutionName,
         institutionId: firebaseUser.uid,
-        subscriptionPlan: 'standard', // Give them Standard features
+        subscriptionPlan: 'basic', // Give them Basic features (200 students)
         subscriptionExpiry: expiryDate.toISOString(),
         isPromoUser: true, // Tag them for the 99 BDT offer later
-        aiCredits: 0,
+        isNewUser: true, // Flag for welcome modal
+        aiCredits: 1500,
         hasReceivedInitialCredits: true,
         dismissedNotifications: [],
         phone: phone
@@ -213,18 +272,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         name: institutionName,
         phone: phone,
         email: email.toLowerCase(),
-        subscriptionPlan: 'standard',
+        subscriptionPlan: 'basic',
         subscriptionExpiry: expiryDate.toISOString(),
         createdAt: new Date().toISOString()
       }, { merge: true });
 
       await setDoc(doc(db, 'users', firebaseUser.uid), newProfile);
 
-      // Initialize credits document with 0 balance
+      // Initialize credits document with 1500 balance
       await setDoc(doc(db, 'credits', firebaseUser.uid), {
         userId: firebaseUser.uid,
         balance: 0,
-        aiBalance: 5, // Give 5 trial credits as it's common in other parts of the app
+        aiBalance: 1500,
         totalSent: 0,
         lastUpdated: new Date().toISOString()
       });

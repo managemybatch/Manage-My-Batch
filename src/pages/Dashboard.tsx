@@ -64,6 +64,24 @@ export function Dashboard() {
   const [aiBalance, setAiBalance] = useState(0);
   const [holidayNotification, setHolidayNotification] = useState<any | null>(null);
   const [showPricing, setShowPricing] = useState(false);
+  const [isWelcomeModalOpen, setIsWelcomeModalOpen] = useState(false);
+
+  useEffect(() => {
+    if (user?.isNewUser) {
+      setIsWelcomeModalOpen(true);
+    }
+  }, [user]);
+
+  const closeWelcomeModal = async () => {
+    setIsWelcomeModalOpen(false);
+    if (user) {
+      try {
+        await updateDoc(doc(db, 'users', user.uid), { isNewUser: false });
+      } catch (err) {
+        console.error("Error clearing isNewUser flag:", err);
+      }
+    }
+  };
 
   useEffect(() => {
     if (!user) return;
@@ -563,7 +581,7 @@ export function Dashboard() {
               <h2 className="text-xl font-black text-indigo-900">Welcome to Launch Campaign! 🚀</h2>
               <p className="text-indigo-600 font-medium text-sm">
                 You currently have <span className="font-black text-indigo-700">3 Months FREE</span> access to Standard features. 
-                After that, enjoy the platform for just <span className="font-black text-indigo-700 font-mono">৳99/month</span> for the rest of 2026.
+                Manage your institution with ease and grow without limits.
               </p>
             </div>
           </div>
@@ -1221,6 +1239,43 @@ export function Dashboard() {
         isOpen={showPricing} 
         onClose={() => setShowPricing(false)} 
       />
+
+      {/* Welcome Modal */}
+      <Modal
+        isOpen={isWelcomeModalOpen}
+        onClose={closeWelcomeModal}
+        title="অভিনন্দন! 🎉"
+        maxWidth="max-w-md"
+      >
+        <div className="space-y-6 text-center">
+          <div className="flex justify-center">
+            <div className="w-20 h-20 bg-emerald-100 rounded-3xl flex items-center justify-center text-emerald-600 shadow-lg shadow-emerald-100">
+              <Gift className="w-10 h-10" />
+            </div>
+          </div>
+          
+          <div className="space-y-2">
+            <h3 className="text-2xl font-black text-gray-900">রেজিস্ট্রেশন সফল হয়েছে!</h3>
+            <p className="text-gray-500 font-medium">
+              লঞ্চ অফারের আওতায় আপনি <span className="text-indigo-600 font-bold">৩ মাসের ফ্রি প্রিমিয়াম এক্সেস</span> এবং <span className="text-indigo-600 font-bold">২০০ জন ছাত্র</span> লিমিট পেয়েছেন।
+            </p>
+          </div>
+
+          <div className="bg-indigo-50 p-4 rounded-2xl flex items-start gap-3 text-left border border-indigo-100">
+            <CheckCircle2 className="w-5 h-5 text-indigo-600 mt-0.5 flex-shrink-0" />
+            <p className="text-sm text-indigo-900 font-medium leading-relaxed">
+              আপনার ড্যাশবোর্ড এখন প্রস্তুত। ৩ মাস পর আপনি খুব সাশ্রয়ী মূল্যে সব প্রিমিয়াম ফিচার ব্যবহার চালিয়ে যেতে পারবেন।
+            </p>
+          </div>
+
+          <button
+            onClick={closeWelcomeModal}
+            className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 flex items-center justify-center gap-2"
+          >
+            চলুন শুরু করি <ArrowUpRight className="w-4 h-4" />
+          </button>
+        </div>
+      </Modal>
 
       {/* Notification Detail Modal */}
       <Modal

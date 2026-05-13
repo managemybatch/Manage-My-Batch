@@ -477,7 +477,7 @@ service cloud.firestore {
       allow list: if true; // Publicly listable for checking results
       allow create: if isTeacher() && isAssignedToBatch(request.resource.data.batchId) && (request.resource.data.institutionId == (getInstitutionId() != null ? getInstitutionId() : request.auth.uid)) && isValidOfflineExam(request.resource.data);
       allow update: if isTeacher() && isAssignedToBatch(resource.data.batchId) && resource.data.institutionId == (getInstitutionId() != null ? getInstitutionId() : request.auth.uid) && isValidOfflineExam(request.resource.data);
-      allow delete: if isInstitutionAdmin() && resource.data.institutionId == (getInstitutionId() != null ? getInstitutionId() : request.auth.uid);
+      allow delete: if isInstitutionAdmin() && isMemberOf(resource.data.institutionId);
     }
 
     match /blogs/{blogId} {
@@ -496,6 +496,7 @@ service cloud.firestore {
       allow read: if true; // Publicly readable for profiles and forms
       allow create: if isAdmin() || (isInstitutionAdmin() && instId == request.auth.uid);
       allow update: if (isAdmin() || (isInstitutionAdmin() && (instId == request.auth.uid || instId == getInstitutionId()))) && isValidInstitution(request.resource.data);
+      allow delete: if isAdmin();
     }
 
     match /applications/{appId} {
@@ -594,6 +595,12 @@ service cloud.firestore {
       allow read: if isOwner(userId) || isAdmin() || getInstitutionId() == userId;
       allow create: if isAdmin() || (isOwner(userId) && isValidCreditBalance(request.resource.data));
       allow update: if (isAdmin() || isOwner(userId) || getInstitutionId() == userId) && isValidCreditBalance(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /blacklist/{userId} {
+      allow read: if true; // Needed for auth check on login
+      allow write: if isAdmin();
     }
 
     match /{path=**} {

@@ -316,22 +316,55 @@ export function ManageInstitutions() {
         'teachers',
         'offline_exams',
         'attendance',
-        'institutions'
+        'batch_content',
+        'applications',
+        'study_sheets',
+        'question_papers',
+        'circulars',
+        'job_applications',
+        'teacher_attendance',
+        'exam_results',
+        'messages',
+        'notices',
+        'events',
+        'schedules',
+        'exam_ai_config',
+        'ai_evaluations'
       ];
 
-      // Delete associated data in batches (approximate client-side cleanup)
+      // Delete associated data in batches
       for (const coll of collectionsToClean) {
-        const q = query(collection(db, coll), where('institutionId', '==', instToDelete), limit(100));
-        const snapshot = await getDocs(q);
-        const deletePromises = snapshot.docs.map(d => deleteDoc(d.ref));
-        await Promise.all(deletePromises);
+        let hasMore = true;
+        while (hasMore) {
+          const q = query(collection(db, coll), where('institutionId', '==', instToDelete), limit(100));
+          const snapshot = await getDocs(q);
+          if (snapshot.empty) {
+            hasMore = false;
+          } else {
+            const deletePromises = snapshot.docs.map(d => deleteDoc(d.ref));
+            await Promise.all(deletePromises);
+            if (snapshot.docs.length < 100) hasMore = false;
+          }
+        }
       }
 
       await deleteDoc(doc(db, 'users', instToDelete));
       await deleteDoc(doc(db, 'credits', instToDelete));
+      await deleteDoc(doc(db, 'institutions', instToDelete));
+
+      // Create a blacklist entry to prevent auto-recreation of the profile
+      try {
+        await setDoc(doc(db, 'blacklist', instToDelete), {
+          id: instToDelete,
+          deletedAt: new Date().toISOString(),
+          reason: 'Institution deleted by Super Admin'
+        });
+      } catch (err) {
+        console.error("Error blacklisting user:", err);
+      }
       
       setToast({
-        message: "Institution and basic linked data deleted successfully",
+        message: "Institution and all linked data deleted successfully",
         type: 'success',
         isVisible: true
       });
@@ -351,8 +384,11 @@ export function ManageInstitutions() {
   };
 
   const filteredInstitutions = institutions.filter(inst => {
-    const matchesSearch = inst.displayName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         inst.email?.toLowerCase().includes(searchQuery.toLowerCase());
+    const nameToMatch = (inst.displayName || inst.name || inst.institution || inst.institutionName || '').toLowerCase();
+    const emailToMatch = (inst.email || '').toLowerCase();
+    const query = searchQuery.toLowerCase();
+
+    const matchesSearch = nameToMatch.includes(query) || emailToMatch.includes(query);
     
     if (!matchesSearch) return false;
 
@@ -407,7 +443,9 @@ export function ManageInstitutions() {
               <ArrowLeft className="w-5 h-5" />
             </button>
             <div>
-              <h1 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight">{selectedInst.displayName}</h1>
+              <h1 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight">
+                {selectedInst.displayName || selectedInst.name || selectedInst.institution || selectedInst.institutionName || 'Unnamed Institution'}
+              </h1>
               <div className="flex items-center gap-2 mt-1">
                 <span className="text-xs font-medium text-gray-500">{selectedInst.email}</span>
                 <span className="w-1 h-1 rounded-full bg-gray-300" />
@@ -498,9 +536,9 @@ export function ManageInstitutions() {
                         <Activity className="w-4 h-4 text-indigo-500" /> Account Information
                       </h4>
                       <div className="bg-gray-50/50 dark:bg-gray-800/30 p-2 rounded-2xl border border-gray-100 dark:border-gray-800">
-                        <DetailRow label="Display Name" value={selectedInst.displayName} icon={UserCheck} />
+                        <DetailRow label="Display Name" value={selectedInst.displayName || selectedInst.name || selectedInst.institution || selectedInst.institutionName} icon={UserCheck} />
                         <DetailRow label="Primary Email" value={selectedInst.email} icon={Mail} />
-                        <DetailRow label="Contact Phone" value={selectedInst.phone} icon={Phone} />
+                        <DetailRow label="Contact Phone" value={selectedInst.phone || 'Not Provided'} icon={Phone} />
                         <DetailRow label="Institution User ID" value={selectedInst.id} icon={Archive} />
                         <DetailRow label="Registration Date" value={selectedInst.createdAt ? formatDate(selectedInst.createdAt) : 'N/A'} icon={Calendar} />
                         <DetailRow label="Subscription Plan" value={selectedInst.subscriptionPlan || 'Free'} icon={Zap} />
@@ -904,7 +942,7 @@ export function ManageInstitutions() {
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 bg-indigo-100 dark:bg-indigo-900/40 rounded-xl flex items-center justify-center text-indigo-600 dark:text-indigo-400 font-bold shrink-0 relative">
-                        {inst.displayName?.charAt(0)}
+                        {inst.displayName?.charAt(0) || inst.name?.charAt(0) || inst.email?.charAt(0) || '?'}
                         {inst.isVerified && (
                           <div className="absolute -top-1 -right-1 bg-white dark:bg-gray-900 rounded-full p-0.5 shadow-sm">
                             <ShieldCheck className="w-3.5 h-3.5 text-indigo-600 fill-indigo-50" />
@@ -917,7 +955,7 @@ export function ManageInstitutions() {
                             onClick={() => fetchInstDetails(inst)}
                             className="text-sm font-bold text-gray-900 dark:text-white hover:text-indigo-600 transition-colors text-left truncate"
                           >
-                            {inst.displayName}
+                            {inst.displayName || inst.name || inst.institution || inst.institutionName || inst.email || 'Unnamed Institution'}
                           </button>
                           {inst.isPromoUser && (
                             <span className="px-1.5 py-0.5 bg-amber-100 text-amber-600 rounded text-[10px] font-black uppercase tracking-tighter shadow-sm animate-pulse">
