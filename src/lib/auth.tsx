@@ -33,6 +33,8 @@ interface UserProfile {
   hasReceivedInitialCredits?: boolean;
   isPromoUser?: boolean;
   isNewUser?: boolean;
+  status?: string;
+  isBlacklisted?: boolean;
 }
 
 interface AuthContextType {
@@ -88,21 +90,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               }
 
               // DATA SYNC: Ensure displayName/institution mismatch is fixed
-              // If displayName is missing but institution exists, fix it
-              if (!userData.displayName && (userData.institution || userData.institutionName)) {
-                const name = userData.institution || userData.institutionName;
-                await updateDoc(doc(db, 'users', firebaseUser.uid), { displayName: name });
-                userData.displayName = name!;
+              // If displayName is missing or is just an email, but institution name exists, fix it
+              const currentName = userData.displayName;
+              const hasCleanName = currentName && !currentName.includes('@');
+              const potentialName = userData.institution || userData.institutionName;
+              
+              if ((!hasCleanName) && potentialName) {
+                await updateDoc(doc(db, 'users', firebaseUser.uid), { 
+                  displayName: potentialName,
+                  institution: potentialName // sync legacy field if needed
+                });
+                userData.displayName = potentialName;
               }
 
-              // Ensure institution doc exists and has the correct name
+              // Ensure institution doc exists and has the correct name/phone
               if (userData.role === 'admin' || userData.role === 'super_admin') {
                 try {
                   const instDoc = await getDoc(doc(db, 'institutions', firebaseUser.uid));
-                  if (!instDoc.exists() || !instDoc.data().name) {
+                  if (!instDoc.exists() || !instDoc.data().name || (!instDoc.data().phone && userData.phone)) {
                     await setDoc(doc(db, 'institutions', firebaseUser.uid), {
                       id: firebaseUser.uid,
-                      name: userData.displayName || userData.institution || userData.institutionName || firebaseUser.displayName || '',
+                      name: userData.displayName || potentialName || firebaseUser.displayName || '',
+                      phone: userData.phone || instDoc.data()?.phone || '',
                       email: userData.email,
                       subscriptionPlan: userData.subscriptionPlan || 'basic',
                       subscriptionExpiry: userData.subscriptionExpiry || null,

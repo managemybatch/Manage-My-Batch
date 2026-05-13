@@ -87,29 +87,37 @@ export function ManageInstitutions() {
   const fetchInstitutions = async () => {
     setLoading(true);
     try {
-      const usersQuery = query(
-        collection(db, 'users'), 
-        where('role', '==', 'admin'),
-        limit(100)
+      // Primary source: institutions collection
+      const instQuery = query(
+        collection(db, 'institutions'),
+        limit(200)
       );
       
-      const [usersSnapshot, creditsSnapshot] = await Promise.all([
-        getDocs(usersQuery),
+      const [instSnapshot, usersSnapshot, creditsSnapshot] = await Promise.all([
+        getDocs(instQuery),
+        getDocs(query(collection(db, 'users'), where('role', '==', 'admin'), limit(200))),
         getDocs(collection(db, 'credits'))
       ]);
 
-      const creditsMap = new Map();
-      creditsSnapshot.docs.forEach(doc => {
-        creditsMap.set(doc.id, doc.data());
-      });
+      const instMap = new Map();
+      instSnapshot.docs.forEach(doc => instMap.set(doc.id, doc.data()));
 
-      const users = usersSnapshot.docs.map(doc => {
+      const creditsMap = new Map();
+      creditsSnapshot.docs.forEach(doc => creditsMap.set(doc.id, doc.data()));
+
+      // Primary source is users (admins) to ensure everyone shows up
+      const institutionsList = usersSnapshot.docs.map(doc => {
+        const id = doc.id;
         const userData = doc.data();
-        const creditData = creditsMap.get(doc.id);
+        const instData = instMap.get(id) || {};
+        const creditData = creditsMap.get(id);
+        
         return { 
-          id: doc.id, 
+          id, 
           ...userData,
-          // Authoritative balance from credits collection
+          ...instData,
+          displayName: instData.name || userData.displayName || userData.institution || userData.institutionName || instData.email || userData.email || 'Unnamed Institution',
+          phone: instData.phone || userData.phone || 'Not Provided',
           aiCredits: creditData?.aiBalance ?? userData.aiCredits ?? 0,
           smsBalance: creditData?.balance ?? userData.smsBalance ?? 0,
           studentCount: null,
@@ -118,9 +126,10 @@ export function ManageInstitutions() {
         };
       });
 
-      setInstitutions(users);
+      setInstitutions(institutionsList);
     } catch (error) {
-      handleFirestoreError(error, OperationType.LIST, 'users');
+      console.error("Error fetching institutions:", error);
+      handleFirestoreError(error, OperationType.LIST, 'institutions');
     } finally {
       setLoading(false);
     }
@@ -363,6 +372,9 @@ export function ManageInstitutions() {
         console.error("Error blacklisting user:", err);
       }
       
+      // Update local state immediately to avoid ghost items
+      setInstitutions(prev => prev.filter(inst => inst.id !== instToDelete));
+      
       setToast({
         message: "Institution and all linked data deleted successfully",
         type: 'success',
@@ -370,7 +382,7 @@ export function ManageInstitutions() {
       });
       setIsDeleteModalOpen(false);
       setInstToDelete(null);
-      fetchInstitutions();
+      // fetchInstitutions(); // No need to refetch if we filter locally correctly
     } catch (error: any) {
       console.error("Error deleting institution:", error);
       setToast({
@@ -971,7 +983,13 @@ export function ManageInstitutions() {
                             </div>
                           )}
                         </div>
-                        <p className="text-xs text-gray-400 truncate">{inst.email}</p>
+                        <p className="text-[10px] text-gray-500 font-bold font-mono tracking-tighter truncate">{inst.email}</p>
+                        {inst.phone && (
+                          <div className="flex items-center gap-1 mt-0.5">
+                            <Phone className="w-2.5 h-2.5 text-emerald-500" />
+                            <span className="text-[9px] font-black text-emerald-600 font-mono tracking-tighter">{inst.phone}</span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </td>
