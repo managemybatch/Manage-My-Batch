@@ -1,23 +1,27 @@
-import React from 'react';
-import { GraduationCap, Sparkles, UserPlus, ShieldCheck, Zap, Globe, ArrowLeft } from 'lucide-react';
+import React, { useState } from 'react';
+import { GraduationCap, Sparkles, UserPlus, ShieldCheck, Zap, Globe, ArrowLeft, Gift, CheckCircle2 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useAuth } from '../lib/auth';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
+import { Modal } from '../components/Modal';
 
 export function Signup() {
   const { signup } = useAuth();
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const [email, setEmail] = React.useState('');
-  const [password, setPassword] = React.useState('');
-  const [institutionName, setInstitutionName] = React.useState('');
-  const [phone, setPhone] = React.useState('');
-  const [loading, setLoading] = React.useState(false);
-  const [error, setError] = React.useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [institutionName, setInstitutionName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Strict field validation
     if (!institutionName.trim()) {
       setError('প্রতিষ্ঠানের নাম দিন।');
       return;
@@ -26,11 +30,24 @@ export function Signup() {
       setError('ফোন নম্বর দিন।');
       return;
     }
+    if (!email.trim()) {
+      setError('ইমেল ঠিকানা দিন।');
+      return;
+    }
+    if (!password.trim()) {
+      setError('পাসওয়ার্ড দিন।');
+      return;
+    }
+    if (password.length < 6) {
+      setError('পাসওয়ার্ডটি অন্তত ৬ অক্ষরের হতে হবে।');
+      return;
+    }
+
     setLoading(true);
     setError('');
     try {
       await signup(email, password, institutionName, phone);
-      navigate('/dashboard');
+      setShowSuccessModal(true);
     } catch (err: any) {
       console.error("Signup error:", err);
       if (err.code === 'auth/email-already-in-use') {
@@ -42,9 +59,13 @@ export function Signup() {
       } else {
         setError('অ্যাকাউন্ট তৈরি করতে ব্যর্থ হয়েছে। আবার চেষ্টা করুন।');
       }
-    } finally {
       setLoading(false);
     }
+  };
+
+  const handleModalClose = () => {
+    setShowSuccessModal(false);
+    navigate('/dashboard');
   };
 
   return (
@@ -208,6 +229,43 @@ export function Signup() {
           </div>
         </div>
       </div>
+      
+      {/* Success Modal */}
+      <Modal
+        isOpen={showSuccessModal}
+        onClose={handleModalClose}
+        title="অভিনন্দন! 🎉"
+        maxWidth="max-w-md"
+      >
+        <div className="space-y-6 text-center">
+          <div className="flex justify-center">
+            <div className="w-20 h-20 bg-emerald-100 rounded-3xl flex items-center justify-center text-emerald-600 shadow-lg shadow-emerald-100">
+              <Gift className="w-10 h-10" />
+            </div>
+          </div>
+          
+          <div className="space-y-2">
+            <h3 className="text-2xl font-black text-gray-900">অ্যাকাউন্ট তৈরি সফল হয়েছে!</h3>
+            <p className="text-gray-500 font-medium">
+              অভিনন্দন! আপনি লঞ্চ ক্যাম্পেইনের আওতায় <span className="text-indigo-600 font-bold">৩ মাসের ফ্রি অফার</span> এবং <span className="text-indigo-600 font-bold">২০০ জন স্টুডেন্ট</span> লিমিট পেয়েছেন।
+            </p>
+          </div>
+
+          <div className="bg-indigo-50 p-4 rounded-2xl flex items-start gap-3 text-left border border-indigo-100">
+            <CheckCircle2 className="w-5 h-5 text-indigo-600 mt-0.5 flex-shrink-0" />
+            <p className="text-sm text-indigo-900 font-medium leading-relaxed">
+              আপনার ড্যাশবোর্ড এখন প্রস্তুত। ৩ মাস পর আপনি মাত্র ৯৯ টাকায় সব প্রিমিয়াম ফিচার ব্যবহার করতে পারবেন।
+            </p>
+          </div>
+
+          <button
+            onClick={handleModalClose}
+            className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 flex items-center justify-center gap-2"
+          >
+            ড্যাশবোর্ডে যান <ArrowLeft className="w-4 h-4 rotate-180" />
+          </button>
+        </div>
+      </Modal>
     </div>
   );
 }

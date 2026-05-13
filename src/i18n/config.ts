@@ -709,12 +709,18 @@ const resources = {
         a8: "In the 'Digital Library' section, you can upload study materials, PDFs, and links. Your students can then access these resources through your institution's public website profile.",
         q9: "Can I design ID Cards and Admit Cards?",
         a9: "Yes! In the 'Marketing' section, you can design ID cards. For Admit Cards, go to the 'Offline Exams' section, select an exam, and go to the 'Admit Cards' tab to generate them for all students.",
-        q10: "What is the 99 BDT Launch Campaign?",
-        a10: "For a limited time, new institutions can enjoy all premium features (including AI tools and unlimited students) for just 99 BDT for the first month. Register now to grab this offer!",
+        q10: "How do I get the 3-month free launch offer?",
+        a10: "Immediately upon registration, you will receive the 3-month free launch offer. This includes access for up to 200 students and all premium AI tools. After 3 months, you can continue using all features for just 99 BDT per month.",
         q11: "How can teachers mark attendance?",
         a11: "You can generate a 'Public Attendance Link' for any batch in the 'Attendance' section. Share this link with the class teacher, and they can mark attendance from their mobile. You just need to verify and save it from your dashboard.",
         q12: "Can I generate branded payment receipts?",
-        a12: "Absolutely! When you collect a fee in the 'Fees' section, you can download a professional PDF receipt. It will automatically include your coaching logo, address, and student details."
+        a12: "Absolutely! When you collect a fee in the 'Fees' section, you can download a professional PDF receipt. It will automatically include your coaching logo, address, and student details.",
+        q13: "How do I import multiple students at once?",
+        a13: "Go to the 'Students' section and use the 'Import' feature. You can download a CSV template, fill it with your student details (name, phone, batch, roll), and upload it to add hundreds of students instantly.",
+        q14: "Can I manage multiple teachers in one account?",
+        a14: "Yes, you can add and manage your faculty in the 'Teachers & Staff' section. You can track their schedules, monthly salaries, and even invite them to mark attendance using smart links.",
+        q15: "How does the WhatsApp messaging integration work?",
+        a15: "After taking attendance or collecting fees, you have the option to send automated confirmation messages to parents via WhatsApp. This helps maintain professional communication and transparency."
       }
     }
   }
@@ -1444,12 +1450,18 @@ bn: {
         a8: "'ডিজিটাল লাইব্রেরি' সেকশনে আপনি স্টাডি মেটেরিয়াল, PDF এবং গুরুত্বপূর্ণ লিঙ্ক আপলোড করতে পারেন। আপনার ছাত্ররা আপনার প্রতিষ্ঠানের পাবলিক ওয়েবসাইট প্রোফাইলের মাধ্যমে এগুলো অ্যাক্সেস করতে পারবে।",
         q9: "আমি কি আইডি কার্ড এবং এডমিট কার্ড ডিজাইন করতে পারি?",
         a9: "হ্যাঁ! 'মার্কেটিং' সেকশন থেকে আপনি আইডি কার্ড ডিজাইন করতে পারেন। আর এডমিট কার্ডের জন্য 'অফলাইন পরীক্ষা' সেকশনে গিয়ে একটি পরীক্ষা সিলেক্ট করুন এবং 'এডমিট কার্ড' ট্যাব থেকে সবার জন্য কার্ড জেনারেট করুন।",
-        q10: "৯৯ টাকার লঞ্চ ক্যাম্পেইনটি কী?",
-        a10: "সীমিত সময়ের জন্য, নতুন শিক্ষা প্রতিষ্ঠানগুলো মাত্র ৯৯ টাকায় প্রথম মাসের জন্য সব প্রিমিয়াম ফিচার (AI টুলস এবং আনলিমিটেড ছাত্রসহ) উপভোগ করতে পারবে। এই অফারটি নিতে এখনই রেজিস্ট্রেশন করুন!",
+        q10: "কিভাবে ফ্রি ৩ মাসের লঞ্চ অফারটি পাবো?",
+        a10: "রেজিস্ট্রেশনের সাথে সাথেই আপনি ৩ মাসের ফ্রি লঞ্চ অফারটি পেয়ে যাবেন। এর আওতায় আপনি ২০০ জন স্টুডেন্ট এবং সব প্রিমিয়াম AI টুলস ব্যবহার করতে পারবেন। ৩ মাস পর আপনি চাইলে মাত্র ৯৯ টাকায় সব ফিচার ব্যবহার চালিয়ে যেতে পারবেন।",
         q11: "শিক্ষকরা কীভাবে হাজিরা নিতে পারবেন?",
-        a11: "'উপস্থিতি' সেকশনে গিয়ে যেকোনো ব্যাচের জন্য 'পাবলিক হাজিরা লিঙ্ক' তৈরি করতে পারেন। এই লিঙ্কটি সংশ্লিষ্ট শিক্ষককে দিলেই তিনি মোবাইল থেকে হাজিরা নিতে পারবেন। আপনি শুধু ড্যাশবোর্ড থেকে সেটি যাচাই করে সেভ করে দেবেন।",
+        a11: "আপনি 'উপস্থিতি' সেকশনে গিয়ে যেকোনো ব্যাচের জন্য 'পাবলিক হাজিরা লিঙ্ক' তৈরি করতে পারেন। এই লিঙ্কটি সংশ্লিষ্ট শিক্ষককে দিলেই তিনি মোবাইল থেকে হাজিরা নিতে পারবেন। আপনি শুধু ড্যাশবোর্ড থেকে সেটি যাচাই করে সেভ করে দেবেন।",
         q12: "আমি কি লোগোসহ পেমেন্ট রসিদ দিতে পারব?",
-        a12: "অবশ্যই! 'ফি' সেকশনে পেমেন্ট সংগ্রহের পর আপনি প্রফেশনাল PDF রসিদ ডাউনলোড করতে পারবেন। এতে আপনার প্রতিষ্ঠানের লোগো, ঠিকানা এবং ছাত্রের সব তথ্য অটোমেটিক যুক্ত থাকবে।"
+        a12: "অবশ্যই! 'ফি' সেকশনে পেমেন্ট সংগ্রহের পর আপনি প্রফেশনাল PDF রসিদ ডাউনলোড করতে পারবেন। এতে আপনার প্রতিষ্ঠানের লোগো, ঠিকানা এবং ছাত্রের সব তথ্য অটোমেটিক যুক্ত থাকবে।",
+        q13: "একসাথে অনেক ছাত্র ইমপোর্ট (Bulkd Import) করব কিভাবে?",
+        a13: "'ছাত্র' সেকশনে গিয়ে 'ইমপোর্ট' ফিচারটি ব্যবহার করুন। একটি সিএসভি টেম্পলেট ডাউনলোড করে তাতে ছাত্রদের তথ্য (নাম, ফোন, রোল, ব্যাচ) লিখে আপলোড করলেই শত শত ছাত্র একসাথে যোগ হয়ে যাবে।",
+        q14: "একই একাউন্টে একাধিক টিচার ম্যানেজ করা যায় কি?",
+        a14: "হ্যাঁ, 'শিক্ষক ও স্টাফ' সেকশনে আপনি আপনার প্রতিষ্ঠানের সব শিক্ষক যোগ করতে পারবেন। তাদের ক্লাস রুটিন এবং মাসিক বেতন ট্র্যাক করার পাশাপাশি স্মার্ট লিঙ্কের মাধ্যমে তাদের দিয়ে হাজিরাও নেওয়া সম্ভব।",
+        q15: "হোয়াটসঅ্যাপে মেসেজ পাঠানোর সুবিধা কি?",
+        a15: "ছাত্রদের হাজিরা নেওয়া বা বেতন আদায়ের পর সরাসরি অভিভাবকদের হোয়াটসঅ্যাপে অটোমেটেড মেসেজ পাঠানোর অপশন পাবেন। এতে প্রতিষ্ঠানের প্রফেশনালিজম ও স্বচ্ছতা বৃদ্ধি পায়।"
       }
     }
   }
