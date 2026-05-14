@@ -65,6 +65,7 @@ export function Dashboard() {
   const [holidayNotification, setHolidayNotification] = useState<any | null>(null);
   const [showPricing, setShowPricing] = useState(false);
   const [isWelcomeModalOpen, setIsWelcomeModalOpen] = useState(false);
+  const hasEverClosedModal = useRef(false);
 
   const [welcomeForm, setWelcomeForm] = useState({
     name: user?.displayName || '',
@@ -73,24 +74,30 @@ export function Dashboard() {
   const [welcomeLoading, setWelcomeLoading] = useState(false);
 
   useEffect(() => {
-    if (user?.isNewUser || (user && (!user.displayName || user.displayName.includes('@') || !user.phone))) {
+    if (hasEverClosedModal.current) return;
+    
+    const needsOnboarding = user?.isNewUser || (user && (!user.displayName || user.displayName.includes('@') || !user.phone));
+    
+    if (needsOnboarding) {
       setIsWelcomeModalOpen(true);
       setWelcomeForm({
-        name: user.displayName && !user.displayName.includes('@') ? user.displayName : '',
-        phone: user.phone || ''
+        name: user?.displayName && !user.displayName.includes('@') ? user.displayName : '',
+        phone: user?.phone || ''
       });
+    } else {
+      setIsWelcomeModalOpen(false);
     }
-  }, [user]);
+  }, [user?.uid, user?.displayName, user?.phone, user?.isNewUser]);
 
   const handleWelcomeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
     
-    if (!welcomeForm.name.trim()) return;
-    if (!welcomeForm.phone.trim()) return;
+    if (!welcomeForm.name.trim() || !welcomeForm.phone.trim()) return;
 
     setWelcomeLoading(true);
     try {
+      // 1. Update database
       await updateDoc(doc(db, 'users', user.uid), {
         displayName: welcomeForm.name,
         phone: welcomeForm.phone,
@@ -102,18 +109,22 @@ export function Dashboard() {
         phone: welcomeForm.phone
       }, { merge: true });
       
+      // 2. Local state updates to prevent re-opening
+      hasEverClosedModal.current = true;
       setIsWelcomeModalOpen(false);
     } catch (err) {
       console.error("Error updating welcome info:", err);
+      // Even on error, if the user wants it gone, we should probably let them try to close it
+      // or show a specific error message.
     } finally {
       setWelcomeLoading(false);
     }
   };
 
   const closeWelcomeModal = async () => {
-    // Only allow closing if data is present
-    if (user?.displayName && !user.displayName.includes('@') && user?.phone) {
-      setIsWelcomeModalOpen(false);
+    hasEverClosedModal.current = true;
+    setIsWelcomeModalOpen(false);
+    if (user) {
       try {
         await updateDoc(doc(db, 'users', user.uid), { isNewUser: false });
       } catch (err) {
