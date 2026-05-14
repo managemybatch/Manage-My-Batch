@@ -180,21 +180,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               setUser(userData);
               setLoading(false);
             } else {
-              const userEmail = firebaseUser.email?.toLowerCase() || '';
-              
-              // Check if this email was recently deleted to prevent auto-recreation
-              try {
-                const blacklistDoc = await getDoc(doc(db, 'blacklist', firebaseUser.uid));
-                if (blacklistDoc.exists()) {
-                  await signOut(auth);
-                  setUser(null);
-                  setLoading(false);
-                  return;
+              // NO DOC EXISTS.
+              // Check if we are in the middle of a signup (within last 30 seconds)
+              const isRecentSignup = firebaseUser.metadata.creationTime && 
+                (new Date().getTime() - new Date(firebaseUser.metadata.creationTime).getTime() < 30000);
+
+              if (isRecentSignup) {
+                // Wait for the signup function to finish creating the doc
+                // If it takes more than 10 seconds, we'll proceed to fallback below
+                const now = new Date().getTime();
+                const creation = new Date(firebaseUser.metadata.creationTime).getTime();
+                if (now - creation < 10000) {
+                   console.log("AuthProvider: Recent signup detected, waiting for profile doc...");
+                   return; 
                 }
-              } catch (e) {
-                console.error("Blacklist check error:", e);
               }
 
+              const userEmail = firebaseUser.email?.toLowerCase() || '';
+              
+              // NEW: Try to recover signup info from sessionStorage if we're creating a fallback
+              let signupInfo = { name: '', phone: '' };
+              try {
+                const stored = sessionStorage.getItem(`signup_info_${firebaseUser.uid}`);
+                if (stored) signupInfo = JSON.parse(stored);
+              } catch (e) {
+                console.error("Error reading signup info from session:", e);
+              }
+
+              // Only create a fallback profile if it's absolutely missing and not a recent signup
+              console.log("AuthProvider: Creating fallback profile for existing user with missing doc. Recovery info:", signupInfo);
+              
               const isSuperAdmin = SUPER_ADMIN_EMAILS.includes(userEmail);
               
               const expiryDate = new Date();
@@ -203,38 +218,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               const newProfile: UserProfile = {
                 uid: firebaseUser.uid,
                 email: userEmail,
-                displayName: firebaseUser.displayName || '',
+                displayName: signupInfo.name || firebaseUser.displayName || '',
                 photoURL: firebaseUser.photoURL || '',
                 role: isSuperAdmin ? 'super_admin' : 'admin',
                 isSuperAdmin,
                 institutionId: firebaseUser.uid,
-                subscriptionPlan: 'basic', // Default to basic (200 students) for launch
-                subscriptionExpiry: expiryDate.toISOString(),
-                aiCredits: 1500, // Give full AI credits for trial
-                hasReceivedInitialCredits: true,
-                dismissedNotifications: [],
-                isNewUser: true // Flag for welcome modal
-              };
-              await setDoc(doc(db, 'users', firebaseUser.uid), newProfile);
-              
-              // Also create institution doc to ensure display name is captured
-              await setDoc(doc(db, 'institutions', firebaseUser.uid), {
-                id: firebaseUser.uid,
-                name: firebaseUser.displayName || '', 
-                email: userEmail,
                 subscriptionPlan: 'basic',
                 subscriptionExpiry: expiryDate.toISOString(),
-                createdAt: new Date().toISOString()
-              }, { merge: true });
+                aiCredits: 1500,
+                hasReceivedInitialCredits: true,
+                dismissedNotifications: [],
+                isNewUser: true,
+                institution: signupInfo.name || firebaseUser.displayName || '',
+                phone: signupInfo.phone || ''
+              };
               
-              // Initialize credits document with balance matching the plan
-              await setDoc(doc(db, 'credits', firebaseUser.uid), {
-                userId: firebaseUser.uid,
-                balance: 0,
-                aiBalance: 1500,
-                totalSent: 0,
-                lastUpdated: new Date().toISOString()
-              });
+              // Create all docs atomically
+              await Promise.all([
+                setDoc(doc(db, 'users', firebaseUser.uid), newProfile),
+                setDoc(doc(db, 'institutions', firebaseUser.uid), {
+                  id: firebaseUser.uid,
+                  name: signupInfo.name || firebaseUser.displayName || '',
+                  displayName: signupInfo.name || firebaseUser.displayName || '',
+                  email: userEmail,
+                  phone: signupInfo.phone || '',
+                  subscriptionPlan: 'basic',
+                  subscriptionExpiry: expiryDate.toISOString(),
+                  createdAt: new Date().toISOString(),
+                  updatedAt: new Date().toISOString()
+                }),
+                setDoc(doc(db, 'credits', firebaseUser.uid), {
+                  userId: firebaseUser.uid,
+                  balance: 0,
+                  aiBalance: 1500,
+                  totalSent: 0,
+                  lastUpdated: new Date().toISOString()
+                })
+              ]);
+
+              // Cleanup session storage
+              sessionStorage.removeItem(`signup_info_${firebaseUser.uid}`);
             }
           } catch (err) {
             console.error("Error processing user profile:", err);
@@ -280,51 +303,94 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
       const firebaseUser = userCredential.user;
       
+      // Store signup info in session storage as a backup for the observer
+      // This is crucial if the following Firestore writes fail or are delayed.
+      try {
+        sessionStorage.setItem(`signup_info_${firebaseUser.uid}`, JSON.stringify({
+          name: institutionName,
+          phone: phone
+        }));
+      } catch (e) {
+        console.warn("Could not save signup info to session storage", e);
+      }
+
       const expiryDate = new Date();
       expiryDate.setMonth(expiryDate.getMonth() + 3);
 
+      const normalizedEmail = email.toLowerCase();
+
+      // First create users doc with all info
       const newProfile: UserProfile = {
         uid: firebaseUser.uid,
-        email: email.toLowerCase(),
+        email: normalizedEmail,
         displayName: institutionName,
         photoURL: '',
         role: 'admin',
         institution: institutionName,
         institutionId: firebaseUser.uid,
-        subscriptionPlan: 'basic', // Give them Basic features (200 students)
+        subscriptionPlan: 'basic',
         subscriptionExpiry: expiryDate.toISOString(),
-        isPromoUser: true, // Tag them for the 99 BDT offer later
-        isNewUser: true, // Flag for welcome modal
+        isPromoUser: true,
+        isNewUser: false, // Set to false because we already have the info from signup form
         aiCredits: 1500,
         hasReceivedInitialCredits: true,
         dismissedNotifications: [],
         phone: phone
       };
       
-      // Also initialize institution doc if needed, but it's usually done in Institution.tsx on first visit
-      // Let's explicitly create it here to be safe and include the phone
-      await setDoc(doc(db, 'institutions', firebaseUser.uid), {
+      // Use setDoc for everything at once to prevent race conditions
+      // This MUST be done before we resolve, but also before the observer kicks in
+      const p1 = setDoc(doc(db, 'users', firebaseUser.uid), newProfile);
+      const p2 = setDoc(doc(db, 'institutions', firebaseUser.uid), {
         id: firebaseUser.uid,
         name: institutionName,
+        displayName: institutionName,
         phone: phone,
-        email: email.toLowerCase(),
+        email: normalizedEmail,
         subscriptionPlan: 'basic',
         subscriptionExpiry: expiryDate.toISOString(),
-        createdAt: new Date().toISOString()
-      }, { merge: true });
-
-      await setDoc(doc(db, 'users', firebaseUser.uid), newProfile);
-
-      // Initialize credits document with 1500 balance
-      await setDoc(doc(db, 'credits', firebaseUser.uid), {
+        admissionForm: {
+          active: true,
+          title: 'Admission Form',
+          instructions: 'Please fill out the form carefully.',
+          fields: {
+            studentName: true,
+            dob: true,
+            birthReg: true,
+            nid: false,
+            fatherName: true,
+            motherName: true,
+            guardianPhone: true,
+            studentPhone: false,
+            admissionDate: true,
+            batch: true,
+            subjectGroup: false,
+            schoolName: false,
+            address: true
+          }
+        },
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      });
+      const p3 = setDoc(doc(db, 'credits', firebaseUser.uid), {
         userId: firebaseUser.uid,
         balance: 0,
         aiBalance: 1500,
         totalSent: 0,
         lastUpdated: new Date().toISOString()
       });
+
+      await Promise.all([p1, p2, p3]);
+      
+      // Successful write, can remove session storage (though AuthProvider will also clean up)
+      sessionStorage.removeItem(`signup_info_${firebaseUser.uid}`);
+
+      console.log("Signup profiles created successfully for:", firebaseUser.uid);
     } catch (error: any) {
-      console.error("Signup failed:", error);
+      console.error("Signup process failed:", error);
+      // If Auth succeeded but profiles failed, we have a broken state.
+      // The observer in AuthProvider will eventually try to fix it,
+      // but we throw here to let the UI know.
       setAuthError(error.message);
       throw error;
     }

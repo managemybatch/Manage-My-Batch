@@ -109,22 +109,32 @@ export function ManageInstitutions() {
           const creditData = creditsMap.get(id) as any;
           
           // DATA MERGE LOGIC: Prioritize real names and phones over account emails
-          const rawName = userData.institution || userData.institutionName || instData.name || userData.displayName || '';
+          const rawName = userData.institution || userData.institutionName || instData.name || instData.displayName || userData.displayName || '';
           const rawPhone = userData.phone || instData.phone || '';
 
-          // If the name is just an email, try to find a better one
+          // If the name is just an email, try and find anything better
           let displayName = rawName;
-          if (rawName.includes('@') || !rawName) {
+          let isProfileComplete = true;
+
+          if (!rawName || rawName.includes('@') || rawName === 'Unnamed Institution') {
             displayName = [
               userData.institution,
-              instData.name,
               userData.institutionName,
+              instData.name,
+              instData.displayName,
               userData.displayName
-            ].find(n => n && typeof n === 'string' && !n.includes('@')) || userData.email || 'Unnamed Institution';
+            ].find(n => n && typeof n === 'string' && !n.includes('@') && n !== 'Unnamed Institution') || userData.email || 'Unnamed Institution';
+            
+            if (displayName === userData.email || displayName === 'Unnamed Institution') {
+              isProfileComplete = false;
+            }
+          }
+
+          if (!rawPhone || rawPhone === 'Not Provided') {
+            isProfileComplete = false;
           }
 
           const phone = rawPhone && rawPhone !== 'Not Provided' ? rawPhone : 'Not Provided';
-          const isProfileComplete = displayName !== userData.email && phone !== 'Not Provided';
 
           return { 
             id, 
@@ -306,6 +316,26 @@ export function ManageInstitutions() {
         name: newInst.name,
         phone: newInst.phone,
         email: newInst.email,
+        admissionForm: {
+          active: true,
+          title: "Student Admission Form",
+          instructions: 'Please fill out the form carefully.',
+          fields: {
+            studentName: true,
+            dob: true,
+            birthReg: true,
+            nid: false,
+            fatherName: true,
+            motherName: true,
+            guardianPhone: true,
+            studentPhone: false,
+            admissionDate: true,
+            batch: true,
+            subjectGroup: false,
+            schoolName: false,
+            address: true
+          }
+        },
         createdAt: new Date().toISOString()
       });
 
@@ -988,12 +1018,20 @@ export function ManageInstitutions() {
                         <div className="flex items-center gap-2">
                           <button 
                             onClick={() => fetchInstDetails(inst)}
-                            className="text-sm font-bold text-gray-900 dark:text-white hover:text-indigo-600 transition-colors text-left truncate"
+                            className={cn(
+                              "text-sm font-bold transition-colors text-left truncate",
+                              inst.isProfileComplete ? "text-gray-900 dark:text-white hover:text-indigo-600" : "text-rose-600 hover:text-rose-700"
+                            )}
                           >
                             {inst.displayName}
                           </button>
                           {inst.isVerified && (
                             <ShieldCheck className="w-3.5 h-3.5 text-indigo-600 fill-indigo-50" />
+                          )}
+                          {!inst.isProfileComplete && (
+                            <span className="px-1.5 py-0.5 bg-rose-50 text-rose-600 text-[8px] font-black uppercase rounded border border-rose-100 whitespace-nowrap">
+                              Incomplete
+                            </span>
                           )}
                         </div>
                         <p className="text-[10px] text-gray-400 font-medium truncate">{inst.email}</p>

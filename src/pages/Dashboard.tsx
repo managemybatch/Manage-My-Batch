@@ -72,17 +72,21 @@ export function Dashboard() {
     phone: user?.phone || ''
   });
   const [welcomeLoading, setWelcomeLoading] = useState(false);
+  const [welcomeError, setWelcomeError] = useState<string | null>(null);
 
   useEffect(() => {
     if (hasEverClosedModal.current) return;
     
-    const needsOnboarding = user?.isNewUser || (user && (!user.displayName || user.displayName.includes('@') || !user.phone));
+    // Explicitly check for invalid or email-looking names
+    const hasIncompleteName = !user?.displayName || user.displayName.includes('@') || user.displayName === 'Unnamed Institution';
+    const hasIncompletePhone = !user?.phone || user.phone === 'Not Provided';
+    const needsOnboarding = user?.isNewUser || (user && (hasIncompleteName || hasIncompletePhone));
     
     if (needsOnboarding) {
       setIsWelcomeModalOpen(true);
       setWelcomeForm({
-        name: user?.displayName && !user.displayName.includes('@') ? user.displayName : '',
-        phone: user?.phone || ''
+        name: hasIncompleteName ? '' : (user?.displayName || ''),
+        phone: hasIncompletePhone ? '' : (user?.phone || '')
       });
     } else {
       setIsWelcomeModalOpen(false);
@@ -93,43 +97,102 @@ export function Dashboard() {
     e.preventDefault();
     if (!user) return;
     
-    if (!welcomeForm.name.trim() || !welcomeForm.phone.trim()) return;
+    const name = welcomeForm.name.trim();
+    const phone = welcomeForm.phone.trim();
+
+    if (!name || !phone) {
+      setWelcomeError("সবগুলো ঘর পূরণ করুন।");
+      return;
+    }
+
+    if (phone.length < 11) {
+      setWelcomeError("সঠিক ফোন নম্বর দিন।");
+      return;
+    }
 
     setWelcomeLoading(true);
+    setWelcomeError(null);
+    
+    // Safety timeout to prevent infinite loading if Firebase hangs
+    const timeout = setTimeout(() => {
+      if (welcomeLoading) {
+        setWelcomeLoading(false);
+        setWelcomeError("নেটওয়ার্ক সমস্যার কারণে দেরি হচ্ছে। আবার চেষ্টা করুন।");
+      }
+    }, 15000);
+
     try {
-      // 1. Update database
-      await updateDoc(doc(db, 'users', user.uid), {
-        displayName: welcomeForm.name,
-        phone: welcomeForm.phone,
-        institution: welcomeForm.name,
+      // Update everything we can find to ensure name sticks
+      const userUpdate = updateDoc(doc(db, 'users', user.uid), {
+        displayName: name,
+        phone: phone,
+        institution: name,
+        institutionName: name,
         isNewUser: false
       });
-      await setDoc(doc(db, 'institutions', user.uid), {
-        name: welcomeForm.name,
-        phone: welcomeForm.phone
-      }, { merge: true });
       
-      // 2. Local state updates to prevent re-opening
+      const instUpdate = setDoc(doc(db, 'institutions', user.uid), {
+        id: user.uid,
+        name: name,
+        displayName: name,
+        phone: phone,
+        email: user.email,
+        admissionForm: {
+          active: true,
+          title: "Student Admission Form",
+          instructions: 'Please fill out the form carefully.',
+          fields: {
+            studentName: true,
+            dob: true,
+            birthReg: true,
+            nid: false,
+            fatherName: true,
+            motherName: true,
+            guardianPhone: true,
+            studentPhone: false,
+            admissionDate: true,
+            batch: true,
+            subjectGroup: false,
+            schoolName: false,
+            address: true
+          }
+        },
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
+
+      await Promise.all([userUpdate, instUpdate]);
+      clearTimeout(timeout);
+
+      // Successfully saved! Now close.
       hasEverClosedModal.current = true;
       setIsWelcomeModalOpen(false);
-    } catch (err) {
+    } catch (err: any) {
+      clearTimeout(timeout);
       console.error("Error updating welcome info:", err);
-      // Even on error, if the user wants it gone, we should probably let them try to close it
-      // or show a specific error message.
+      if (err.message?.includes('permission-denied')) {
+        setWelcomeError("অনুমতি নেই। অনুগ্রহ করে আবার লগইন করুন।");
+      } else {
+        setWelcomeError(err.message || "সংরক্ষণে ব্যর্থ হয়েছে। আবার চেষ্টা করুন।");
+      }
     } finally {
       setWelcomeLoading(false);
     }
   };
 
   const closeWelcomeModal = async () => {
-    hasEverClosedModal.current = true;
-    setIsWelcomeModalOpen(false);
-    if (user) {
-      try {
-        await updateDoc(doc(db, 'users', user.uid), { isNewUser: false });
-      } catch (err) {
-        console.error("Error clearing isNewUser flag:", err);
+    // Only allow closing if they have a real name and phone set in state/form
+    if (welcomeForm.name.trim() && welcomeForm.phone.trim()) {
+      hasEverClosedModal.current = true;
+      setIsWelcomeModalOpen(false);
+      if (user) {
+        try {
+          await updateDoc(doc(db, 'users', user.uid), { isNewUser: false });
+        } catch (err) {
+          console.error("Error clearing isNewUser flag:", err);
+        }
       }
+    } else {
+      setWelcomeError("অনুগ্রহ করে আপনার তথ্য দিন। এটি ছাড়া আপনি এগিয়ে যেতে পারবেন না।");
     }
   };
 
@@ -1314,6 +1377,12 @@ export function Dashboard() {
           </div>
 
           <form onSubmit={handleWelcomeSubmit} className="space-y-4">
+            {welcomeError && (
+              <div className="p-3 bg-rose-50 border border-rose-100 rounded-xl flex items-center gap-2 text-rose-600 text-xs font-bold animate-shake">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <p>{welcomeError}</p>
+              </div>
+            )}
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">প্রতিষ্ঠানের নাম</label>
               <input 
