@@ -66,15 +66,54 @@ export function Dashboard() {
   const [showPricing, setShowPricing] = useState(false);
   const [isWelcomeModalOpen, setIsWelcomeModalOpen] = useState(false);
 
+  const [welcomeForm, setWelcomeForm] = useState({
+    name: user?.displayName || '',
+    phone: user?.phone || ''
+  });
+  const [welcomeLoading, setWelcomeLoading] = useState(false);
+
   useEffect(() => {
-    if (user?.isNewUser) {
+    if (user?.isNewUser || (user && (!user.displayName || user.displayName.includes('@') || !user.phone))) {
       setIsWelcomeModalOpen(true);
+      setWelcomeForm({
+        name: user.displayName && !user.displayName.includes('@') ? user.displayName : '',
+        phone: user.phone || ''
+      });
     }
   }, [user]);
 
+  const handleWelcomeSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+    
+    if (!welcomeForm.name.trim()) return;
+    if (!welcomeForm.phone.trim()) return;
+
+    setWelcomeLoading(true);
+    try {
+      await updateDoc(doc(db, 'users', user.uid), {
+        displayName: welcomeForm.name,
+        phone: welcomeForm.phone,
+        institution: welcomeForm.name,
+        isNewUser: false
+      });
+      await setDoc(doc(db, 'institutions', user.uid), {
+        name: welcomeForm.name,
+        phone: welcomeForm.phone
+      }, { merge: true });
+      
+      setIsWelcomeModalOpen(false);
+    } catch (err) {
+      console.error("Error updating welcome info:", err);
+    } finally {
+      setWelcomeLoading(false);
+    }
+  };
+
   const closeWelcomeModal = async () => {
-    setIsWelcomeModalOpen(false);
-    if (user) {
+    // Only allow closing if data is present
+    if (user?.displayName && !user.displayName.includes('@') && user?.phone) {
+      setIsWelcomeModalOpen(false);
       try {
         await updateDoc(doc(db, 'users', user.uid), { isNewUser: false });
       } catch (err) {
@@ -1244,36 +1283,68 @@ export function Dashboard() {
       <Modal
         isOpen={isWelcomeModalOpen}
         onClose={closeWelcomeModal}
-        title="অভিনন্দন! 🎉"
+        title="স্বাগতম! 🎉"
         maxWidth="max-w-md"
       >
-        <div className="space-y-6 text-center">
-          <div className="flex justify-center">
-            <div className="w-20 h-20 bg-emerald-100 rounded-3xl flex items-center justify-center text-emerald-600 shadow-lg shadow-emerald-100">
-              <Gift className="w-10 h-10" />
+        <div className="space-y-6">
+          <div className="text-center space-y-4">
+            <div className="flex justify-center">
+              <div className="w-16 h-16 bg-indigo-100 rounded-3xl flex items-center justify-center text-indigo-600 shadow-lg shadow-indigo-100">
+                <Sparkles className="w-8 h-8" />
+              </div>
+            </div>
+            
+            <div className="space-y-2">
+              <h3 className="text-2xl font-black text-gray-900">আপনার প্রতিষ্ঠানের তথ্য দিন</h3>
+              <p className="text-gray-500 font-medium text-sm">
+                সঠিক নাম এবং ফোন নম্বর দিন যাতে আমরা আপনার সেবা নিশ্চিত করতে পারি।
+              </p>
             </div>
           </div>
-          
-          <div className="space-y-2">
-            <h3 className="text-2xl font-black text-gray-900">রেজিস্ট্রেশন সফল হয়েছে!</h3>
-            <p className="text-gray-500 font-medium">
-              লঞ্চ অফারের আওতায় আপনি <span className="text-indigo-600 font-bold">৩ মাসের ফ্রি প্রিমিয়াম এক্সেস</span> এবং <span className="text-indigo-600 font-bold">২০০ জন ছাত্র</span> লিমিট পেয়েছেন।
-            </p>
-          </div>
 
-          <div className="bg-indigo-50 p-4 rounded-2xl flex items-start gap-3 text-left border border-indigo-100">
-            <CheckCircle2 className="w-5 h-5 text-indigo-600 mt-0.5 flex-shrink-0" />
-            <p className="text-sm text-indigo-900 font-medium leading-relaxed">
-              আপনার ড্যাশবোর্ড এখন প্রস্তুত। ৩ মাস পর আপনি খুব সাশ্রয়ী মূল্যে সব প্রিমিয়াম ফিচার ব্যবহার চালিয়ে যেতে পারবেন।
-            </p>
-          </div>
+          <form onSubmit={handleWelcomeSubmit} className="space-y-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">প্রতিষ্ঠানের নাম</label>
+              <input 
+                required
+                type="text"
+                placeholder="যেমন: আইডিয়াল কোচিং সেন্টার"
+                value={welcomeForm.name}
+                onChange={(e) => setWelcomeForm({ ...welcomeForm, name: e.target.value })}
+                className="w-full px-5 py-3.5 bg-gray-50 border border-gray-200 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-bold"
+              />
+            </div>
 
-          <button
-            onClick={closeWelcomeModal}
-            className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 flex items-center justify-center gap-2"
-          >
-            চলুন শুরু করি <ArrowUpRight className="w-4 h-4" />
-          </button>
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">ফোন নম্বর</label>
+              <input 
+                required
+                type="tel"
+                placeholder="০১xxxxxxxxx"
+                value={welcomeForm.phone}
+                onChange={(e) => setWelcomeForm({ ...welcomeForm, phone: e.target.value })}
+                className="w-full px-5 py-3.5 bg-gray-50 border border-gray-200 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-bold"
+              />
+            </div>
+
+            <div className="p-4 bg-emerald-50 rounded-2xl flex items-start gap-3 border border-emerald-100 mt-2">
+              <Gift className="w-5 h-5 text-emerald-600 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="text-xs text-emerald-900 font-bold">লঞ্চ অফার সচল আছে!</p>
+                <p className="text-[10px] text-emerald-700 font-medium leading-relaxed">
+                  তথ্য পূরণ করলেই ৩ মাসের ফ্রি প্রিমিয়াম এক্সেস এবং ২০০ জন ছাত্র লিমিট পাবেন।
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={welcomeLoading || !welcomeForm.name.trim() || !welcomeForm.phone.trim()}
+              className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 flex items-center justify-center gap-2 mt-4 disabled:opacity-50"
+            >
+              {welcomeLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <>চলুন শুরু করি <ArrowUpRight className="w-4 h-4" /></>}
+            </button>
+          </form>
         </div>
       </Modal>
 

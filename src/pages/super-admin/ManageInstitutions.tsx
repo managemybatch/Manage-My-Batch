@@ -87,15 +87,10 @@ export function ManageInstitutions() {
   const fetchInstitutions = async () => {
     setLoading(true);
     try {
-      // Primary source: institutions collection
-      const instQuery = query(
-        collection(db, 'institutions'),
-        limit(200)
-      );
-      
-      const [instSnapshot, usersSnapshot, creditsSnapshot] = await Promise.all([
-        getDocs(instQuery),
-        getDocs(query(collection(db, 'users'), where('role', '==', 'admin'), limit(200))),
+      // Fetch primary data sources (Limit increased to 1000)
+      const [usersSnapshot, instSnapshot, creditsSnapshot] = await Promise.all([
+        getDocs(query(collection(db, 'users'), where('role', '==', 'admin'), limit(1000))),
+        getDocs(query(collection(db, 'institutions'), limit(1000))),
         getDocs(collection(db, 'credits'))
       ]);
 
@@ -105,31 +100,59 @@ export function ManageInstitutions() {
       const creditsMap = new Map();
       creditsSnapshot.docs.forEach(doc => creditsMap.set(doc.id, doc.data()));
 
-      // Primary source is users (admins) to ensure everyone shows up
-      const institutionsList = usersSnapshot.docs.map(doc => {
-        const id = doc.id;
-        const userData = doc.data();
-        const instData = instMap.get(id) || {};
-        const creditData = creditsMap.get(id);
-        
-        return { 
-          id, 
-          ...userData,
-          ...instData,
-          displayName: instData.name || userData.displayName || userData.institution || userData.institutionName || instData.email || userData.email || 'Unnamed Institution',
-          phone: instData.phone || userData.phone || 'Not Provided',
-          aiCredits: creditData?.aiBalance ?? userData.aiCredits ?? 0,
-          smsBalance: creditData?.balance ?? userData.smsBalance ?? 0,
-          studentCount: null,
-          batchCount: null,
-          activityScore: 0
-        };
+      const institutionsList = usersSnapshot.docs
+        .filter(doc => (doc.data() as any).status !== 'deleted')
+        .map(doc => {
+          const id = doc.id;
+          const userData = doc.data() as any;
+          const instData = (instMap.get(id) || {}) as any;
+          const creditData = creditsMap.get(id) as any;
+          
+          // DATA MERGE LOGIC: Prioritize real names and phones over account emails
+          const rawName = userData.institution || userData.institutionName || instData.name || userData.displayName || '';
+          const rawPhone = userData.phone || instData.phone || '';
+
+          // If the name is just an email, try to find a better one
+          let displayName = rawName;
+          if (rawName.includes('@') || !rawName) {
+            displayName = [
+              userData.institution,
+              instData.name,
+              userData.institutionName,
+              userData.displayName
+            ].find(n => n && typeof n === 'string' && !n.includes('@')) || userData.email || 'Unnamed Institution';
+          }
+
+          const phone = rawPhone && rawPhone !== 'Not Provided' ? rawPhone : 'Not Provided';
+          const isProfileComplete = displayName !== userData.email && phone !== 'Not Provided';
+
+          return { 
+            id, 
+            ...userData,
+            ...instData,
+            displayName: String(displayName),
+            phone: String(phone),
+            isProfileComplete,
+            aiCredits: creditData?.aiBalance ?? userData.aiCredits ?? 0,
+            smsBalance: creditData?.balance ?? userData.smsBalance ?? 0,
+            studentCount: null,
+            batchCount: null,
+            activityScore: 0,
+            lastActive: userData.lastLogin || userData.createdAt || new Date().toISOString()
+          };
+        });
+
+      // Sort by newest created first so Super Admin sees fresh signups at top
+      const sortedList = institutionsList.sort((a, b) => {
+        const dateA = new Date(a.createdAt || 0).getTime();
+        const dateB = new Date(b.createdAt || 0).getTime();
+        return dateB - dateA;
       });
 
-      setInstitutions(institutionsList);
+      setInstitutions(sortedList);
     } catch (error) {
       console.error("Error fetching institutions:", error);
-      handleFirestoreError(error, OperationType.LIST, 'institutions');
+      handleFirestoreError(error, OperationType.LIST, 'users');
     } finally {
       setLoading(false);
     }
@@ -953,11 +976,11 @@ export function ManageInstitutions() {
                 <tr key={inst.id} className="hover:bg-gray-50/50 dark:hover:bg-gray-800/50 transition-colors">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-indigo-100 dark:bg-indigo-900/40 rounded-xl flex items-center justify-center text-indigo-600 dark:text-indigo-400 font-bold shrink-0 relative">
-                        {inst.displayName?.charAt(0) || inst.name?.charAt(0) || inst.email?.charAt(0) || '?'}
+                      <div className="w-10 h-10 bg-indigo-100 dark:bg-indigo-900/40 rounded-xl flex items-center justify-center text-indigo-600 dark:text-indigo-400 font-bold shrink-0 relative border-2 border-indigo-200/50">
+                        {inst.displayName?.charAt(0) || '?'}
                         {inst.isVerified && (
-                          <div className="absolute -top-1 -right-1 bg-white dark:bg-gray-900 rounded-full p-0.5 shadow-sm">
-                            <ShieldCheck className="w-3.5 h-3.5 text-indigo-600 fill-indigo-50" />
+                          <div className="absolute -top-1 -right-1 bg-emerald-500 rounded-full p-0.5 shadow-sm border border-white">
+                            <ShieldCheck className="w-2.5 h-2.5 text-white" />
                           </div>
                         )}
                       </div>
@@ -967,29 +990,22 @@ export function ManageInstitutions() {
                             onClick={() => fetchInstDetails(inst)}
                             className="text-sm font-bold text-gray-900 dark:text-white hover:text-indigo-600 transition-colors text-left truncate"
                           >
-                            {inst.displayName || inst.name || inst.institution || inst.institutionName || inst.email || 'Unnamed Institution'}
+                            {inst.displayName}
                           </button>
-                          {inst.isPromoUser && (
-                            <span className="px-1.5 py-0.5 bg-amber-100 text-amber-600 rounded text-[10px] font-black uppercase tracking-tighter shadow-sm animate-pulse">
-                              Promo
-                            </span>
-                          )}
-                          {inst.superAdminNote && (
-                            <div className="group relative">
-                              <Info className="w-3 h-3 text-amber-500 cursor-help" />
-                              <div className="absolute left-0 bottom-full mb-2 w-48 p-2 bg-gray-900 text-white text-[10px] rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-all z-20">
-                                {inst.superAdminNote}
-                              </div>
-                            </div>
+                          {inst.isVerified && (
+                            <ShieldCheck className="w-3.5 h-3.5 text-indigo-600 fill-indigo-50" />
                           )}
                         </div>
-                        <p className="text-[10px] text-gray-500 font-bold font-mono tracking-tighter truncate">{inst.email}</p>
-                        {inst.phone && (
-                          <div className="flex items-center gap-1 mt-0.5">
-                            <Phone className="w-2.5 h-2.5 text-emerald-500" />
-                            <span className="text-[9px] font-black text-emerald-600 font-mono tracking-tighter">{inst.phone}</span>
-                          </div>
-                        )}
+                        <p className="text-[10px] text-gray-400 font-medium truncate">{inst.email}</p>
+                        <div className="flex items-center gap-1 mt-0.5">
+                          <Phone className={cn("w-2.5 h-2.5", inst.phone !== 'Not Provided' ? "text-emerald-500" : "text-gray-300")} />
+                          <span className={cn(
+                            "text-[10px] font-black font-mono tracking-tighter",
+                            inst.phone !== 'Not Provided' ? "text-emerald-600" : "text-gray-400"
+                          )}>
+                            {inst.phone}
+                          </span>
+                        </div>
                       </div>
                     </div>
                   </td>

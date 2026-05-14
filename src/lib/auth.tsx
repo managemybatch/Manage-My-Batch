@@ -91,27 +91,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
               // DATA SYNC: Ensure displayName/institution mismatch is fixed
               // If displayName is missing or is just an email, but institution name exists, fix it
-              const currentName = userData.displayName;
-              const hasCleanName = currentName && !currentName.includes('@');
-              const potentialName = userData.institution || userData.institutionName;
-              
-              if ((!hasCleanName) && potentialName) {
-                await updateDoc(doc(db, 'users', firebaseUser.uid), { 
-                  displayName: potentialName,
-                  institution: potentialName // sync legacy field if needed
-                });
-                userData.displayName = potentialName;
-              }
+              let currentName = userData.displayName;
+              let currentPhone = userData.phone;
+              let needsUpdate = false;
 
-              // Ensure institution doc exists and has the correct name/phone
+              // Check institution doc for missing info
               if (userData.role === 'admin' || userData.role === 'super_admin') {
                 try {
                   const instDoc = await getDoc(doc(db, 'institutions', firebaseUser.uid));
-                  if (!instDoc.exists() || !instDoc.data().name || (!instDoc.data().phone && userData.phone)) {
+                  if (instDoc.exists()) {
+                    const instData = instDoc.data();
+                    if ((!currentName || currentName.includes('@')) && instData.name) {
+                      currentName = instData.name;
+                      needsUpdate = true;
+                    }
+                    if (!currentPhone && instData.phone) {
+                      currentPhone = instData.phone;
+                      needsUpdate = true;
+                    }
+
+                    // Update local userData object for immediate use
+                    userData.displayName = currentName;
+                    userData.phone = currentPhone;
+
+                    // Sync back to Firestore if we found missing data
+                    if (needsUpdate) {
+                      await updateDoc(doc(db, 'users', firebaseUser.uid), {
+                        displayName: currentName,
+                        phone: currentPhone,
+                        institution: currentName
+                      });
+                    }
+                  } else {
+                    // Force create institution doc if missing
                     await setDoc(doc(db, 'institutions', firebaseUser.uid), {
                       id: firebaseUser.uid,
-                      name: userData.displayName || potentialName || firebaseUser.displayName || '',
-                      phone: userData.phone || instDoc.data()?.phone || '',
+                      name: currentName || firebaseUser.displayName || '',
+                      phone: currentPhone || '',
                       email: userData.email,
                       subscriptionPlan: userData.subscriptionPlan || 'basic',
                       subscriptionExpiry: userData.subscriptionExpiry || null,
@@ -121,6 +137,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 } catch (e) {
                   console.error("Silent error syncing institution doc:", e);
                 }
+              }
+
+              const hasCleanName = currentName && !currentName.includes('@');
+              const potentialName = userData.institution || userData.institutionName;
+              
+              if ((!hasCleanName) && potentialName) {
+                await updateDoc(doc(db, 'users', firebaseUser.uid), { 
+                  displayName: potentialName,
+                  institution: potentialName // sync legacy field if needed
+                });
+                userData.displayName = potentialName;
               }
               
               // Ensure Super Admin status is synced
