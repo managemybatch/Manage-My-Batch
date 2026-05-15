@@ -2,6 +2,7 @@ import React from 'react';
 import { Sidebar } from './Sidebar';
 import { Navbar } from './Navbar';
 import { BottomNav } from './BottomNav';
+import { OnboardingTutorial } from './OnboardingTutorial';
 import { motion, AnimatePresence } from 'motion/react';
 import { useLocation, Outlet } from 'react-router-dom';
 
@@ -14,6 +15,7 @@ export function Layout({ children }: LayoutProps) {
 
   return (
     <div className="flex min-h-screen bg-gray-50 dark:bg-gray-950 font-sans transition-colors duration-300">
+      <OnboardingTutorial />
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0 pb-16 lg:pb-0">
         <Navbar />

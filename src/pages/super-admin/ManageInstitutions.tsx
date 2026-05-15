@@ -65,6 +65,7 @@ export function ManageInstitutions() {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [instToDelete, setInstToDelete] = useState<string | null>(null);
   const [filterExpiry, setFilterExpiry] = useState<'all' | 'next5' | 'today' | 'ended' | 'inactive'>('all');
+  const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: ToastType; isVisible: boolean }>({
     message: '',
     type: 'success',
@@ -77,7 +78,7 @@ export function ManageInstitutions() {
     password: '',
     plan: 'free',
     tokens: 100,
-    aiCredits: 50
+    aiCredits: 5
   });
 
   useEffect(() => {
@@ -248,32 +249,40 @@ export function ManageInstitutions() {
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedInst) return;
-
+    setSaving(true);
     try {
-      await setDoc(doc(db, 'credits', selectedInst.id), {
-        userId: selectedInst.id,
-        aiBalance: Number(selectedInst.aiCredits || 0),
+      const targetId = selectedInst.id;
+      const newCredits = Number(selectedInst.aiCredits || 0);
+
+      // 1. Update Credits Document
+      await setDoc(doc(db, 'credits', targetId), {
+        userId: targetId,
+        aiBalance: newCredits,
         lastUpdated: new Date().toISOString()
       }, { merge: true });
 
-      // Update user cache for aiCredits and other fields
-      await updateDoc(doc(db, 'users', selectedInst.id), {
-        displayName: selectedInst.displayName,
+      // 2. Update User Profile
+      await updateDoc(doc(db, 'users', targetId), {
+        displayName: selectedInst.displayName || '',
         phone: selectedInst.phone || '',
-        subscriptionPlan: selectedInst.subscriptionPlan,
+        subscriptionPlan: selectedInst.subscriptionPlan || 'free',
         subscriptionExpiry: selectedInst.subscriptionExpiry || null,
         superAdminNote: selectedInst.superAdminNote || '',
         isVerified: selectedInst.isVerified || false,
-        aiCredits: Number(selectedInst.aiCredits || 0)
+        aiCredits: newCredits
       });
 
-      // Update institution doc as well
-      await updateDoc(doc(db, 'institutions', selectedInst.id), {
-        name: selectedInst.displayName,
+      // 3. Update Institution Document
+      await updateDoc(doc(db, 'institutions', targetId), {
+        name: selectedInst.displayName || '',
         phone: selectedInst.phone || '',
-        email: selectedInst.email
+        email: selectedInst.email,
+        subscriptionPlan: selectedInst.subscriptionPlan || 'free',
+        subscriptionExpiry: selectedInst.subscriptionExpiry || null,
+        updatedAt: new Date().toISOString()
       });
 
+      console.log(`SuperAdmin: Successfully updated institution ${targetId} with ${newCredits} credits.`);
       setIsEditModalOpen(false);
       setToast({
         message: "Institution updated successfully",
@@ -282,17 +291,21 @@ export function ManageInstitutions() {
       });
       fetchInstitutions();
     } catch (error: any) {
-      handleFirestoreError(error, OperationType.WRITE, 'users');
+      console.error("SuperAdmin: Critical update error:", error);
+      handleFirestoreError(error, OperationType.WRITE, 'super-admin/manage-institutions');
       setToast({
         message: error.message || "Error updating institution",
         type: 'error',
         isVisible: true
       });
+    } finally {
+      setSaving(false);
     }
   };
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSaving(true);
     try {
       // 1. Create Auth account
       const uid = await createStaffAccount(newInst.email, newInst.password);
@@ -357,11 +370,14 @@ export function ManageInstitutions() {
       fetchInstitutions();
     } catch (error: any) {
       console.error("Error creating institution:", error);
+      handleFirestoreError(error, OperationType.WRITE, 'super-admin/manage-institutions/create');
       setToast({
         message: error.message || "Error creating institution",
         type: 'error',
         isVisible: true
       });
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -845,7 +861,7 @@ export function ManageInstitutions() {
                         <input 
                           type="number"
                           value={selectedInst.aiCredits || 0}
-                          onChange={(e) => setSelectedInst({ ...selectedInst, aiCredits: e.target.value })}
+                          onChange={(e) => setSelectedInst({ ...selectedInst, aiCredits: Number(e.target.value) })}
                           className="w-full pl-12 pr-5 py-4 bg-gray-50 dark:bg-gray-800 border-2 border-transparent rounded-2xl focus:border-indigo-500 focus:bg-white dark:focus:bg-gray-900 outline-none transition-all font-bold text-gray-900 dark:text-white"
                         />
                       </div>
@@ -1267,8 +1283,10 @@ export function ManageInstitutions() {
                 </div>
                 <button 
                   type="submit"
-                  className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 dark:shadow-none mt-4"
+                  disabled={saving}
+                  className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 dark:shadow-none mt-4 flex items-center justify-center gap-2"
                 >
+                  {saving && <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />}
                   Create Account
                 </button>
               </form>
@@ -1342,7 +1360,7 @@ export function ManageInstitutions() {
                   <input 
                     type="number"
                     value={selectedInst.aiCredits || 0}
-                    onChange={(e) => setSelectedInst({ ...selectedInst, aiCredits: e.target.value })}
+                    onChange={(e) => setSelectedInst({ ...selectedInst, aiCredits: Number(e.target.value) })}
                     className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border-none rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
                   />
                 </div>
@@ -1382,8 +1400,10 @@ export function ManageInstitutions() {
 
                 <button 
                   type="submit"
-                  className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 dark:shadow-none"
+                  disabled={saving}
+                  className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 dark:shadow-none flex items-center justify-center gap-2"
                 >
+                  {saving && <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />}
                   Save Changes
                 </button>
               </form>

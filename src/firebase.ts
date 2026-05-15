@@ -76,19 +76,85 @@ export interface FirestoreErrorInfo {
 
 export function safeStringify(obj: any): string {
   const cache = new WeakSet();
-  try {
-    return JSON.stringify(obj, (key, value) => {
-      if (typeof value === 'object' && value !== null) {
-        if (cache.has(value)) {
-          return '[Circular]';
-        }
-        cache.add(value);
-      }
+  
+  // Internal recursive stringifier that doesn't rely on JSON.stringify's replacer for circularity if possible
+  const safeReplacer = (key: string, value: any) => {
+    // Handle standard primitives and null directly
+    if (value === null || typeof value !== 'object') {
       return value;
-    });
+    }
+
+    // Circular reference check
+    if (cache.has(value)) {
+      return '[Circular]';
+    }
+    cache.add(value);
+
+    // Native Firestore objects handling (obfuscation-safe)
+    // DocumentReference/CollectionReference check
+    if (typeof value.path === 'string' && (typeof value.id === 'string') && (value.firestore || value._firestore)) {
+      return `[FirestoreRef: ${value.path}]`;
+    }
+    
+    // Timestamp check (has seconds and nanoseconds)
+    if (typeof value.seconds === 'number' && typeof value.nanoseconds === 'number' && typeof value.toDate === 'function') {
+      try {
+        return value.toDate().toISOString();
+      } catch {
+        return `[Timestamp: ${value.seconds}]`;
+      }
+    }
+    
+    // GeoPoint check
+    if (typeof value.latitude === 'number' && typeof value.longitude === 'number' && !value.path) {
+      return `[GeoPoint: ${value.latitude}, ${value.longitude}]`;
+    }
+
+    // Protection against DOM elements and React internals which are often circular
+    if (value.nodeType && typeof value.nodeName === 'string') {
+      return `[DOMElement: ${value.nodeName}]`;
+    }
+    if (value.$$typeof || value._owner || value._reactInternalFiber || value._reactFiber) {
+      return '[ReactInternal]';
+    }
+
+    // Handle Error objects specially because message/stack are non-enumerable
+    if (value instanceof Error) {
+      return {
+        name: value.name,
+        message: value.message,
+        stack: value.stack,
+        ...value // Include other enumerable properties (like code in Firebase errors)
+      };
+    }
+
+    return value;
+  };
+
+  try {
+    return JSON.stringify(obj, safeReplacer);
   } catch (err) {
     console.error('safeStringify failed:', err);
-    return '{"error": "Failed to stringify object due to circularity or complex types"}';
+    // Ultimate fallback: shallow serializable version
+    try {
+      const fallback: any = {};
+      const keys = Object.keys(obj); // Only enumerable own properties
+      for (const k of keys) {
+        try {
+          const val = obj[k];
+          if (val === null || typeof val !== 'object') {
+            fallback[k] = val;
+          } else {
+            fallback[k] = `[${typeof val}]`;
+          }
+        } catch {
+          fallback[k] = '[Unreadable]';
+        }
+      }
+      return JSON.stringify(fallback);
+    } catch {
+      return '{"error": "Total failure to stringify object"}';
+    }
   }
 }
 

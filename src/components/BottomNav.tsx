@@ -20,7 +20,8 @@ import {
   TrendingUp,
   HelpCircle,
   Zap,
-  Library
+  Library,
+  IdCard
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useTranslation } from 'react-i18next';
@@ -80,6 +81,7 @@ export function BottomNav() {
     { icon: GraduationCap, label: t('nav.offlineExams'), path: '/offline-exams' },
     { icon: Sparkles, label: t('nav.aiEvaluator'), path: '/ai-evaluator' },
     { icon: Library, label: t('nav.library'), path: '/library' },
+    { icon: IdCard, label: 'Cards', path: '/cards' },
     { icon: Building2, label: t('nav.institution'), path: '/institution' },
     { icon: UserSquare2, label: t('nav.teachers'), path: '/teachers' },
     { icon: MessageSquare, label: t('nav.messages'), path: '/messages' },

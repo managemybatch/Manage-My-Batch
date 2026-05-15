@@ -202,9 +202,19 @@ service cloud.firestore {
     function isAdmin() {
       return isAuthenticated() && (
         (request.auth.token.email != null && request.auth.token.email.lower() in ["managemybatch@gmail.com", "pallistoreinfo@gmail.com", "admin@managemybatch.com"]) ||
+        request.auth.uid in ["zczBdARcutSo1RirwiDK8CbdgUd2"] ||
         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'super_admin')
+         (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'super_admin' || 
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isSuperAdmin == true))
       );
+    }
+
+    function isSuperAdmin() {
+      return isAdmin();
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
     }
 
     function isInstitutionAdmin() {
@@ -420,11 +430,10 @@ service cloud.firestore {
     }
      match /users/{userId} {
       allow read: if isAuthenticated();
-      allow create: if isOwner(userId) && isValidUser(request.resource.data) && 
-                      (request.resource.data.role == 'admin' || isAdmin());
-      allow update: if isAdmin() || (isOwner(userId) && isValidUser(request.resource.data) && 
-                      (request.resource.data.role == resource.data.role || isAdmin()));
-      allow delete: if isAdmin();
+      allow create: if isSuperAdmin() || (isOwner(userId) && isValidUser(request.resource.data) && 
+                      (request.resource.data.role == 'admin'));
+      allow update: if isSuperAdmin() || (isOwner(userId) && (request.resource.data.role == resource.data.role || isAdmin()));
+      allow delete: if isSuperAdmin();
     }
 
     match /students/{studentId} {
@@ -494,9 +503,9 @@ service cloud.firestore {
 
     match /institutions/{instId} {
       allow read: if true; // Publicly readable for profiles and forms
-      allow create: if isAdmin() || (isInstitutionAdmin() && instId == request.auth.uid);
-      allow update: if (isAdmin() || (isInstitutionAdmin() && (instId == request.auth.uid || instId == getInstitutionId()))) && isValidInstitution(request.resource.data);
-      allow delete: if isAdmin();
+      allow create: if (isSuperAdmin() || (isInstitutionAdmin() && instId == request.auth.uid)) && isValidInstitution(request.resource.data);
+      allow update: if isSuperAdmin() || (isInstitutionAdmin() && (instId == request.auth.uid || instId == getInstitutionId()));
+      allow delete: if isSuperAdmin();
     }
 
     match /applications/{appId} {
@@ -592,10 +601,10 @@ service cloud.firestore {
     }
 
     match /credits/{userId} {
-      allow read: if isOwner(userId) || isAdmin() || getInstitutionId() == userId;
-      allow create: if isAdmin() || (isOwner(userId) && isValidCreditBalance(request.resource.data));
-      allow update: if (isAdmin() || isOwner(userId) || getInstitutionId() == userId) && isValidCreditBalance(request.resource.data);
-      allow delete: if isAdmin();
+      allow read: if isAuthenticated() && (userId == request.auth.uid || userId == getInstitutionId() || isSuperAdmin());
+      allow create: if isAuthenticated() && (userId == request.auth.uid || isSuperAdmin());
+      allow update: if isAuthenticated() && (isSuperAdmin() || userId == request.auth.uid || userId == getInstitutionId());
+      allow delete: if isSuperAdmin();
     }
 
     match /blacklist/{userId} {

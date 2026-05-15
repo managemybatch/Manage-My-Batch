@@ -19,7 +19,7 @@ interface Student {
   id: string;
   name: string;
   rollNo: string;
-  photoUrl?: string;
+  photoURL?: string;
   batchName?: string;
   grade?: string;
   studentId?: string;
@@ -375,8 +375,8 @@ export function AdmitCardDesigner({ students, exam, institution, onClose }: Admi
                  config.design === 'vibrant' ? "rounded-full" : 
                  config.design === 'elegant' ? "rounded-3xl rotate-3" : "rounded-none"
                )} style={{ borderColor: config.primaryColor }}>
-                 {student.photoUrl ? (
-                   <img src={student.photoUrl} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                 {student.photoURL ? (
+                   <img src={student.photoURL} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                  ) : (
                    <User className="w-16 h-16 text-gray-300" />
                  )}

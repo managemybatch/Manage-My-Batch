@@ -24,7 +24,8 @@ export class ErrorBoundary extends React.Component<Props, State> {
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('Uncaught error:', error, errorInfo);
+    // We use String() and a minimal log to avoid circularity issues in some environments
+    console.error('Uncaught error:', error?.message || 'Unknown Error');
   }
 
   public render(): ReactNode {

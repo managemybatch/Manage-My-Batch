@@ -15,6 +15,7 @@ import { Messages } from './pages/Messages';
 import { Settings } from './pages/Settings';
 import { Institution } from './pages/Institution';
 import { Teachers } from './pages/Teachers';
+import { Cards } from './pages/Cards';
 import { Marketing } from './pages/Marketing';
 import { SuperAdminDashboard } from './pages/super-admin/SuperAdminDashboard';
 import { ManageInstitutions } from './pages/super-admin/ManageInstitutions';
@@ -105,6 +106,7 @@ function AppRoutes() {
         <Route path="/ai-question-generator" element={<AiQuestionGenerator />} />
         <Route path="/ai-evaluator" element={<AIPaperEvaluator />} />
         <Route path="/library" element={<DigitalLibrary />} />
+        <Route path="/cards" element={<Cards />} />
         <Route path="/messages" element={<Messages />} />
         <Route path="/institution" element={<Institution />} />
 

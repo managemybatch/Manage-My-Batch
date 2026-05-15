@@ -20,7 +20,8 @@ import {
   Building2,
   Bell,
   Library,
-  Book
+  Book,
+  IdCard
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useAuth } from '../lib/auth';
@@ -65,38 +66,41 @@ export function Sidebar() {
     label: string;
     path: string;
     badge?: number | string;
+    id?: string;
   }
 
   const regularItems: NavItem[] = [
-    { icon: LayoutDashboard, label: t('nav.dashboard'), path: '/dashboard' },
-    { icon: Layers, label: t('nav.batches'), path: '/batches' },
-    { icon: Users, label: t('nav.students'), path: '/students' },
-    { icon: ClipboardCheck, label: t('nav.attendance'), path: '/attendance' },
-    { icon: GraduationCap, label: t('nav.offlineExams'), path: '/offline-exams' },
+    { icon: LayoutDashboard, label: t('nav.dashboard'), path: '/dashboard', id: 'tutorial-sidebar-dashboard' },
+    { icon: Layers, label: t('nav.batches'), path: '/batches', id: 'tutorial-sidebar-batches' },
+    { icon: Users, label: t('nav.students'), path: '/students', id: 'tutorial-sidebar-students' },
+    { icon: ClipboardCheck, label: t('nav.attendance'), path: '/attendance', id: 'tutorial-sidebar-attendance' },
+    { icon: GraduationCap, label: t('nav.offlineExams'), path: '/offline-exams', id: 'tutorial-sidebar-exams' },
     { icon: Sparkles, label: t('nav.aiStudyAssistant'), path: '/ai-study-assistant' },
     { icon: Layers, label: t('nav.aiQuestionGenerator'), path: '/ai-question-generator' },
     { icon: Sparkles, label: t('nav.aiEvaluator'), path: '/ai-evaluator' },
     { icon: Library, label: t('nav.library'), path: '/library' },
+    { icon: IdCard, label: 'Cards', path: '/cards', id: 'tutorial-sidebar-cards' },
     { icon: MessageSquare, label: t('nav.messages'), path: '/messages' },
-    { icon: CreditCard, label: t('nav.fees'), path: '/fees' },
+    { icon: CreditCard, label: t('nav.fees'), path: '/fees', id: 'tutorial-sidebar-fees' },
     { icon: School, label: t('nav.institution'), path: '/institution' },
     { icon: Briefcase, label: t('nav.teachers'), path: '/teachers' },
     { icon: Zap, label: t('nav.marketing'), path: '/marketing', badge: birthdayCount > 0 ? birthdayCount : undefined },
     { icon: Settings, label: t('nav.settings'), path: '/settings' },
-    { icon: HelpCircle, label: t('Help'), path: '/help' },
+    { icon: HelpCircle, label: t('Help'), path: '/help', id: 'tutorial-sidebar-help' },
   ];
 
   const teacherItems: NavItem[] = [
-    { icon: LayoutDashboard, label: t('nav.dashboard'), path: '/dashboard' },
-    { icon: Layers, label: t('nav.batches'), path: '/batches' },
-    { icon: Users, label: t('nav.students'), path: '/students' },
-    { icon: ClipboardCheck, label: t('nav.attendance'), path: '/attendance' },
-    { icon: GraduationCap, label: t('nav.offlineExams'), path: '/offline-exams' },
+    { icon: LayoutDashboard, label: t('nav.dashboard'), path: '/dashboard', id: 'tutorial-sidebar-dashboard' },
+    { icon: Layers, label: t('nav.batches'), path: '/batches', id: 'tutorial-sidebar-batches' },
+    { icon: Users, label: t('nav.students'), path: '/students', id: 'tutorial-sidebar-students' },
+    { icon: ClipboardCheck, label: t('nav.attendance'), path: '/attendance', id: 'tutorial-sidebar-attendance' },
+    { icon: GraduationCap, label: t('nav.offlineExams'), path: '/offline-exams', id: 'tutorial-sidebar-exams' },
     { icon: Sparkles, label: t('nav.aiStudyAssistant'), path: '/ai-study-assistant' },
     { icon: Layers, label: t('nav.aiQuestionGenerator'), path: '/ai-question-generator' },
     { icon: Sparkles, label: t('nav.aiEvaluator'), path: '/ai-evaluator' },
     { icon: School, label: 'Student Zone', path: '/institution' },
     { icon: Library, label: t('nav.library'), path: '/library' },
+    { icon: IdCard, label: 'Cards', path: '/cards', id: 'tutorial-sidebar-cards' },
     { icon: MessageSquare, label: t('nav.messages'), path: '/messages' },
     { icon: Settings, label: t('nav.settings'), path: '/settings' },
   ];
@@ -109,6 +113,7 @@ export function Sidebar() {
     { icon: HelpCircle, label: 'Manage FAQs', path: '/super-admin/faqs' },
     { icon: FileText, label: 'Manage Blogs', path: '/super-admin/blogs' },
     { icon: Bell, label: 'Notifications', path: '/super-admin/notifications' },
+    { icon: IdCard, label: 'Cards Management', path: '/cards' },
     { icon: ShieldCheck, label: 'System Health', path: '/super-admin/health' },
     { icon: Settings, label: t('nav.settings'), path: '/settings' },
   ];
@@ -138,6 +143,7 @@ export function Sidebar() {
           <NavLink
             key={item.path}
             to={item.path}
+            id={item.id}
             className={({ isActive }) =>
               cn(
                 "flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 group",

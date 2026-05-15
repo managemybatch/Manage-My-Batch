@@ -10,7 +10,7 @@ import {
 } from 'firebase/auth';
 import { initializeApp, deleteApp } from 'firebase/app';
 import { doc, getDoc, setDoc, updateDoc, onSnapshot } from 'firebase/firestore';
-import { auth, db, testConnection, firebaseConfig } from '../firebase';
+import { auth, db, testConnection, firebaseConfig, safeStringify } from '../firebase';
 
 interface UserProfile {
   uid: string;
@@ -33,6 +33,7 @@ interface UserProfile {
   hasReceivedInitialCredits?: boolean;
   isPromoUser?: boolean;
   isNewUser?: boolean;
+  hasSeenOnboarding?: boolean;
   status?: string;
   isBlacklisted?: boolean;
 }
@@ -46,6 +47,7 @@ interface AuthContextType {
   createStaffAccount: (email: string, pass: string) => Promise<string>;
   logout: () => Promise<void>;
   clearError: () => void;
+  setHasSeenOnboarding: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -129,7 +131,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                       name: currentName || firebaseUser.displayName || '',
                       phone: currentPhone || '',
                       email: userData.email,
-                      subscriptionPlan: userData.subscriptionPlan || 'basic',
+                      subscriptionPlan: userData.subscriptionPlan || 'free',
                       subscriptionExpiry: userData.subscriptionExpiry || null,
                       createdAt: userData.lastLogin || new Date().toISOString()
                     }, { merge: true });
@@ -223,12 +225,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 role: isSuperAdmin ? 'super_admin' : 'admin',
                 isSuperAdmin,
                 institutionId: firebaseUser.uid,
-                subscriptionPlan: 'basic',
+                subscriptionPlan: 'free',
                 subscriptionExpiry: expiryDate.toISOString(),
-                aiCredits: 1500,
+                aiCredits: 5,
                 hasReceivedInitialCredits: true,
                 dismissedNotifications: [],
                 isNewUser: true,
+                hasSeenOnboarding: false,
                 institution: signupInfo.name || firebaseUser.displayName || '',
                 phone: signupInfo.phone || ''
               };
@@ -242,7 +245,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                   displayName: signupInfo.name || firebaseUser.displayName || '',
                   email: userEmail,
                   phone: signupInfo.phone || '',
-                  subscriptionPlan: 'basic',
+                  subscriptionPlan: 'free',
                   subscriptionExpiry: expiryDate.toISOString(),
                   createdAt: new Date().toISOString(),
                   updatedAt: new Date().toISOString()
@@ -250,7 +253,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 setDoc(doc(db, 'credits', firebaseUser.uid), {
                   userId: firebaseUser.uid,
                   balance: 0,
-                  aiBalance: 1500,
+                  aiBalance: 5,
                   totalSent: 0,
                   lastUpdated: new Date().toISOString()
                 })
@@ -306,7 +309,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Store signup info in session storage as a backup for the observer
       // This is crucial if the following Firestore writes fail or are delayed.
       try {
-        sessionStorage.setItem(`signup_info_${firebaseUser.uid}`, JSON.stringify({
+        sessionStorage.setItem(`signup_info_${firebaseUser.uid}`, safeStringify({
           name: institutionName,
           phone: phone
         }));
@@ -320,6 +323,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const normalizedEmail = email.toLowerCase();
 
       // First create users doc with all info
+      const initialAiCredits = 5;
       const newProfile: UserProfile = {
         uid: firebaseUser.uid,
         email: normalizedEmail,
@@ -328,11 +332,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         role: 'admin',
         institution: institutionName,
         institutionId: firebaseUser.uid,
-        subscriptionPlan: 'basic',
+        subscriptionPlan: 'free',
         subscriptionExpiry: expiryDate.toISOString(),
         isPromoUser: true,
         isNewUser: false, // Set to false because we already have the info from signup form
-        aiCredits: 1500,
+        hasSeenOnboarding: false,
+        aiCredits: initialAiCredits,
         hasReceivedInitialCredits: true,
         dismissedNotifications: [],
         phone: phone
@@ -347,7 +352,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         displayName: institutionName,
         phone: phone,
         email: normalizedEmail,
-        subscriptionPlan: 'basic',
+        subscriptionPlan: 'free',
         subscriptionExpiry: expiryDate.toISOString(),
         admissionForm: {
           active: true,
@@ -375,7 +380,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const p3 = setDoc(doc(db, 'credits', firebaseUser.uid), {
         userId: firebaseUser.uid,
         balance: 0,
-        aiBalance: 1500,
+        aiBalance: initialAiCredits,
         totalSent: 0,
         lastUpdated: new Date().toISOString()
       });
@@ -424,8 +429,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const clearError = () => setAuthError(null);
 
+  const setHasSeenOnboarding = async () => {
+    if (user) {
+      try {
+        await updateDoc(doc(db, 'users', user.uid), { hasSeenOnboarding: true });
+        setUser({ ...user, hasSeenOnboarding: true });
+      } catch (error) {
+        console.error("Error updating onboarding status:", error);
+      }
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, authError, loginWithEmail, signup, createStaffAccount, logout, clearError }}>
+    <AuthContext.Provider value={{ user, loading, authError, loginWithEmail, signup, createStaffAccount, logout, clearError, setHasSeenOnboarding }}>
       {children}
     </AuthContext.Provider>
   );

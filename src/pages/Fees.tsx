@@ -432,16 +432,19 @@ export function Fees() {
         }
       } else if (paymentData.type === 'Other') {
         const template = (instData?.otherFeeTemplates || []).find((t: any) => t.id === paymentData.otherFeeId);
-        if (template) {
+        const description = template ? template.name : (paymentData as any).customDesc || 'Manual Fee';
+        const amount = template ? template.amount : paymentData.amount;
+        
+        if (amount > 0) {
           const feeRef = doc(collection(db, 'fees'));
           batch.set(feeRef, {
             studentId: selectedStudent.id,
             studentName: selectedStudent.name,
-            amount: template.amount,
+            amount,
             date: paymentDate,
             status: 'paid',
             type: 'Other',
-            description: template.name,
+            description,
             paymentMethod: paymentData.method,
             bkashNumber: paymentData.method === 'bKash' ? paymentData.bkashNumber : null,
             transactionId: paymentData.method === 'bKash' ? paymentData.transactionId : null,
@@ -755,7 +758,10 @@ export function Fees() {
               <div className="flex items-center gap-4">
                 <label className="flex items-center gap-2 cursor-pointer pb-2">
                   <input name="isMandatory" type="checkbox" className="w-4 h-4 text-indigo-600 rounded" />
-                  <span className="text-xs font-bold text-gray-500 uppercase tracking-widest">Mandatory</span>
+                  <div className="flex flex-col">
+                    <span className="text-xs font-bold text-gray-500 uppercase tracking-widest">Mandatory</span>
+                    <span className="text-[9px] text-gray-400 leading-tight">Shows in Dues List</span>
+                  </div>
                 </label>
                 <button type="submit" className="flex-1 bg-indigo-600 text-white rounded-xl py-2 text-sm font-bold shadow-lg shadow-indigo-100">Add Fee</button>
               </div>
@@ -1038,13 +1044,15 @@ export function Fees() {
                 <button
                   key={type}
                   type="button"
-                  onClick={() => setPaymentData({ ...paymentData, type })}
+                  onClick={() => {
+                    setPaymentData({ ...paymentData, type, amount: type === 'Other' ? 0 : paymentData.amount });
+                  }}
                   className={cn(
                     "flex-1 py-2 text-xs font-bold rounded-lg transition-all",
                     paymentData.type === type ? "bg-white text-indigo-600 shadow-sm" : "text-gray-500"
                   )}
                 >
-                  {type === 'Other' ? 'Book/Custom' : type}
+                  {type === 'Other' ? t('fees.otherFees') || 'Other / Custom' : t(`fees.type.${type.toLowerCase().replace(' ', '')}`) || type}
                 </button>
               ))}
             </div>
@@ -1116,12 +1124,12 @@ export function Fees() {
             )}
 
             {paymentData.type === 'Other' && (
-              <div className="space-y-3 animate-in fade-in slide-in-from-top-2">
+              <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
                 <div className="flex items-center justify-between">
-                  <label className="text-xs font-black text-gray-500 uppercase tracking-widest">Select custom fee</label>
-                  <span className="text-[10px] font-bold text-indigo-500 bg-indigo-50 px-2 py-0.5 rounded-full">Book / Materials</span>
+                  <label className="text-xs font-black text-gray-500 uppercase tracking-widest">Select or Enter Amount</label>
                 </div>
-                <div className="space-y-2">
+                
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
                   {(instData?.otherFeeTemplates || []).map((template: OtherFeeTemplate) => {
                     const isPaid = fees.some(f => f.studentId === selectedStudent.id && f.type === 'Other' && f.description === template.name && f.status === 'paid');
                     const isApplicable = !template.batchId || template.batchId === 'All' || template.batchId === selectedStudent.batchId;
@@ -1134,27 +1142,38 @@ export function Fees() {
                         type="button"
                         onClick={() => setPaymentData({ ...paymentData, otherFeeId: paymentData.otherFeeId === template.id ? '' : template.id, amount: template.amount })}
                         className={cn(
-                          "w-full flex items-center justify-between p-4 rounded-xl border transition-all text-left",
+                          "flex items-center justify-between p-3 rounded-xl border transition-all text-left",
                           paymentData.otherFeeId === template.id ? "bg-amber-50 border-amber-200 text-amber-700 shadow-sm" : "bg-white border-gray-100 hover:border-amber-100"
                         )}
                       >
-                        <div>
-                          <p className="font-bold text-sm">{template.name}</p>
-                          <p className="text-[10px] text-amber-500 font-bold uppercase">{template.isMandatory ? 'Mandatory' : 'Optional Choice'}</p>
+                        <div className="min-w-0">
+                          <p className="font-bold text-xs truncate">{template.name}</p>
+                          <p className="text-[8px] text-amber-500 font-bold uppercase">{template.isMandatory ? 'Mandatory' : 'Optional'}</p>
                         </div>
-                        <p className="text-lg font-black italic">৳{template.amount}</p>
+                        <p className="font-black text-indigo-600">৳{template.amount}</p>
                       </button>
                     );
                   })}
-                  {!(instData?.otherFeeTemplates || []).some((t: any) => {
-                    const isPaid = fees.some(f => f.studentId === selectedStudent.id && f.type === 'Other' && f.description === t.name && f.status === 'paid');
-                    const isApplicable = !t.batchId || t.batchId === 'All' || t.batchId === selectedStudent.batchId;
-                    return !isPaid && isApplicable;
-                  }) && (
-                    <div className="p-8 text-center text-gray-400 bg-gray-50 rounded-2xl border-2 border-dashed border-gray-100">
-                      No other fees available for this student.
-                    </div>
-                  )}
+                </div>
+
+                <div className="space-y-2 pt-2 border-t border-gray-100">
+                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Custom Amount / Description</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <input 
+                      type="number"
+                      placeholder="Amount"
+                      value={paymentData.otherFeeId === 'custom' ? paymentData.amount : ''}
+                      onChange={(e) => setPaymentData({ ...paymentData, otherFeeId: 'custom', amount: parseInt(e.target.value) || 0 })}
+                      className="px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:bg-white focus:border-indigo-500 outline-none"
+                    />
+                    <input 
+                      type="text"
+                      placeholder="e.g. Identity Card"
+                      value={paymentData.otherFeeId === 'custom' ? (paymentData as any).customDesc || '' : ''}
+                      onChange={(e) => setPaymentData({ ...paymentData, otherFeeId: 'custom', customDesc: e.target.value } as any)}
+                      className="px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:bg-white focus:border-indigo-500 outline-none"
+                    />
+                  </div>
                 </div>
               </div>
             )}
