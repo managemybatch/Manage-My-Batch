@@ -75,86 +75,166 @@ export interface FirestoreErrorInfo {
 }
 
 export function safeStringify(obj: any): string {
-  const cache = new WeakSet();
-  
-  // Internal recursive stringifier that doesn't rely on JSON.stringify's replacer for circularity if possible
-  const safeReplacer = (key: string, value: any) => {
+  const visited = new WeakSet();
+
+  function preClean(val: any): any {
     // Handle standard primitives and null directly
-    if (value === null || typeof value !== 'object') {
-      return value;
+    if (val === null || typeof val !== 'object') {
+      return val;
     }
 
     // Circular reference check
-    if (cache.has(value)) {
+    if (visited.has(val)) {
       return '[Circular]';
     }
-    cache.add(value);
+    visited.add(val);
 
-    // Native Firestore objects handling (obfuscation-safe)
-    // DocumentReference/CollectionReference check
-    if (typeof value.path === 'string' && (typeof value.id === 'string') && (value.firestore || value._firestore)) {
-      return `[FirestoreRef: ${value.path}]`;
+    // Date
+    if (val instanceof Date) {
+      return val.toISOString();
     }
-    
-    // Timestamp check (has seconds and nanoseconds)
-    if (typeof value.seconds === 'number' && typeof value.nanoseconds === 'number' && typeof value.toDate === 'function') {
+
+    // RegExp
+    if (val instanceof RegExp) {
+      return val.toString();
+    }
+
+    // Set
+    if (val instanceof Set) {
+      return Array.from(val).map(item => preClean(item));
+    }
+
+    // Map
+    if (val instanceof Map) {
+      const mapObj: any = {};
+      val.forEach((v, k) => {
+        try {
+          mapObj[String(k)] = preClean(v);
+        } catch {
+          // ignore
+        }
+      });
+      return mapObj;
+    }
+
+    const asAny = val as any;
+
+    // Custom toJSON support
+    if (typeof asAny.toJSON === 'function') {
       try {
-        return value.toDate().toISOString();
+        const jsonVal = asAny.toJSON();
+        if (jsonVal === val) {
+          return '[Circular toJSON]';
+        }
+        return preClean(jsonVal);
       } catch {
-        return `[Timestamp: ${value.seconds}]`;
+        return '[Unreadable toJSON]';
       }
     }
-    
-    // GeoPoint check
-    if (typeof value.latitude === 'number' && typeof value.longitude === 'number' && !value.path) {
-      return `[GeoPoint: ${value.latitude}, ${value.longitude}]`;
+
+    // Native Firestore Ref
+    if (typeof asAny.path === 'string' && typeof asAny.id === 'string' && (asAny.firestore || asAny._firestore)) {
+      return `[FirestoreRef: ${asAny.path}]`;
     }
 
-    // Protection against DOM elements and React internals which are often circular
-    if (value.nodeType && typeof value.nodeName === 'string') {
-      return `[DOMElement: ${value.nodeName}]`;
+    // Timestamp
+    if (typeof asAny.seconds === 'number' && typeof asAny.nanoseconds === 'number' && typeof asAny.toDate === 'function') {
+      try {
+        return asAny.toDate().toISOString();
+      } catch {
+        return `[Timestamp: ${asAny.seconds}]`;
+      }
     }
-    if (value.$$typeof || value._owner || value._reactInternalFiber || value._reactFiber) {
+
+    // GeoPoint
+    if (typeof asAny.latitude === 'number' && typeof asAny.longitude === 'number' && !asAny.path) {
+      return `[GeoPoint: ${asAny.latitude}, ${asAny.longitude}]`;
+    }
+
+    // DOM Element
+    if (asAny.nodeType && typeof asAny.nodeName === 'string') {
+      return `[DOMElement: ${asAny.nodeName}]`;
+    }
+
+    // React Fiber
+    if (asAny.$$typeof || asAny._owner || asAny._reactInternalFiber || asAny._reactFiber) {
       return '[ReactInternal]';
     }
 
-    // Handle Error objects specially because message/stack are non-enumerable
-    if (value instanceof Error) {
-      return {
-        name: value.name,
-        message: value.message,
-        stack: value.stack,
-        ...value // Include other enumerable properties (like code in Firebase errors)
-      };
+    // DOM Event
+    if (typeof asAny.preventDefault === 'function' && typeof asAny.stopPropagation === 'function') {
+      return '[DOMEvent]';
     }
 
-    return value;
-  };
+    // Window / Global
+    if (val === window || val === document || (asAny.location && asAny.history)) {
+      return '[GlobalWindow]';
+    }
 
-  try {
-    return JSON.stringify(obj, safeReplacer);
-  } catch (err) {
-    console.error('safeStringify failed:', err);
-    // Ultimate fallback: shallow serializable version
-    try {
-      const fallback: any = {};
-      const keys = Object.keys(obj); // Only enumerable own properties
-      for (const k of keys) {
+    // Error Object
+    if (val instanceof Error) {
+      const errRes: any = {
+        name: val.name,
+        message: val.message,
+        stack: val.stack
+      };
+      
+      const propNames = Object.getOwnPropertyNames(val);
+      for (const k of propNames) {
         try {
-          const val = obj[k];
-          if (val === null || typeof val !== 'object') {
-            fallback[k] = val;
+          const subVal = asAny[k];
+          if (subVal === null || typeof subVal !== 'object') {
+            errRes[k] = subVal;
+          } else if (k === 'customData' && typeof subVal === 'object') {
+            errRes[k] = {};
+            const subProps = Object.getOwnPropertyNames(subVal);
+            for (const subKey of subProps) {
+              try {
+                const subSubVal = subVal[subKey];
+                if (subSubVal === null || typeof subSubVal !== 'object') {
+                  errRes[k][subKey] = subSubVal;
+                } else {
+                  errRes[k][subKey] = `[${typeof subSubVal}]`;
+                }
+              } catch {
+                errRes[k][subKey] = '[Unreadable]';
+              }
+            }
           } else {
-            fallback[k] = `[${typeof val}]`;
+            errRes[k] = `[${subVal.constructor?.name || typeof subVal}]`;
           }
         } catch {
-          fallback[k] = '[Unreadable]';
+          // ignore
         }
       }
-      return JSON.stringify(fallback);
-    } catch {
-      return '{"error": "Total failure to stringify object"}';
+      return errRes;
     }
+
+    // Array
+    if (Array.isArray(val)) {
+      return val.map(item => preClean(item));
+    }
+
+    // For any object, let's build a safe plain object deep copy
+    const copy: any = {};
+    const keys = Object.getOwnPropertyNames(val);
+    for (const k of keys) {
+      try {
+        const valueAtKey = asAny[k];
+        copy[k] = preClean(valueAtKey);
+      } catch {
+        copy[k] = '[Unreadable]';
+      }
+    }
+    return copy;
+  }
+
+  try {
+    const cleaned = preClean(obj);
+    return JSON.stringify(cleaned);
+  } catch (err) {
+    console.error('safeStringify fail:', err);
+    return '{"error": "Failed to serialize"}';
   }
 }
 

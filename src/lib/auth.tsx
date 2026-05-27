@@ -97,34 +97,64 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               let currentPhone = userData.phone;
               let needsUpdate = false;
 
-              // Check institution doc for missing info
-              if (userData.role === 'admin' || userData.role === 'super_admin') {
+              let instPlanByAuthority = userData.subscriptionPlan || 'free';
+              let instExpiryByAuthority = userData.subscriptionExpiry || null;
+
+              const belongsToInstId = userData.institutionId || userData.uid;
+              if (belongsToInstId) {
                 try {
-                  const instDoc = await getDoc(doc(db, 'institutions', firebaseUser.uid));
+                  const instDoc = await getDoc(doc(db, 'institutions', belongsToInstId));
                   if (instDoc.exists()) {
                     const instData = instDoc.data();
-                    if ((!currentName || currentName.includes('@')) && instData.name) {
-                      currentName = instData.name;
-                      needsUpdate = true;
-                    }
-                    if (!currentPhone && instData.phone) {
-                      currentPhone = instData.phone;
-                      needsUpdate = true;
+                    let plan = instData.subscriptionPlan || 'free';
+                    let expiry = instData.subscriptionExpiry || null;
+
+                    // Verify expiry
+                    if (plan !== 'free' && expiry) {
+                      const expiryDate = new Date(expiry);
+                      const gracePeriodExpiry = new Date(expiryDate);
+                      gracePeriodExpiry.setDate(gracePeriodExpiry.getDate() + 5);
+                      
+                      if (gracePeriodExpiry < new Date()) {
+                        plan = 'free';
+                        // Keep Firestore updated if authorized (only the owner is authorized)
+                        if (firebaseUser.uid === belongsToInstId) {
+                          try {
+                            await updateDoc(doc(db, 'institutions', belongsToInstId), { subscriptionPlan: 'free' });
+                            await updateDoc(doc(db, 'users', belongsToInstId), { subscriptionPlan: 'free' });
+                          } catch (err) {
+                            console.error("Error updating expired subscription in Firestore:", err);
+                          }
+                        }
+                      }
                     }
 
-                    // Update local userData object for immediate use
-                    userData.displayName = currentName;
-                    userData.phone = currentPhone;
+                    instPlanByAuthority = plan;
+                    instExpiryByAuthority = expiry;
 
-                    // Sync back to Firestore if we found missing data
-                    if (needsUpdate) {
-                      await updateDoc(doc(db, 'users', firebaseUser.uid), {
-                        displayName: currentName,
-                        phone: currentPhone,
-                        institution: currentName
-                      });
+                    // Support administrative data sync for admins
+                    if (userData.role === 'admin' || userData.role === 'super_admin') {
+                      if ((!currentName || currentName.includes('@')) && instData.name) {
+                        currentName = instData.name;
+                        needsUpdate = true;
+                      }
+                      if (!currentPhone && instData.phone) {
+                        currentPhone = instData.phone;
+                        needsUpdate = true;
+                      }
+
+                      userData.displayName = currentName;
+                      userData.phone = currentPhone;
+
+                      if (needsUpdate) {
+                        await updateDoc(doc(db, 'users', firebaseUser.uid), {
+                          displayName: currentName,
+                          phone: currentPhone,
+                          institution: currentName
+                        });
+                      }
                     }
-                  } else {
+                  } else if (userData.role === 'admin' || userData.role === 'super_admin') {
                     // Force create institution doc if missing
                     await setDoc(doc(db, 'institutions', firebaseUser.uid), {
                       id: firebaseUser.uid,
@@ -137,9 +167,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     }, { merge: true });
                   }
                 } catch (e) {
-                  console.error("Silent error syncing institution doc:", e);
+                  console.error("Silent error syncing institution details:", e);
                 }
               }
+
+              // Apply the live, validated subscription info to the user object
+              userData.subscriptionPlan = instPlanByAuthority;
+              userData.subscriptionExpiry = instExpiryByAuthority;
 
               const hasCleanName = currentName && !currentName.includes('@');
               const potentialName = userData.institution || userData.institutionName;
@@ -165,18 +199,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               const today = new Date().toISOString().split('T')[0];
               if (userData.lastLogin !== today) {
                 await updateDoc(doc(db, 'users', firebaseUser.uid), { lastLogin: today });
-              }
-
-              // Check for subscription expiry with 5-day grace period
-              if (userData.role === 'admin' && userData.subscriptionPlan !== 'free' && userData.subscriptionExpiry) {
-                const expiryDate = new Date(userData.subscriptionExpiry);
-                const gracePeriodExpiry = new Date(expiryDate);
-                gracePeriodExpiry.setDate(gracePeriodExpiry.getDate() + 5);
-                
-                if (gracePeriodExpiry < new Date()) {
-                  await updateDoc(doc(db, 'users', firebaseUser.uid), { subscriptionPlan: 'free' });
-                  return;
-                }
               }
               
               setUser(userData);
@@ -227,6 +249,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 institutionId: firebaseUser.uid,
                 subscriptionPlan: 'free',
                 subscriptionExpiry: expiryDate.toISOString(),
+                isPromoUser: true,
                 aiCredits: 5,
                 hasReceivedInitialCredits: true,
                 dismissedNotifications: [],

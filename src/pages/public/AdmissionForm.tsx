@@ -4,7 +4,7 @@ import { doc, getDoc, collection, addDoc } from 'firebase/firestore';
 import { useParams } from 'react-router-dom';
 import { Building, CheckCircle, Loader2, Send, Info, User, Phone, Mail, GraduationCap, Calendar } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { cn } from '../../lib/utils';
+import { cn, compressImage } from '../../lib/utils';
 
 export function AdmissionForm() {
   const { id } = useParams();
@@ -37,18 +37,16 @@ export function AdmissionForm() {
     fetchData();
   }, [id]);
 
-  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 1024 * 1024) { // 1MB limit for base64
-        alert('Photo size should be less than 1MB');
-        return;
+      try {
+        const compressed = await compressImage(file, 400, 0.7);
+        setPhotoPreview(compressed);
+      } catch (err) {
+        console.error('Error compressing admission photo:', err);
+        alert('Failed to compress or upload the photo.');
       }
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPhotoPreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
     }
   };
 

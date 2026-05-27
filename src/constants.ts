@@ -18,11 +18,11 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
     id: 'free',
     name: 'Free',
     price: '0',
-    studentLimit: 50,
+    studentLimit: 200,
     batchLimit: 3,
     aiCreditLimit: 5,
     features: [
-      'Up to 50 students',
+      'Up to 200 students',
       'Up to 3 batches',
       '5 AI Credits (One-time trial)',
       'Basic student management',

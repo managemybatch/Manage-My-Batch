@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Search, Filter, MoreVertical, Mail, Phone, Download, Loader2, Layers, User, MessageSquare, Contact, FileText, CheckCircle2, XCircle, Users, HelpCircle, FileDown, ShieldCheck, CreditCard as IDCardIcon } from 'lucide-react';
 import { Table, TableRow, TableCell } from '../components/Table';
 import { motion, AnimatePresence } from 'motion/react';
-import { cn, formatWhatsAppPhone, formatDate } from '../lib/utils';
+import { cn, formatWhatsAppPhone, formatDate, compressImage } from '../lib/utils';
 import { collection, onSnapshot, query, addDoc, updateDoc, serverTimestamp, deleteDoc, doc, getDoc, writeBatch, where, orderBy, increment, limit } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { useAuth } from '../lib/auth';
@@ -709,22 +709,20 @@ export function Students() {
            app.phone?.includes(searchTerm);
   });
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, isEdit = false) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>, isEdit = false) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 500000) { // 500KB limit
-        alert('Image size too large. Please choose an image under 500KB.');
-        return;
-      }
-      const reader = new FileReader();
-      reader.onloadend = () => {
+      try {
+        const compressed = await compressImage(file, 400, 0.7);
         if (isEdit) {
-          setEditingStudent({ ...editingStudent, photoUrl: reader.result as string });
+          setEditingStudent({ ...editingStudent, photoUrl: compressed });
         } else {
-          setNewStudent({ ...newStudent, photoUrl: reader.result as string });
+          setNewStudent({ ...newStudent, photoUrl: compressed });
         }
-      };
-      reader.readAsDataURL(file);
+      } catch (err) {
+        console.error("Error compressing student photo:", err);
+        alert("Failed to compress or upload the selected photo.");
+      }
     }
   };
 

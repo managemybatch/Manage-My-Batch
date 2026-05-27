@@ -35,10 +35,8 @@ export function formatWhatsAppPhone(phone: string) {
 export async function compressImage(file: File, maxWidth = 800, quality = 0.6): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.readAsDataURL(file);
     reader.onload = (event) => {
       const img = new Image();
-      img.src = event.target?.result as string;
       img.onload = () => {
         const canvas = document.createElement('canvas');
         let width = img.width;
@@ -55,8 +53,18 @@ export async function compressImage(file: File, maxWidth = 800, quality = 0.6): 
         ctx?.drawImage(img, 0, 0, width, height);
         resolve(canvas.toDataURL('image/jpeg', quality));
       };
-      img.onerror = reject;
+      img.onerror = () => {
+        reject(new Error('Failed to load image into image element'));
+      };
+      if (event.target?.result) {
+        img.src = event.target.result as string;
+      } else {
+        reject(new Error('FileReader result is empty'));
+      }
     };
-    reader.onerror = reject;
+    reader.onerror = () => {
+      reject(new Error('Failed to read file via FileReader'));
+    };
+    reader.readAsDataURL(file);
   });
 }

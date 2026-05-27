@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { User, Bell, Shield, Globe, Palette, LogOut, Mail, Phone, MapPin, Building, Loader2, CheckCircle, Moon, Sun, Monitor, UserPlus, Trash2, ShieldAlert, XCircle, AlertCircle, MessageSquare, Smartphone } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import { useTheme } from '../lib/theme';
-import { cn } from '../lib/utils';
+import { cn, compressImage } from '../lib/utils';
 import { useTranslation } from 'react-i18next';
 import { collection, query, where, onSnapshot, doc, deleteDoc, setDoc, getDocs, writeBatch, getDoc } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';
@@ -117,18 +117,16 @@ export function Settings() {
     }
   }, [user]);
 
-  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 500000) {
-        setToast({ message: 'Image size too large. Please choose an image under 500KB.', type: 'error' });
-        return;
+      try {
+        const compressed = await compressImage(file, 400, 0.7);
+        setProfileData(prev => ({ ...prev, photoURL: compressed }));
+      } catch (err) {
+        console.error('Error compressing image:', err);
+        setToast({ message: 'Failed to compress or upload image.', type: 'error' });
       }
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setProfileData(prev => ({ ...prev, photoURL: reader.result as string }));
-      };
-      reader.readAsDataURL(file);
     }
   };
 
