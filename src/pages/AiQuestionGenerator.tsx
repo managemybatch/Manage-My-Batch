@@ -73,7 +73,32 @@ export function AiQuestionGenerator() {
 
   const getAIContext = () => {
     const source = knowledgeSources.find(s => (s.grade || s.class) === classLevel && s.subject.toLowerCase() === subject.toLowerCase());
-    return source ? source.contentSummary : '';
+    const matchedBookJson = localStorage.getItem('mmb_nctb_trained_books');
+    let extraNctbPrompt = '';
+    
+    // Auto Ground on NCTB Book configuration
+    if (matchedBookJson) {
+      try {
+        const syncIds = JSON.parse(matchedBookJson);
+        if (syncIds && syncIds.length > 0) {
+          extraNctbPrompt = `
+          **BANGLADESHI NATIONAL CURRICULUM SYLLABUS GROUNDING:**
+          - Synchronized on Active Teacher-Trained NCTB Book indices for ${classLevel}.
+          - The academic standards MUST follow standard textbooks from the National Curriculum and Textbook Board (NCTB) of Bangladesh.
+          - Apply board formatting appropriate for PEC, JSC, SSC or HSC standards depending on the Class level selected.
+          - If generating Creative Questions (CQ / সৃজনশীল), they must strictly feature a logical stimulus/stem (উদ্দীপক) followed by:
+            ক) জ্ঞানমূলক (Conceptual Definition) - 1 Mark
+            খ) অনুধাবনমূলক (Explanation / Core comprehension) - 2 Marks
+            গ) প্রয়োগমূলক (Application in Scenario / Math problem) - 3 Marks
+            ঘ) উচ্চতর দক্ষতামূলক (Higher Ability Evaluation / Critical Synthesis) - 4 Marks.
+          - Translate all technical terminologies elegantly when Language is "Bangla". Keep formulas and key terms easily relatable to Board Exams (Dhaka, Chittagong, Rajshahi Boards etc.).
+          `;
+        }
+      } catch (e) {
+        console.error("Failed to parse local NCTB state:", e);
+      }
+    }
+    return (source ? source.contentSummary : '') + '\n' + extraNctbPrompt;
   };
 
   const handleGenerateSamples = async () => {
@@ -87,24 +112,27 @@ export function AiQuestionGenerator() {
     try {
       const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
       const prompt = `
-        You are an expert teacher creating a question for ${classLevel} ${subject}.
+        You are an expert teacher creating a question for ${classLevel} ${subject} in Bangladesh.
         Language: ${language}
         Topic/Instruction: ${stepStepInstruction}
-        Context: ${getAIContext()}
-        
+        Context Guidelines: ${getAIContext()}
+
         Generate 3 distinct sample questions (JSON array format).
         Question Object Structure: { "type": "MCQ" | "CQ" | "Short", "text": "...", "marks": number, "options": ["A", "B", "C", "D"] (if MCQ), "explanation": "..." }
         
+        Note: If any of these are Creative Questions (CQ), structure the text with: 
+        "Stem: [Scenario description]\\n\\nক) [Question text]\\nখ) [Question text]\\nগ) [Question text]\\nঘ) [Question text]"
+
         Return ONLY valid JSON.
       `;
 
       const response = await ai.models.generateContent({
-        model: "gemini-1.5-flash",
+        model: "gemini-3.5-flash",
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
       });
 
       const text = response.text || '[]';
-      const cleanText = text.replace(/```json|```/g, '');
+      const cleanText = text.replace(/```json|```/g, '').trim();
       const parsed = JSON.parse(cleanText);
       setSamples(parsed.map((q: any, i: number) => ({ ...q, id: `sample-${Date.now()}-${i}` })));
       
@@ -130,19 +158,26 @@ export function AiQuestionGenerator() {
     try {
       const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
       const prompt = `
-        Generate a full question paper for ${classLevel} ${subject}.
+        Generate a full standard Board examination question paper for ${classLevel} ${subject} in Bangladesh.
         - Total Marks: ${totalMarks}
         - Language: ${language}
-        - Requirements: ${bulkConfig.cqCount} Creative Questions, ${bulkConfig.mcqCount} MCQs, ${bulkConfig.shortCount} Short Questions.
+        - Requirements: ${bulkConfig.cqCount} Creative Questions (CQs / সৃজনশীল), ${bulkConfig.mcqCount} MCQs, ${bulkConfig.shortCount} Short Questions.
         - Topics to focus: ${bulkConfig.topics}
-        - Context: ${getAIContext()}
+        - Context Guidelines: ${getAIContext()}
         
         Format the output in clean Markdown suitable for printing. 
-        Include headers for Institution Name (Placeholder), Class, Subject, Time, and Marks.
+        Include professional headers for:
+        [Institution Name / জেলা স্কুল বা স্বনামধন্য কলেজ (Placeholder)]
+        Class: ${classLevel}
+        Subject: ${subject}
+        Time Allowed: ${totalMarks > 50 ? '3 Hours' : '1.5 Hours'}
+        Total Marks: ${totalMarks}
+
+        Ensure that the Creative Questions strictly feature an elegant Stimulus Stem (উদ্দীপক) and are partitioned into ক, খ, গ, ঘ sections with respective marking outlines.
       `;
 
       const response = await ai.models.generateContent({
-        model: "gemini-1.5-flash",
+        model: "gemini-3.5-flash",
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
       });
 

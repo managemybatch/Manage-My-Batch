@@ -125,9 +125,27 @@ export function AiStudyAssistant() {
       // Find relevant knowledge
       const source = knowledgeSources.find(s => s.grade === selectedClass && s.subject.toLowerCase() === selectedSubject.toLowerCase());
       
+      const matchedBookJson = localStorage.getItem('mmb_nctb_trained_books');
+      let extraNctbPrompt = '';
+      if (matchedBookJson) {
+        try {
+          const syncIds = JSON.parse(matchedBookJson);
+          if (syncIds && syncIds.length > 0) {
+            extraNctbPrompt = `
+            NCTB SYLLABUS DIRECTIVE:
+            - Ground the material inside the National Curriculum and Textbook Board (NCTB) guidelines of Bangladesh for ${selectedClass}.
+            - Structure study items and creative questions (সৃজনশীল) strictly on ক, খ, গ, ঘ layout guidelines where applicable.
+            - Ensure level-appropriate scientific vocabulary in both Bangla & English.
+            `;
+          }
+        } catch (e) {
+          console.error(e);
+        }
+      }
+
       const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
       const prompt = `
-        You are an expert ${selectedSubject} teacher for ${selectedClass}. 
+        You are an expert ${selectedSubject} teacher for ${selectedClass} specialized in the National Curriculum of Bangladesh. 
         Your task is to generate a high-quality ${type === 'sheet' ? 'STUDY SHEET' : 'LESSON PLAN'} for the topic: "${topic}".
         
         LANGUAGE: ${language}
@@ -138,6 +156,7 @@ export function AiStudyAssistant() {
         ${customInstructions ? `TEACHER'S CUSTOM INSTRUCTIONS: ${customInstructions}` : ''}
         
         ${source ? `STRICT CONTEXT (Use this as your source of truth): ${source.contentSummary}` : 'Use standard academic curriculum facts.'}
+        ${extraNctbPrompt}
         
         REQUIREMENTS:
         1. Context: Standard curriculum (NCTB Bangladesh for Bangla context or Global standards for English).
@@ -155,7 +174,7 @@ export function AiStudyAssistant() {
       `;
 
       const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
+        model: "gemini-3.5-flash",
         contents: prompt,
       });
 
